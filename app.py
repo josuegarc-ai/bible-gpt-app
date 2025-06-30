@@ -235,3 +235,4 @@ elif mode == "Tailored Learning Path":
         )
         response = ask_gpt(prompt)
         st.text_area("📘 Tailored Bible Path", response, height=600)
+
