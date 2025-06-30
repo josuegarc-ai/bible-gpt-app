@@ -93,18 +93,35 @@ def run_chat_mode():
     st.subheader("💬 Chat with GPT")
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
-    user_input = st.text_input("Ask a question or share a thought:")
+
+    user_input = st.text_input("Ask a question, share a thought, or type 'exit' to end the chat:")
+
     if st.button("Send") and user_input:
+        if user_input.lower() in ["exit", "quit", "end", "stop"]:
+            st.markdown("🙏 Before you go... I'd like to pray for you. Would this be okay?")
+            if st.button("Yes, please pray for me"):
+                full_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history])
+                prayer_prompt = f"As a compassionate Christian pastor, write a short, powerful prayer based on this conversation that encourages, blesses, and speaks life over the person. Rebuke anything not Christ-like, and root the prayer in Scripture and the love of Jesus.\n\nConversation:\n{full_context}"
+                prayer = ask_gpt_conversation(prayer_prompt)
+                st.markdown("**🙏 Prayer:**")
+                st.write(prayer)
+            return
+
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         history_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history]
-        history_messages.insert(0, {"role": "system", "content": "You are a wise, compassionate, Christ-centered pastoral mentor with deep theological understanding. You speak to users as someone who loves them like Jesus would—with empathy, truth, and patience. Your tone is warm, relatable, and filled with grace. When someone is anxious, hurting, or uncertain, you comfort them not just with Scripture but also with the heart of God, helping them feel seen, safe, and loved. Always bring the conversation back to Jesus, His love, and practical encouragement for their journey."})
+        history_messages.insert(0, {
+            "role": "system",
+            "content": "You are a wise, compassionate, Christ-centered pastoral mentor with deep theological understanding. You speak to users as someone who loves them like Jesus would—with empathy, truth, and patience. Your tone is warm, relatable, and filled with grace. When someone is anxious, hurting, or uncertain, you comfort them not just with Scripture but also with the heart of God, helping them feel seen, safe, and loved. Always bring the conversation back to Jesus, His love, and practical encouragement for their journey."
+        })
+
         response = client.chat.completions.create(
             model=model,
             messages=history_messages,
-            temperature=0.3
+            temperature=0.4
         )
         reply = response.choices[0].message.content.strip()
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
+
     for msg in st.session_state.chat_history:
         speaker = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
         st.markdown(f"**{speaker}:** {msg['content']}")
