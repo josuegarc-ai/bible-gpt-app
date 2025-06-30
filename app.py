@@ -1,5 +1,5 @@
-# ✅ Bible GPT — Full Version v2.8 — All Modes Fully Integrated
-# Includes all 11+ modes including conversational chat, practice, faith journaling, Bible Beta, and more
+# ✅ Bible GPT — Full Version v2.9 — All Modes Fixed & Refactored
+# Includes all 12 modes correctly, with functioning components inside each mode
 
 import os
 import openai
@@ -159,9 +159,9 @@ def run_bible_beta():
         st.text_area("📖 Bible Passage:", text, height=300)
         if st.button("Play AI Audio"):
             st.info(f"🔊 Playing in {voice} voice (simulated)")
-        highlight = st.text_area("Highlight text to summarize:")
-        if st.button("Summarize Highlight") and highlight:
-            st.info(ask_gpt_conversation(f"Summarize and explain this passage: {highlight}"))
+    highlight = st.text_area("Highlight text to summarize:")
+    if st.button("Summarize Highlight") and highlight:
+        st.info(ask_gpt_conversation(f"Summarize and explain this passage: {highlight}"))
 
 def run_growth_summary():
     st.subheader("📈 Growth Summary")
