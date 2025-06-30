@@ -210,4 +210,3 @@ MODE_FUNCS = {
 st.title("📖 TrueVine AI — Bible GPT")
 mode = st.sidebar.radio("Choose a mode:", list(MODE_FUNCS.keys()))
 MODE_FUNCS[mode]()
-
