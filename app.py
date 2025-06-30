@@ -9,7 +9,7 @@ import re
 import os
 
 # === CONFIG ===
-client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
+client = openai.Client(api_key=st.secrets["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"])
 MODEL = "gpt-4o"
 BIBLE_API = "https://bible-api.com/"
 VALID_TRANSLATIONS = ["web", "kjv", "asv", "bbe", "oeb-us"]
