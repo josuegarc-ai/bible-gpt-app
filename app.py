@@ -97,11 +97,11 @@ def run_chat_mode():
     if st.button("Send") and user_input:
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         history_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history]
-        history_messages.insert(0, {"role": "system", "content": "You are a helpful biblical mentor who speaks naturally and reflectively."})
+        history_messages.insert(0, {"role": "system", "content": "You are a pastoral, compassionate, honest, and expert biblical mentor with deep theological understanding. You speak with empathy and truth, offering thoughtful, wise, and scripturally grounded guidance to help people through all walks of life."})
         response = client.chat.completions.create(
             model=model,
             messages=history_messages,
-            temperature=0.4
+            temperature=0.3
         )
         reply = response.choices[0].message.content.strip()
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
