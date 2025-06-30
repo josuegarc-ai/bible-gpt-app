@@ -8,6 +8,7 @@ import json
 import re
 import os
 import random
+from googlesearch import search
 
 # === CONFIG ===
 client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
@@ -46,6 +47,18 @@ def extract_json_from_response(response_text):
     except:
         return None
 
+def search_sermons(passage):
+    pastors = ["Philip Anthony Mitchell", "TD Jakes", "Tony Evans", "Mike Todd"]
+    queries = [f"{pastor} sermon on {passage} site:youtube.com" for pastor in pastors]
+    results = []
+    for query, pastor in zip(queries, pastors):
+        try:
+            for url in search(query, num_results=1):
+                results.append(f"[{pastor}]({url})")
+        except Exception as e:
+            results.append(f"{pastor}: ❌ No sermon found")
+    return results
+
 # === UI ===
 st.set_page_config(page_title="TrueVine Bible GPT", layout="wide")
 st.title("✝️ TrueVine Bible GPT")
@@ -73,6 +86,12 @@ if mode == "Bible Lookup":
         st.markdown(f"**💡 Summary:**\n\n{summary}")
         cross_ref = ask_gpt(f"List 2-3 cross-referenced Bible verses related to: '{verse}' and explain their connection.")
         st.markdown(f"**🔗 Cross-References:**\n\n{cross_ref}")
+        sermons = search_sermons(passage)
+        st.markdown("**🎙️ Related Sermons from Selected Pastors:**")
+        for s in sermons:
+            st.markdown(f"- {s}")
+        action = ask_gpt(f"Based on this verse: '{verse}', suggest one small, practical action someone can take today.")
+        st.markdown(f"**🔥 Action Step:**\n\n{action}")
 
 elif mode == "Chat with GPT":
     st.markdown("🙏 Start a conversation with Bible GPT")
@@ -126,8 +145,9 @@ elif mode == "Study Plan":
             f"1. A relevant Bible verse or passage\n"
             f"2. A short devotional thought or explanation\n"
             f"3. A personal reflection or application question\n"
-            f"4. A prayer\n"
+            f"4. For each devotional day in the study plan, provide a sincere, thoughtful and relevant prayer\n"
             f"End with a closing encouragement.\n"
+            f"Keep it clean, simple, formatted for readability."
         )
         plan = ask_gpt(prompt)
         st.text_area("📅 Study Plan", plan, height=500)
@@ -138,9 +158,11 @@ elif mode == "Faith Journal":
     entry = st.text_area("Write your thoughts or prayers")
     if st.button("Save Entry"):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        with open(f"journal_{ts}.txt", "w") as f:
+        os.makedirs("journals", exist_ok=True)
+        path = os.path.join("journals", f"journal_{ts}.txt")
+        with open(path, "w") as f:
             f.write(entry)
-        st.success(f"✅ Saved as journal_{ts}.txt")
+        st.success(f"✅ Saved as journals/journal_{ts}.txt")
         if st.checkbox("Get spiritual growth insight"):
             insight = ask_gpt(f"Provide spiritual insight based on this journal: {entry}")
             st.markdown(f"💡 **Insight:**\n\n{insight}")
