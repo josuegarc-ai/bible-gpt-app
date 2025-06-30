@@ -53,11 +53,13 @@ def search_sermons_online(passage):
     results = []
     ddgs = DDGS()
     for pastor in pastors:
-        query = f"{pastor} sermon on {passage} site:youtube.com"
+        query = f'"{pastor}" sermon on {passage} site:youtube.com'
         try:
-            search_results = ddgs.text(query, max_results=1)
-            if search_results:
-                url = search_results[0]['href']
+            search_results = ddgs.text(query, max_results=3)
+            # Filter for results that mention the actual pastor's name in the snippet or title
+            filtered = [res for res in search_results if pastor.lower() in (res.get("title", "") + res.get("body", "")).lower()]
+            if filtered:
+                url = filtered[0]['href']
                 results.append({"pastor": pastor, "url": url})
             else:
                 results.append({"pastor": pastor, "url": "❌ No result"})
