@@ -1,3 +1,6 @@
+# ✅ Bible GPT — Full Version v2.8 — All Modes Fully Integrated
+# Includes all 11+ modes including conversational chat, practice, faith journaling, Bible Beta, and more
+
 import os
 import openai
 import requests
@@ -5,7 +8,6 @@ import json
 import re
 import random
 from datetime import datetime
-from duckduckgo_search import DDGS
 import streamlit as st
 
 # ================= CONFIG =================
@@ -44,171 +46,168 @@ def extract_json_from_response(response_text):
     except:
         return None
 
-# =============== SERMON SEARCH ===============
-def search_sermons_online(passage):
-    pastors = ["Philip Anthony Mitchell", "TD Jakes", "Tony Evans", "Mike Todd"]
-    results = []
-    for pastor in pastors:
-        query = f"{pastor} sermon on {passage} site:youtube.com"
-        try:
-            for result in DDGS().text(query, max_results=1):
-                results.append({"pastor": pastor, "url": result["href"]})
-        except Exception as e:
-            results.append({"pastor": pastor, "url": f"❌ Error searching"})
-    return results
-
 # =============== MODES ===============
 def run_bible_lookup():
-    st.subheader("📖 Bible Lookup")
+    st.subheader("🔍 Bible Lookup")
     passage = st.text_input("Enter a Bible passage (e.g., John 3:16):")
     translation = st.selectbox("Choose translation:", valid_translations)
-    if st.button("Fetch Verse") and passage:
+    if st.button("Lookup") and passage:
         try:
             verse_text = fetch_bible_verse(passage, translation)
             st.success(verse_text)
-            summary_prompt = f"Summarize and explain this Bible verse clearly: '{verse_text}' ({passage}). Include a daily life takeaway."
-            summary = ask_gpt_conversation(summary_prompt)
-            st.markdown("**💡 AI Summary:**")
+            summary = ask_gpt_conversation(f"Summarize and explain this Bible verse clearly: '{verse_text}' ({passage}). Include a daily life takeaway.")
             st.info(summary)
-            cross_prompt = f"List 2–3 cross-referenced Bible verses related to: '{verse_text}' and explain their connection."
-            cross = ask_gpt_conversation(cross_prompt)
-            st.markdown("**🔗 Cross References:**")
-            st.markdown(cross)
-            sermons = search_sermons_online(passage)
-            st.markdown("**🎙️ Related Sermons:**")
-            for item in sermons:
-                st.markdown(f"- {item['pastor']}: {item['url']}")
+            action_step = ask_gpt_conversation(f"Based on this verse: '{verse_text}', suggest one small, practical action someone can take today.")
+            st.write("🔥 **Action Step:**", action_step)
         except Exception as e:
             st.error(str(e))
 
 def run_chat_mode():
-    st.subheader("💬 Chat Mode")
-    user_input = st.text_area("Ask a question or share a thought:")
-    if st.button("Send") and user_input:
+    st.subheader("💬 Chat with Bible GPT")
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    for user, bot in st.session_state.chat_history:
+        st.markdown(f"**You:** {user}")
+        st.markdown(f"**Bible GPT:** {bot}")
+    user_input = st.text_input("Ask a question:", key="chat")
+    if user_input:
         response = ask_gpt_conversation(user_input)
-        st.markdown("**✝️ Bible GPT:**")
-        st.write(response)
+        st.session_state.chat_history.append((user_input, response))
+        st.experimental_rerun()
 
 def run_practice_chat():
     st.subheader("🧠 Practice Chat")
-    book = st.text_input("Enter Bible book:")
-    style = st.selectbox("Choose question style:", ["multiple choice", "fill in the blank", "true or false"])
-    if st.button("Start Practice") and book:
+    book = st.text_input("Bible book (e.g., Matthew):")
+    style = st.selectbox("Question style:", ["multiple choice", "fill in the blank", "true or false"])
+    if st.button("Start Practice"):
+        st.session_state.practice_qs = []
+        for _ in range(3):
+            prompt = f"Generate a {style} Bible question from the book of {book} with 1 correct answer and 3 incorrect ones. Format the response in JSON with keys: 'question', 'correct', 'choices'."
+            data = extract_json_from_response(ask_gpt_conversation(prompt))
+            if data:
+                st.session_state.practice_qs.append(data)
+    if "practice_qs" in st.session_state:
         score = 0
-        for i in range(3):
-            q_prompt = f"Generate a {style} Bible question from the book of {book} with 1 correct answer and 3 incorrect ones. Format the response in JSON with keys: 'question', 'correct', 'choices'."
-            response = ask_gpt_conversation(q_prompt)
-            q_data = extract_json_from_response(response)
-            if not q_data:
-                continue
-            st.markdown(f"**Q{i+1}: {q_data['question']}**")
-            user_answer = ""
-            if style == "multiple choice":
-                user_answer = st.radio("Choose:", q_data['choices'], key=i)
-            else:
-                user_answer = st.text_input("Your answer:", key=i+10)
-            if st.button(f"Submit Answer {i+1}", key=i+20):
-                if user_answer.lower() == q_data['correct'].lower():
-                    score += 1
-                    st.success("Correct!")
+        for i, q_data in enumerate(st.session_state.practice_qs):
+            st.markdown(f"**Q{i+1}:** {q_data['question']}")
+            with st.form(f"qform_{i}"):
+                if style == "multiple choice":
+                    user_answer = st.radio("Choose:", q_data['choices'], key=f"q_{i}")
                 else:
-                    st.error(f"Incorrect. Correct answer: {q_data['correct']}")
-                    explain = ask_gpt_conversation(f"Why is this answer incorrect for: '{q_data['question']}' (correct: {q_data['correct']})?")
-                    st.markdown("**📖 Teaching Moment:**")
-                    st.write(explain)
-        st.markdown(f"**🏁 Final Score:** {score}/3")
+                    user_answer = st.text_input("Your answer:", key=f"input_{i}")
+                submitted = st.form_submit_button("Submit")
+                if submitted:
+                    if user_answer.lower() == q_data['correct'].lower():
+                        st.success("✅ Correct!")
+                        score += 1
+                    else:
+                        st.error(f"❌ Incorrect. Correct: {q_data['correct']}")
+                        explanation = ask_gpt_conversation(f"Why is this answer incorrect for: '{q_data['question']}' (correct: {q_data['correct']})?")
+                        st.info(explanation)
+        st.write(f"🏁 Final Score: {score}/{len(st.session_state.practice_qs)}")
 
 def run_verse_of_the_day():
     st.subheader("🌅 Verse of the Day")
-    if st.button("Get Daily Verse"):
-        books = ["Genesis", "Exodus", "Matthew", "John", "Psalms", "Romans"]
-        verse = f"{random.choice(books)} {random.randint(1,5)}:{random.randint(1,20)}"
-        try:
-            verse_text = fetch_bible_verse(verse)
-            st.markdown(f"**{verse}**")
-            st.success(verse_text)
-            prompt = f"Summarize and reflect on this daily verse: '{verse_text}' ({verse}). Include encouragement and life application."
-            reflection = ask_gpt_conversation(prompt)
-            st.markdown("**💬 Reflection:**")
-            st.write(reflection)
-        except Exception as e:
-            st.error(str(e))
+    books = ["John", "Matthew", "Romans", "Psalms"]
+    verse = f"{random.choice(books)} {random.randint(1, 5)}:{random.randint(1, 20)}"
+    verse_text = fetch_bible_verse(verse)
+    st.write(f"**{verse}:** {verse_text}")
+    reflection = ask_gpt_conversation(f"Reflect on this daily verse: '{verse_text}' ({verse}).")
+    st.info(reflection)
 
 def run_study_plan():
-    st.subheader("📅 Study Plan")
-    topic = st.text_input("Topic (e.g., grace, forgiveness):")
-    goal = st.text_input("Goal/timeframe (e.g., 14 days):")
-    if st.button("Generate Plan") and topic:
-        prompt = f"Create a Bible study plan on '{topic}' for {goal}. Include daily verse, reflection, application, and prayer."
+    st.subheader("📘 Bible Study Plan")
+    topic = st.text_input("Study Topic (e.g., grace):")
+    goal = st.text_input("Study Goal or Timeframe (e.g., 14 days):")
+    if st.button("Generate Plan"):
+        prompt = f"Create a theologically sound daily study plan on '{topic}' for {goal}."
         plan = ask_gpt_conversation(prompt)
-        st.text_area("Study Plan", plan, height=500)
-        summary = ask_gpt_conversation(f"Analyze this Bible study plan and summarize spiritual growth achieved and two areas for continued growth: {plan}")
-        st.markdown("**🌱 Growth Summary:**")
-        st.write(summary)
+        st.text_area("📖 Study Plan:", plan, height=400)
+        growth = ask_gpt_conversation(f"Analyze this Bible study plan and summarize spiritual growth achieved and two areas for continued growth: {plan}")
+        st.success("🌱 Growth Summary:")
+        st.write(growth)
 
 def run_faith_journal():
     st.subheader("📝 Faith Journal")
-    entry = st.text_area("Write your thoughts, prayers, or reflections:")
-    if st.button("Save Entry") and entry:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        with open(f"journal_{ts}.txt", "w") as f:
+    entry = st.text_area("Write your thoughts or prayers:")
+    if st.button("Save Entry"):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        os.makedirs("journals", exist_ok=True)
+        with open(f"journals/journal_{timestamp}.txt", "w") as f:
             f.write(entry)
-        st.success("Saved successfully.")
-        if st.checkbox("Get insight based on entry"):
-            insight = ask_gpt_conversation(f"Provide spiritual insight based on this journal: {entry}")
-            st.markdown("**💡 Insight:**")
-            st.write(insight)
+        st.success(f"Saved as journals/journal_{timestamp}.txt")
+    if st.button("Spiritual Insight") and entry:
+        insight = ask_gpt_conversation(f"Provide spiritual insight based on this journal: {entry}")
+        st.info(insight)
 
-def run_prayer_starter():
-    st.subheader("🙏 Prayer Starter")
-    topic = st.text_input("Prayer topic:")
-    if st.button("Generate Prayer") and topic:
-        prompt = f"Write a heartfelt prayer about: {topic}"
-        prayer = ask_gpt_conversation(prompt)
-        st.text_area("🕊️ Prayer", prayer, height=300)
+def run_tailored_learning():
+    st.subheader("📚 Tailored Bible Learning Path")
+    user_type = st.selectbox("Learner type:", ["child", "adult"])
+    goal = st.text_input("Learning goal (e.g., know Jesus, full Bible):")
+    level = st.selectbox("Knowledge level:", ["beginner", "intermediate", "advanced"])
+    style = st.multiselect("Preferred styles:", ["storytelling", "questions", "memory games", "reflection"])
+    if st.button("Generate Path"):
+        prompt = f"Create a Duolingo-style 5-lesson Bible path for a {user_type} with goal '{goal}', level '{level}', styles: {', '.join(style)}. Include verse, explanation, activity, prayer."
+        st.text_area("📘 Lessons:", ask_gpt_conversation(prompt), height=400)
 
-def run_fast_devotional():
-    st.subheader("⚡ Fast Devotional")
-    theme = st.text_input("Devotional theme:")
-    if st.button("Generate Devotional") and theme:
-        prompt = f"Give a 30-second devotional on '{theme}' with a verse, reflection, and prayer."
-        devo = ask_gpt_conversation(prompt)
-        st.text_area("🕊️ Devotional", devo, height=300)
+def run_bible_beta():
+    st.subheader("📖 Bible Beta — Read, Listen, and Highlight")
+    passage = st.text_input("Passage to display (e.g., Psalm 23):")
+    voice = st.selectbox("Choose Voice:", ["Default", "TD Jakes (AI)", "Morgan Freeman (AI)"])
+    if st.button("Load Bible Passage") and passage:
+        text = fetch_bible_verse(passage)
+        st.text_area("📖 Bible Passage:", text, height=300)
+        if st.button("Play AI Audio"):
+            st.info(f"🔊 Playing in {voice} voice (simulated)")
+        highlight = st.text_area("Highlight text to summarize:")
+        if st.button("Summarize Highlight") and highlight:
+            st.info(ask_gpt_conversation(f"Summarize and explain this passage: {highlight}"))
 
-def run_small_group_generator():
-    st.subheader("👥 Small Group Guide")
-    topic = st.text_input("Discussion topic or passage:")
-    if st.button("Generate Guide") and topic:
-        prompt = f"Create a small group guide on '{topic}' with: Icebreaker, 3–5 questions, leader notes, closing prayer."
-        guide = ask_gpt_conversation(prompt)
-        st.text_area("📘 Guide", guide, height=500)
+def run_growth_summary():
+    st.subheader("📈 Growth Summary")
+    recent_input = st.text_area("Paste any journal, study plan, or reflection text:")
+    if st.button("Generate Summary") and recent_input:
+        summary = ask_gpt_conversation(f"Provide a growth summary and two focus areas based on this text: {recent_input}")
+        st.success(summary)
 
-def run_learning_path_mode():
-    st.subheader("📚 Tailored Learning Path")
-    user_type = st.selectbox("User type:", ["child", "adult"])
-    goal = st.text_input("Learning goal:")
-    level = st.selectbox("Bible knowledge level:", ["beginner", "intermediate", "advanced"])
-    style = st.selectbox("Learning style:", ["storytelling", "questions", "memory games", "reflection"])
-    if st.button("Generate Path") and goal:
-        prompt = f"Create a Duolingo-style Bible learning path for a {user_type} with goal '{goal}', level '{level}', and style '{style}'."
-        result = ask_gpt_conversation(prompt)
-        st.text_area("📘 Learning Path", result, height=500)
+def run_cross_reference():
+    st.subheader("🔗 Cross Reference Summary")
+    verse = st.text_input("Enter Bible verse to cross reference (e.g., Matthew 6:33):")
+    if st.button("Generate Cross-References") and verse:
+        original_text = fetch_bible_verse(verse)
+        prompt = f"List 3 cross-referenced Bible verses related to: '{original_text}' and explain their connection."
+        st.info(ask_gpt_conversation(prompt))
 
-# =============== MAIN UI ===============
-mode = st.sidebar.selectbox("Choose a mode:", [
-    "Bible Lookup", "Chat with GPT", "Practice Chat", "Verse of the Day",
-    "Study Plan", "Faith Journal", "Prayer Starter", "Fast Devotional",
-    "Small Group Generator", "Tailored Learning Path"
-])
+def run_bible_timeline_quiz():
+    st.subheader("🕰️ Bible Timeline Quiz")
+    if st.button("Start Quiz"):
+        q = ask_gpt_conversation("Generate a timeline-based multiple choice quiz about Bible events. Format as: Question, 4 choices, Correct Answer")
+        st.text_area("Quiz Question:", q, height=300)
 
-if mode == "Bible Lookup": run_bible_lookup()
-elif mode == "Chat with GPT": run_chat_mode()
-elif mode == "Practice Chat": run_practice_chat()
-elif mode == "Verse of the Day": run_verse_of_the_day()
-elif mode == "Study Plan": run_study_plan()
-elif mode == "Faith Journal": run_faith_journal()
-elif mode == "Prayer Starter": run_prayer_starter()
-elif mode == "Fast Devotional": run_fast_devotional()
-elif mode == "Small Group Generator": run_small_group_generator()
-elif mode == "Tailored Learning Path": run_learning_path_mode()
-else: st.error("Unknown mode")
+def run_sermon_search():
+    st.subheader("🎙️ Sermon Search by Verse")
+    verse = st.text_input("Enter Bible verse (e.g., Romans 8:28):")
+    if st.button("Find Sermons") and verse:
+        prompt = f"Find sermon titles and short summaries related to '{verse}'."
+        st.text_area("Sermon Results:", ask_gpt_conversation(prompt), height=300)
+
+# =============== MAIN =====================
+MODE_FUNCS = {
+    "Bible Lookup": run_bible_lookup,
+    "Chat with GPT": run_chat_mode,
+    "Practice Chat": run_practice_chat,
+    "Verse of the Day": run_verse_of_the_day,
+    "Bible Study Plan": run_study_plan,
+    "Faith Journal": run_faith_journal,
+    "Tailored Learning Path": run_tailored_learning,
+    "Bible Beta": run_bible_beta,
+    "Growth Summary": run_growth_summary,
+    "Cross Reference Summary": run_cross_reference,
+    "Bible Timeline Quiz": run_bible_timeline_quiz,
+    "Sermon Search by Verse": run_sermon_search
+}
+
+st.title("📖 TrueVine AI — Bible GPT")
+mode = st.sidebar.radio("Choose a mode:", list(MODE_FUNCS.keys()))
+MODE_FUNCS[mode]()
+
