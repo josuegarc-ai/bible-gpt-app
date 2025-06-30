@@ -160,21 +160,38 @@ def run_learning_path_mode():
         result = ask_gpt_conversation(prompt)
         st.text_area("📘 Learning Path", result, height=500)
 
+def run_bible_beta():
+    st.subheader("📘 Bible Beta Mode")
+    st.info("🧪 Experimental: Read and Listen to Bible page by page.")
+    book = st.text_input("Book (e.g., John):")
+    chapter = st.number_input("Chapter:", min_value=1, step=1)
+    if st.button("Display Page"):
+        verse = f"{book} {chapter}:1"
+        try:
+            text = fetch_bible_verse(verse)
+            st.text_area("📖 Bible Text:", value=text, height=200)
+            if st.button("🔊 Listen (AI Voice TBD)"):
+                st.warning("Voice synthesis with celebrity tones coming soon.")
+            if st.checkbox("✨ Highlight and Summarize"):
+                highlight = st.text_area("Paste the section to summarize:")
+                if highlight:
+                    summary = ask_gpt_conversation(f"Summarize and reflect on this Bible passage: {highlight}")
+                    st.markdown("**💬 Summary:**")
+                    st.markdown(summary)
+        except Exception as e:
+            st.error(str(e))
+
 # =============== MAIN UI ===============
 mode = st.sidebar.selectbox("Choose a mode:", [
     "Bible Lookup", "Chat with GPT", "Practice Chat", "Verse of the Day",
     "Study Plan", "Faith Journal", "Prayer Starter", "Fast Devotional",
-    "Small Group Generator", "Tailored Learning Path"
+    "Small Group Generator", "Tailored Learning Path", "Bible Beta Mode"
 ])
 
 if mode == "Bible Lookup": run_bible_lookup()
 elif mode == "Chat with GPT": run_chat_mode()
 elif mode == "Practice Chat": run_practice_chat()
-elif mode == "Verse of the Day": run_verse_of_the_day()
-elif mode == "Study Plan": run_study_plan()
 elif mode == "Faith Journal": run_faith_journal()
-elif mode == "Prayer Starter": run_prayer_starter()
-elif mode == "Fast Devotional": run_fast_devotional()
-elif mode == "Small Group Generator": run_small_group_generator()
 elif mode == "Tailored Learning Path": run_learning_path_mode()
-else: st.error("Unknown mode")
+elif mode == "Bible Beta Mode": run_bible_beta()
+else: st.warning("This mode is under construction.")
