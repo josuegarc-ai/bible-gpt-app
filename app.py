@@ -132,10 +132,6 @@ def run_chat_mode():
 def run_practice_chat():
     st.subheader("🧠 Practice Chat")
 
-    if st.session_state.get("force_rerun"):
-        st.session_state.force_rerun = False
-        st.experimental_rerun()
-
     if "practice_state" not in st.session_state:
         st.session_state.practice_state = {
             "questions": [],
@@ -144,7 +140,8 @@ def run_practice_chat():
             "book": "",
             "style": "",
             "level": "",
-            "awaiting_next": False
+            "awaiting_next": False,
+            "proceed": False
         }
 
     state = st.session_state.practice_state
@@ -165,22 +162,14 @@ def run_practice_chat():
                 chosen_style = style if style != "mixed" else random.choice(["multiple choice", "fill in the blank", "true or false"])
                 topic = book if book else "the Bible"
                 if chosen_style == "true or false":
-                    q_prompt = f"""Generate a true or false Bible question from {topic} for a {level} learner.
-Return JSON: {{
-"question": "...",
-"correct": "True" or "False",
-"choices": ["True", "False"]
-}}"""
+                    q_prompt = f"Generate a true or false Bible question from {topic} suitable for a {level} learner. Format as JSON with 'question', 'correct', and 'choices' as ['True', 'False']."
                 else:
-                    q_prompt = f"""Generate a {chosen_style} Bible question from {topic} suitable for a {level} learner,
-with 1 correct and 3 incorrect answers. Return JSON with 'question', 'correct', and 'choices'."""
+                    q_prompt = f"Generate a {chosen_style} Bible question from {topic} suitable for a {level} learner, with 1 correct answer and 3 incorrect ones. Format as JSON with 'question', 'correct', 'choices'."
                 response = ask_gpt_conversation(q_prompt)
                 q_data = extract_json_from_response(response)
                 if q_data:
                     if chosen_style == "true or false":
                         q_data['choices'] = ["True", "False"]
-                        if q_data['correct'] not in q_data['choices']:
-                            continue
                     else:
                         unique_choices = list(dict.fromkeys(q_data['choices']))
                         if q_data['correct'] not in unique_choices:
@@ -188,8 +177,7 @@ with 1 correct and 3 incorrect answers. Return JSON with 'question', 'correct', 
                         random.shuffle(unique_choices)
                         q_data['choices'] = unique_choices
                     state["questions"].append(q_data)
-            st.session_state.force_rerun = True
-            return
+            st.experimental_rerun()
 
     elif state["current"] < len(state["questions"]):
         q_data = state["questions"][state["current"]]
@@ -201,26 +189,30 @@ with 1 correct and 3 incorrect answers. Return JSON with 'question', 'correct', 
                 if user_answer.lower() == q_data['correct'].lower():
                     state["score"] += 1
                     st.success("✅ Correct!")
-                    state["current"] += 1
-                    st.session_state.force_rerun = True
+                    state["proceed"] = True
                 else:
                     st.error(f"❌ Incorrect. Correct answer: {q_data['correct']}")
-                    explain_prompt = f"You're a theological Bible teacher. Explain why '{q_data['correct']}' is correct for: '{q_data['question']}', and briefly clarify why the other options are incorrect using Bible references."
+                    explain_prompt = f"You're a theological Bible teacher. Explain why '{q_data['correct']}' is correct for: '{q_data['question']}', and briefly clarify why the other options are incorrect, using Scripture-based reasoning."
                     explanation = ask_gpt_conversation(explain_prompt)
                     st.markdown("**📜 Teaching Moment:**")
                     st.write(explanation)
                     state["awaiting_next"] = True
-        else:
-            if st.button("Next Question"):
-                state["current"] += 1
-                state["awaiting_next"] = False
-                st.session_state.force_rerun = True
+
+        if state.get("proceed") and st.button("👉 Next Question"):
+            state["current"] += 1
+            state["proceed"] = False
+            st.experimental_rerun()
+
+        if state.get("awaiting_next") and st.button("Next Question"):
+            state["current"] += 1
+            state["awaiting_next"] = False
+            st.experimental_rerun()
 
     else:
         st.markdown(f"**🌞 Final Score: {state['score']}/{len(state['questions'])}**")
         if st.button("Restart Practice"):
-            st.session_state.practice_state = {}
-            st.session_state.force_rerun = True
+            st.session_state.practice_state = {}  # Reset state
+            st.experimental_rerun()
             
 def run_faith_journal():
     st.subheader("📝 Faith Journal")
