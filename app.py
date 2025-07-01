@@ -97,17 +97,17 @@ def run_chat_mode():
     if st.button("Send") and user_input:
         if user_input.lower().strip() in ["exit", "quit", "end", "stop"]:
             full_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history])
-            prayer_prompt = (
-                "You are a pastoral, Christ-centered mentor. Based on the following conversation, write a gentle, encouraging prayerful reflection "
-                "that blesses the user, guides them to seek God’s presence, and reminds them of Jesus’ love and truth. It should not be a direct prayer "
-                "for them, but a Spirit-led send-off rooted in compassion, biblical encouragement, and theological wisdom. "
-                "Also, rebuke any fear, lies, or heaviness not from God, and close with an uplifting note.\n\n"
+            guidance_prompt = (
+                "You are a Christ-centered, pastoral guide. Based on the following conversation, write a short, encouraging reflection that gently sends the user off. "
+                "Do not pray for them directly. Instead, guide them to seek God's presence, remind them of Jesus' love, and rebuke any anxiety, fear, or lies. "
+                "Speak life, truth, and peace over them using Scripture and loving counsel. End with a hopeful, Spirit-led encouragement.\n\n"
                 f"Conversation:\n{full_context}"
             )
-            prayer_response = ask_gpt_conversation(prayer_prompt)
-            st.markdown("**🙏 Parting Reflection:**")
-            st.write(prayer_response)
+            reflection = ask_gpt_conversation(guidance_prompt)
+            st.markdown("**🙏 Final Encouragement:**")
+            st.write(reflection)
             return
+
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         history_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history]
         history_messages.insert(0, {
