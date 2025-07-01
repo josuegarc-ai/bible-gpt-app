@@ -148,9 +148,19 @@ def run_practice_chat():
     state = st.session_state.practice_state
 
     # Restart the quiz
-    if state.get("restart_flag"):
-        st.session_state.practice_state = {}
-        st.experimental_rerun()
+if state.get("restart_flag"):
+    st.session_state.practice_state = {
+        "questions": [],
+        "current": 0,
+        "score": 0,
+        "book": "",
+        "style": "",
+        "level": "",
+        "awaiting_next": False,
+        "proceed": False,
+        "restart_flag": False
+    }
+    st.experimental_rerun()
 
     if not state["questions"]:
         random_practice = st.checkbox("📖 Random questions from the Bible")
