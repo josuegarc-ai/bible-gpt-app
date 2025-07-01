@@ -144,7 +144,8 @@ def run_practice_chat():
             "proceed": False,
             "restart_flag": False,
             "last_answer_correct": False,
-            "used_questions": set()
+            "used_questions": set(),
+            "used_phrases": set()
         }
 
     state = st.session_state.practice_state
@@ -162,7 +163,8 @@ def run_practice_chat():
             "proceed": False,
             "restart_flag": False,
             "last_answer_correct": False,
-            "used_questions": set()
+            "used_questions": set(),
+            "used_phrases": set()
         }
         st.rerun()
 
@@ -184,24 +186,29 @@ def run_practice_chat():
                 topic = book if book else "the Bible"
 
                 if chosen_style == "true or false":
-                    q_prompt = f"Generate a true or false Bible question from {topic} suitable for a {level} learner. Format as JSON with 'question', 'correct', and 'choices' as ['True', 'False']. The answer should be clearly either 'True' or 'False'."
+                    q_prompt = f"Generate a true or false Bible question from {topic} suitable for a {level} learner. Format as JSON with 'question', 'correct', and 'choices' as ['True', 'False']. The answer should be clearly either 'True' or 'False'. Avoid asking the same question in slightly different phrasing."
                 else:
-                    q_prompt = f"Generate a {chosen_style} Bible question from {topic} suitable for a {level} learner, with 1 correct answer and 3 incorrect ones. Format as JSON with 'question', 'correct', 'choices'."
+                    q_prompt = f"Generate a {chosen_style} Bible question from {topic} suitable for a {level} learner, with 1 correct answer and 3 incorrect ones. Format as JSON with 'question', 'correct', 'choices'. Avoid asking the same question in slightly different phrasing."
 
                 response = ask_gpt_conversation(q_prompt)
                 q_data = extract_json_from_response(response)
 
-                if q_data and q_data['question'] not in state['used_questions']:
-                    state['used_questions'].add(q_data['question'])
-                    if chosen_style == "true or false":
-                        q_data['choices'] = ["True", "False"]
-                    else:
-                        unique_choices = list(dict.fromkeys(q_data['choices']))
-                        if q_data['correct'] not in unique_choices:
-                            unique_choices.append(q_data['correct'])
-                        random.shuffle(unique_choices)
-                        q_data['choices'] = unique_choices
-                    state["questions"].append(q_data)
+                if q_data:
+                    normalized_question = q_data['question'].strip().lower()
+                    if normalized_question not in state['used_questions']:
+                        state['used_questions'].add(normalized_question)
+                        phrase_key = " ".join(sorted(normalized_question.split()))
+                        if phrase_key not in state['used_phrases']:
+                            state['used_phrases'].add(phrase_key)
+                            if chosen_style == "true or false":
+                                q_data['choices'] = ["True", "False"]
+                            else:
+                                unique_choices = list(dict.fromkeys(q_data['choices']))
+                                if q_data['correct'] not in unique_choices:
+                                    unique_choices.append(q_data['correct'])
+                                random.shuffle(unique_choices)
+                                q_data['choices'] = unique_choices
+                            state["questions"].append(q_data)
 
             st.rerun()
 
@@ -235,7 +242,7 @@ def run_practice_chat():
         st.markdown(f"**🌞 Final Score: {state['score']}/{len(state['questions'])}**")
         score_percent = (state['score'] / len(state['questions'])) * 100
         if score_percent >= 80:
-            st.balloons()
+            st.markdown('<script>confetti({ particleCount: 300, spread: 70, origin: { y: 0.6 }, scalar: 0.1 });</script>', unsafe_allow_html=True)
         if st.button("Restart Practice"):
             state["restart_flag"] = True
             st.rerun()
