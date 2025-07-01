@@ -144,18 +144,24 @@ def run_practice_chat():
     state = st.session_state.practice_state
 
     if not state["questions"]:
-        book = st.text_input("Enter Bible book:")
-        style = st.selectbox("Choose question style:", ["multiple choice", "fill in the blank", "true or false"])
-        if st.button("Start Practice") and book:
+        random_practice = st.checkbox("📖 Random questions from the Bible")
+        book = ""
+        if not random_practice:
+            book = st.text_input("Enter Bible book:")
+        style = st.selectbox("Choose question style:", ["multiple choice", "fill in the blank", "true or false", "mixed"])
+        if st.button("Start Practice") and (random_practice or book):
             state["book"] = book
             state["style"] = style
-            for _ in range(3):
-                q_prompt = f"Generate a {style} Bible question from the book of {book} with 1 correct answer and 3 incorrect ones. Format as JSON with 'question', 'correct', 'choices'."
+            num_questions = random.randint(7, 10)
+            for _ in range(num_questions):
+                chosen_style = style if style != "mixed" else random.choice(["multiple choice", "fill in the blank", "true or false"])
+                topic = book if book else "the Bible"
+                q_prompt = f"Generate a {chosen_style} Bible question from {topic} with 1 correct answer and 3 incorrect ones. Format as JSON with 'question', 'correct', 'choices'."
                 response = ask_gpt_conversation(q_prompt)
                 q_data = extract_json_from_response(response)
                 if q_data:
                     state["questions"].append(q_data)
-            return  # Let rerun naturally
+            return
         return
 
     if state["current"] < len(state["questions"]):
@@ -168,21 +174,24 @@ def run_practice_chat():
                 if user_answer.lower() == q_data['correct'].lower():
                     state["score"] += 1
                     st.success("✅ Correct!")
+                    state["current"] += 1
                 else:
                     st.error(f"❌ Incorrect. Correct answer: {q_data['correct']}")
                     explain_prompt = f"You're a theological Bible teacher. Explain why '{q_data['correct']}' is correct for: '{q_data['question']}', and briefly clarify why the other options are incorrect, using Scripture-based reasoning."
                     explanation = ask_gpt_conversation(explain_prompt)
                     st.markdown("**📘 Teaching Moment:**")
                     st.write(explanation)
-                state["awaiting_next"] = True
+                    state["awaiting_next"] = True
         else:
             if st.button("Next Question"):
                 state["current"] += 1
                 state["awaiting_next"] = False
+
     else:
         st.markdown(f"**🏁 Final Score: {state['score']}/{len(state['questions'])}**")
         if st.button("Restart Practice"):
-            del st.session_state.practice_state
+            st.session_state.practice_state = {}  # Reset state
+            st.experimental_rerun()
 
 def run_faith_journal():
     st.subheader("📝 Faith Journal")
