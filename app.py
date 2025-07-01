@@ -130,6 +130,10 @@ def run_chat_mode():
         st.markdown(f"**{speaker}:** {msg['content']}")
 
 def run_practice_chat():
+    if st.session_state.get("practice_rerun", False):
+        st.session_state.practice_rerun = False
+        st.experimental_rerun()
+
     st.subheader("🧠 Practice Chat")
     if "practice_state" not in st.session_state:
         st.session_state.practice_state = {
@@ -181,26 +185,29 @@ def run_practice_chat():
                     state["score"] += 1
                     st.success("✅ Correct!")
                     state["current"] += 1
-                    st.experimental_rerun()
+                    st.session_state.practice_rerun = True
+                    st.stop()
                 else:
                     st.error(f"❌ Incorrect. Correct answer: {q_data['correct']}")
                     explain_prompt = f"You're a theological Bible teacher. Explain why '{q_data['correct']}' is correct for: '{q_data['question']}', and briefly clarify why the other options are incorrect, using Scripture-based reasoning."
                     explanation = ask_gpt_conversation(explain_prompt)
-                    st.markdown("**📘 Teaching Moment:**")
+                    st.markdown("**📜 Teaching Moment:**")
                     st.write(explanation)
                     state["awaiting_next"] = True
         else:
             if st.button("Next Question"):
                 state["current"] += 1
                 state["awaiting_next"] = False
-                st.experimental_rerun()
+                st.session_state.practice_rerun = True
+                st.stop()
 
     else:
-        st.markdown(f"**🏁 Final Score: {state['score']}/{len(state['questions'])}**")
+        st.markdown(f"**🌞 Final Score: {state['score']}/{len(state['questions'])}**")
         if st.button("Restart Practice"):
             st.session_state.practice_state = {}  # Reset state
-            st.experimental_rerun()
-
+            st.session_state.practice_rerun = True
+            st.stop()
+            
 def run_faith_journal():
     st.subheader("📝 Faith Journal")
     entry = st.text_area("Write your thoughts, prayers, or reflections:")
