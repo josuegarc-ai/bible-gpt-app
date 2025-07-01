@@ -130,7 +130,7 @@ def run_chat_mode():
         st.markdown(f"**{speaker}:** {msg['content']}")
 
 def run_practice_chat():
-    st.subheader("🧠 Practice Chat")
+    st.subheader("🤠 Practice Chat")
 
     if "practice_state" not in st.session_state:
         st.session_state.practice_state = {
@@ -142,15 +142,27 @@ def run_practice_chat():
             "level": "",
             "awaiting_next": False,
             "proceed": False,
-            "restart_flag": False
+            "restart_flag": False,
+            "last_answer_correct": False
         }
 
     state = st.session_state.practice_state
 
     # Restart the quiz
     if state.get("restart_flag"):
-        st.session_state.practice_state = {}
-        st.experimental_rerun()
+        st.session_state.practice_state = {
+            "questions": [],
+            "current": 0,
+            "score": 0,
+            "book": "",
+            "style": "",
+            "level": "",
+            "awaiting_next": False,
+            "proceed": False,
+            "restart_flag": False,
+            "last_answer_correct": False
+        }
+        st.rerun()
 
     if not state["questions"]:
         random_practice = st.checkbox("📖 Random questions from the Bible")
@@ -170,7 +182,7 @@ def run_practice_chat():
                 topic = book if book else "the Bible"
 
                 if chosen_style == "true or false":
-                    q_prompt = f"Generate a true or false Bible question from {topic} suitable for a {level} learner. Format as JSON with 'question', 'correct', and 'choices' as ['True', 'False']."
+                    q_prompt = f"Generate a true or false Bible question from {topic} suitable for a {level} learner. Format as JSON with 'question', 'correct', and 'choices' as ['True', 'False']. The answer should be clearly either 'True' or 'False'."
                 else:
                     q_prompt = f"Generate a {chosen_style} Bible question from {topic} suitable for a {level} learner, with 1 correct answer and 3 incorrect ones. Format as JSON with 'question', 'correct', 'choices'."
 
@@ -188,7 +200,7 @@ def run_practice_chat():
                         q_data['choices'] = unique_choices
                     state["questions"].append(q_data)
 
-            st.experimental_rerun()
+            st.rerun()
 
     elif state["current"] < len(state["questions"]):
         q_data = state["questions"][state["current"]]
@@ -200,7 +212,8 @@ def run_practice_chat():
                 if user_answer.lower() == q_data['correct'].lower():
                     state["score"] += 1
                     st.success("✅ Correct!")
-                    state["proceed"] = True
+                    state["current"] += 1
+                    st.rerun()
                 else:
                     st.error(f"❌ Incorrect. Correct answer: {q_data['correct']}")
                     explain_prompt = f"You're a theological Bible teacher. Explain why '{q_data['correct']}' is correct for: '{q_data['question']}', and briefly clarify why the other options are incorrect, using Scripture-based reasoning."
@@ -209,23 +222,17 @@ def run_practice_chat():
                     st.write(explanation)
                     state["awaiting_next"] = True
 
-        if state.get("proceed"):
-            if st.button("👉 Next Question", key="next_after_correct"):
-                state["current"] += 1
-                state["proceed"] = False
-                st.experimental_rerun()
-
         if state.get("awaiting_next"):
-            if st.button("Next Question", key="next_after_incorrect"):
+            if st.button("Next Question", key=f"next_{state['current']}"):
                 state["current"] += 1
                 state["awaiting_next"] = False
-                st.experimental_rerun()
+                st.rerun()
 
     else:
         st.markdown(f"**🌞 Final Score: {state['score']}/{len(state['questions'])}**")
         if st.button("Restart Practice"):
             state["restart_flag"] = True
-            st.experimental_rerun()
+            st.rerun()
             
 def run_faith_journal():
     st.subheader("📝 Faith Journal")
