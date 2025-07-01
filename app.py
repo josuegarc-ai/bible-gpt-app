@@ -88,32 +88,36 @@ def run_bible_lookup():
                 st.markdown(f"- {item['pastor']}: {item['url']}")
         except Exception as e:
             st.error(str(e))
-
+        
 def run_chat_mode():
     st.subheader("💬 Chat with GPT")
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
-
-    user_input = st.text_input("Ask a question, share a thought, or type 'exit' to end the chat:")
-
+    user_input = st.text_input("Ask a question or share a thought:")
     if st.button("Send") and user_input:
-        if user_input.lower() in ["exit", "quit", "end", "stop"]:
-            st.markdown("🙏 Before you go... I'd like to pray for you. Would this be okay?")
-            if st.button("Yes, please pray for me"):
-                full_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history])
-                prayer_prompt = f"As a compassionate Christian pastor, write a short, powerful prayer based on this conversation that encourages, blesses, and speaks life over the person. Rebuke anything not Christ-like, and root the prayer in Scripture and the love of Jesus.\n\nConversation:\n{full_context}"
-                prayer = ask_gpt_conversation(prayer_prompt)
-                st.markdown("**🙏 Prayer:**")
-                st.write(prayer)
+        if user_input.lower().strip() in ["exit", "quit", "end", "stop"]:
+            full_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history])
+            prayer_prompt = (
+                "You are a pastoral, Christ-centered mentor. Based on the following conversation, write a gentle, encouraging prayerful reflection "
+                "that blesses the user, guides them to seek God’s presence, and reminds them of Jesus’ love and truth. It should not be a direct prayer "
+                "for them, but a Spirit-led send-off rooted in compassion, biblical encouragement, and theological wisdom. "
+                "Also, rebuke any fear, lies, or heaviness not from God, and close with an uplifting note.\n\n"
+                f"Conversation:\n{full_context}"
+            )
+            prayer_response = ask_gpt_conversation(prayer_prompt)
+            st.markdown("**🙏 Parting Reflection:**")
+            st.write(prayer_response)
             return
-
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         history_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history]
         history_messages.insert(0, {
             "role": "system",
-            "content": "You are a Spirit-led, compassionate, Christ-centered pastoral mentor with deep theological wisdom and emotional intelligence. You speak with the warmth, patience, and honesty of someone who deeply loves others like Jesus does. When someone is anxious, hurting, or lost, you don’t just quote Scripture—you help them feel seen, heard, and loved by guiding them gently into God’s presence. Encourage prayer and stillness before the Lord as a first step. Use your words to restore peace, point to Jesus personally, and offer practical, Spirit-filled encouragement that brings clarity, hope, and identity rooted in Christ. Always bring the conversation back to intimacy with God, not just knowledge of Him."
+            "content": (
+                "You are a pastoral, compassionate, honest, and expert biblical mentor with deep theological understanding. "
+                "You speak with empathy and truth, offering thoughtful, wise, and scripturally grounded guidance to help people through all walks of life. "
+                "You encourage people to seek God's presence first in prayer and reflection, and point them to Jesus as their ultimate source of peace, wisdom, and strength."
+            )
         })
-                        ## You are a pastoral, compassionate, honest, and expert biblical mentor with deep theological understanding. You speak with empathy and truth, offering thoughtful, wise, and scripturally grounded guidance to help people through all walks of life. You encourage people to seek God's presence first in prayer and reflection, and point them to Jesus as their ultimate source of peace, wisdom, and strength.
         response = client.chat.completions.create(
             model=model,
             messages=history_messages,
@@ -121,7 +125,6 @@ def run_chat_mode():
         )
         reply = response.choices[0].message.content.strip()
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
-
     for msg in st.session_state.chat_history:
         speaker = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
         st.markdown(f"**{speaker}:** {msg['content']}")
