@@ -233,6 +233,9 @@ def run_practice_chat():
 
     else:
         st.markdown(f"**🌞 Final Score: {state['score']}/{len(state['questions'])}**")
+        score_percent = (state['score'] / len(state['questions'])) * 100
+        if score_percent >= 80:
+            st.balloons()
         if st.button("Restart Practice"):
             state["restart_flag"] = True
             st.rerun()
