@@ -143,7 +143,8 @@ def run_practice_chat():
             "awaiting_next": False,
             "proceed": False,
             "restart_flag": False,
-            "last_answer_correct": False
+            "last_answer_correct": False,
+            "used_questions": set()
         }
 
     state = st.session_state.practice_state
@@ -160,7 +161,8 @@ def run_practice_chat():
             "awaiting_next": False,
             "proceed": False,
             "restart_flag": False,
-            "last_answer_correct": False
+            "last_answer_correct": False,
+            "used_questions": set()
         }
         st.rerun()
 
@@ -177,7 +179,7 @@ def run_practice_chat():
             state["style"] = style
             state["level"] = level
             num_questions = random.randint(7, 10)
-            for _ in range(num_questions):
+            while len(state["questions"]) < num_questions:
                 chosen_style = style if style != "mixed" else random.choice(["multiple choice", "fill in the blank", "true or false"])
                 topic = book if book else "the Bible"
 
@@ -189,7 +191,8 @@ def run_practice_chat():
                 response = ask_gpt_conversation(q_prompt)
                 q_data = extract_json_from_response(response)
 
-                if q_data:
+                if q_data and q_data['question'] not in state['used_questions']:
+                    state['used_questions'].add(q_data['question'])
                     if chosen_style == "true or false":
                         q_data['choices'] = ["True", "False"]
                     else:
@@ -233,7 +236,7 @@ def run_practice_chat():
         if st.button("Restart Practice"):
             state["restart_flag"] = True
             st.rerun()
-            
+
 def run_faith_journal():
     st.subheader("📝 Faith Journal")
     entry = st.text_area("Write your thoughts, prayers, or reflections:")
