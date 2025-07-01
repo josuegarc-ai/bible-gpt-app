@@ -141,10 +141,16 @@ def run_practice_chat():
             "style": "",
             "level": "",
             "awaiting_next": False,
-            "proceed": False
+            "proceed": False,
+            "restart_flag": False
         }
 
     state = st.session_state.practice_state
+
+    # Restart the quiz
+    if state.get("restart_flag"):
+        st.session_state.practice_state = {}
+        st.experimental_rerun()
 
     if not state["questions"]:
         random_practice = st.checkbox("📖 Random questions from the Bible")
@@ -153,6 +159,7 @@ def run_practice_chat():
             book = st.text_input("Enter Bible book:")
         style = st.selectbox("Choose question style:", ["multiple choice", "fill in the blank", "true or false", "mixed"])
         level = st.selectbox("Select your understanding level:", ["beginner", "intermediate", "advanced"])
+
         if st.button("Start Practice") and (random_practice or book):
             state["book"] = book
             state["style"] = style
@@ -161,12 +168,15 @@ def run_practice_chat():
             for _ in range(num_questions):
                 chosen_style = style if style != "mixed" else random.choice(["multiple choice", "fill in the blank", "true or false"])
                 topic = book if book else "the Bible"
+
                 if chosen_style == "true or false":
                     q_prompt = f"Generate a true or false Bible question from {topic} suitable for a {level} learner. Format as JSON with 'question', 'correct', and 'choices' as ['True', 'False']."
                 else:
                     q_prompt = f"Generate a {chosen_style} Bible question from {topic} suitable for a {level} learner, with 1 correct answer and 3 incorrect ones. Format as JSON with 'question', 'correct', 'choices'."
+
                 response = ask_gpt_conversation(q_prompt)
                 q_data = extract_json_from_response(response)
+
                 if q_data:
                     if chosen_style == "true or false":
                         q_data['choices'] = ["True", "False"]
@@ -177,14 +187,15 @@ def run_practice_chat():
                         random.shuffle(unique_choices)
                         q_data['choices'] = unique_choices
                     state["questions"].append(q_data)
+
             st.experimental_rerun()
 
     elif state["current"] < len(state["questions"]):
         q_data = state["questions"][state["current"]]
-        st.markdown(f"**Q{state['current']+1}: {q_data['question']}**")
+        st.markdown(f"**Q{state['current'] + 1}: {q_data['question']}**")
         user_answer = st.radio("Choose:", q_data['choices'], key=f"q{state['current']}_choice")
 
-        if not state.get("awaiting_next", False):
+        if not state.get("awaiting_next", False) and not state.get("proceed", False):
             if st.button("Submit Answer"):
                 if user_answer.lower() == q_data['correct'].lower():
                     state["score"] += 1
@@ -198,20 +209,22 @@ def run_practice_chat():
                     st.write(explanation)
                     state["awaiting_next"] = True
 
-        if state.get("proceed") and st.button("👉 Next Question"):
-            state["current"] += 1
-            state["proceed"] = False
-            st.experimental_rerun()
+        if state.get("proceed"):
+            if st.button("👉 Next Question", key="next_after_correct"):
+                state["current"] += 1
+                state["proceed"] = False
+                st.experimental_rerun()
 
-        if state.get("awaiting_next") and st.button("Next Question"):
-            state["current"] += 1
-            state["awaiting_next"] = False
-            st.experimental_rerun()
+        if state.get("awaiting_next"):
+            if st.button("Next Question", key="next_after_incorrect"):
+                state["current"] += 1
+                state["awaiting_next"] = False
+                st.experimental_rerun()
 
     else:
         st.markdown(f"**🌞 Final Score: {state['score']}/{len(state['questions'])}**")
         if st.button("Restart Practice"):
-            st.session_state.practice_state = {}  # Reset state
+            state["restart_flag"] = True
             st.experimental_rerun()
             
 def run_faith_journal():
