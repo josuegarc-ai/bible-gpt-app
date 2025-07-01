@@ -130,11 +130,8 @@ def run_chat_mode():
         st.markdown(f"**{speaker}:** {msg['content']}")
 
 def run_practice_chat():
-    if st.session_state.get("practice_rerun", False):
-        st.session_state.practice_rerun = False
-        st.experimental_rerun()
-
     st.subheader("🧠 Practice Chat")
+
     if "practice_state" not in st.session_state:
         st.session_state.practice_state = {
             "questions": [],
@@ -171,10 +168,9 @@ def run_practice_chat():
                     random.shuffle(unique_choices)
                     q_data['choices'] = unique_choices
                     state["questions"].append(q_data)
-            return
-        return
+            st.experimental_rerun()
 
-    if state["current"] < len(state["questions"]):
+    elif state["current"] < len(state["questions"]):
         q_data = state["questions"][state["current"]]
         st.markdown(f"**Q{state['current']+1}: {q_data['question']}**")
         user_answer = st.radio("Choose:", q_data['choices'], key=f"q{state['current']}_choice")
@@ -185,8 +181,7 @@ def run_practice_chat():
                     state["score"] += 1
                     st.success("✅ Correct!")
                     state["current"] += 1
-                    st.session_state.practice_rerun = True
-                    st.stop()
+                    st.experimental_rerun()
                 else:
                     st.error(f"❌ Incorrect. Correct answer: {q_data['correct']}")
                     explain_prompt = f"You're a theological Bible teacher. Explain why '{q_data['correct']}' is correct for: '{q_data['question']}', and briefly clarify why the other options are incorrect, using Scripture-based reasoning."
@@ -198,15 +193,13 @@ def run_practice_chat():
             if st.button("Next Question"):
                 state["current"] += 1
                 state["awaiting_next"] = False
-                st.session_state.practice_rerun = True
-                st.stop()
+                st.experimental_rerun()
 
     else:
         st.markdown(f"**🌞 Final Score: {state['score']}/{len(state['questions'])}**")
         if st.button("Restart Practice"):
             st.session_state.practice_state = {}  # Reset state
-            st.session_state.practice_rerun = True
-            st.stop()
+            st.experimental_rerun()
             
 def run_faith_journal():
     st.subheader("📝 Faith Journal")
