@@ -131,7 +131,7 @@ def run_chat_mode():
 
 def run_pixar_story_animation():
     st.subheader("🎥 Pixar-Style Animated Bible Story")
-    st.info("Turn a Bible story into a Pixar-style visual storybook for kids!")
+    st.info("Turn a Bible story into a Pixar-style visual storybook for kids, with biblically accurate and richly detailed imagery.")
 
     book = st.text_input("📘 Enter Bible book (e.g., Daniel):")
     chapter = st.text_input("🔢 Chapter (optional):")
@@ -154,16 +154,30 @@ def run_pixar_story_animation():
 
         for idx, scene in enumerate(scenes):
             st.markdown(f"**Scene {idx + 1}:** {scene}")
-            dalle_prompt = f"{scene} Pixar-style, colorful, animated film still, soft lighting, child-friendly"
-            image_response = client.images.generate(
-                model="dall-e-3",
-                prompt=dalle_prompt,
-                size="1024x1024",
-                n=1
+
+            # 💡 Use GPT to enhance the prompt with biblical detail
+            prompt_enhancer = (
+                f"You are a prompt engineer for DALL·E. Convert the following Bible scene into a rich, historically and biblically accurate Pixar-style image prompt. "
+                f"Include setting, clothing, ethnicity, architecture, and spiritual emotion. Keep it imaginative but accurate to biblical context. "
+                f"End the prompt with: 'Pixar-style, colorful, animated, child-friendly'.\n\n"
+                f"Scene: {scene}"
             )
-            image_url = image_response.data[0].url
-            dalle_images.append(image_url)
-            st.image(image_url, caption=f"🎨 Scene {idx + 1}", use_column_width=True)
+
+            enhanced_prompt = ask_gpt_conversation(prompt_enhancer)
+
+            # 🎨 Generate image from DALL·E
+            try:
+                image_response = client.images.generate(
+                    model="dall-e-3",
+                    prompt=enhanced_prompt,
+                    size="1024x1024",
+                    n=1
+                )
+                image_url = image_response.data[0].url
+                dalle_images.append(image_url)
+                st.image(image_url, caption=f"🎨 Scene {idx + 1}", use_column_width=True)
+            except Exception as e:
+                st.error(f"❌ Image generation failed: {e}")
 
 def run_practice_chat():
     st.subheader("🤠 Practice Chat")
