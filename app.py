@@ -97,7 +97,7 @@ def run_chat_mode():
     if st.button("Send") and user_input:
         if user_input.lower().strip() in ["exit", "quit", "end", "stop"]:
             full_context = "
-".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history]).join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history])
+".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history])
             guidance_prompt = (
                 "You are a Christ-centered, pastoral guide. Based on the following conversation, write a short, encouraging reflection that gently sends the user off. "
                 "Do not pray for them directly. Instead, guide them to seek God's presence, remind them of Jesus' love, and create a related prayer for the user. "
@@ -110,6 +110,7 @@ def run_chat_mode():
             reflection = ask_gpt_conversation(guidance_prompt)
             st.markdown("**🙏 Final Encouragement:**")
             st.write(reflection)
+            return
             return
 
         st.session_state.chat_history.append({"role": "user", "content": user_input})
