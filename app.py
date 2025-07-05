@@ -128,6 +128,32 @@ def run_chat_mode():
     for msg in st.session_state.chat_history:
         speaker = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
         st.markdown(f"**{speaker}:** {msg['content']}")
+def run_pixar_story_mode():
+    st.subheader("🎬 Pixar-Style Bible Story for Kids")
+    st.info("Generate a fun, engaging, Pixar-style retelling of a Bible story!")
+
+    book = st.text_input("Enter Bible book (e.g., Genesis):")
+    chapter = st.text_input("Enter chapter (optional):")
+    tone = st.selectbox("Choose tone:", ["Funny", "Adventurous", "Heartwarming", "All Ages Pixar"])
+    theme = st.text_input("Optional theme or moral (e.g., forgiveness, bravery):")
+
+    if st.button("🎨 Generate Pixar Story") and book:
+        reference = f"{book} {chapter}" if chapter else book
+        prompt = (
+            f"You are a creative Pixar-style storyteller for kids. Turn the story from {reference} "
+            f"into a short, engaging, animated-style Bible story appropriate for children ages 4–10. "
+            f"Use a {tone.lower()} tone and make it feel like a Pixar short film. "
+        )
+        if theme:
+            prompt += f"Include a clear moral or lesson around the theme of '{theme}'. "
+        prompt += (
+            "Use imaginative language, colorful characters (like talking animals, funny angels, or silly villains), "
+            "and break the story into clear paragraphs or scenes. Keep the tone joyful and faith-filled, but accurate to the Scripture."
+        )
+
+        story = ask_gpt_conversation(prompt)
+        st.markdown("**📖 AI-Generated Pixar Bible Story:**")
+        st.write(story)
 
 def run_practice_chat():
     st.subheader("🤠 Practice Chat")
@@ -260,32 +286,6 @@ def run_faith_journal():
             insight = ask_gpt_conversation(f"Analyze this faith journal and offer spiritual insight and encouragement: {entry}")
             st.markdown("**💡 Insight:**")
             st.write(insight)
-def run_pixar_story_mode():
-    st.subheader("🎬 Pixar-Style Bible Story for Kids")
-    st.info("Generate a fun, engaging, Pixar-style retelling of a Bible story!")
-
-    book = st.text_input("Enter Bible book (e.g., Genesis):")
-    chapter = st.text_input("Enter chapter (optional):")
-    tone = st.selectbox("Choose tone:", ["Funny", "Adventurous", "Heartwarming", "All Ages Pixar"])
-    theme = st.text_input("Optional theme or moral (e.g., forgiveness, bravery):")
-
-    if st.button("🎨 Generate Pixar Story") and book:
-        reference = f"{book} {chapter}" if chapter else book
-        prompt = (
-            f"You are a creative Pixar-style storyteller for kids. Turn the story from {reference} "
-            f"into a short, engaging, animated-style Bible story appropriate for children ages 4–10. "
-            f"Use a {tone.lower()} tone and make it feel like a Pixar short film. "
-        )
-        if theme:
-            prompt += f"Include a clear moral or lesson around the theme of '{theme}'. "
-        prompt += (
-            "Use imaginative language, colorful characters (like talking animals, funny angels, or silly villains), "
-            "and break the story into clear paragraphs or scenes. Keep the tone joyful and faith-filled, but accurate to the Scripture."
-        )
-
-        story = ask_gpt_conversation(prompt)
-        st.markdown("**📖 AI-Generated Pixar Bible Story:**")
-        st.write(story)
 
 def run_learning_path_mode():
     st.subheader("📚 Tailored Learning Path")
