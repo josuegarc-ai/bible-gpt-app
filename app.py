@@ -100,7 +100,7 @@ def run_chat_mode():
 ".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history])
             guidance_prompt = (
                 "You are a Christ-centered, pastoral guide. Based on the following conversation, write a short, encouraging reflection that gently sends the user off. "
-                "Do not pray for them directly. Instead, guide them to seek God's presence, remind them of Jesus' love, and create a related prayer for for the user. "
+                "Do not pray for them directly. Instead, guide them to seek God's presence, remind them of Jesus' love, and create a related prayer for the user. "
                 "Speak life, truth, and peace over them using Scripture and loving counsel. End with a hopeful, Spirit-led encouragement.
 
 "
