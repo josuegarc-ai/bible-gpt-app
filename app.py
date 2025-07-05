@@ -335,7 +335,7 @@ mode = st.sidebar.selectbox("Choose a mode:", [
     "Bible Lookup", "Chat with GPT", "Practice Chat", "Verse of the Day",
     "Study Plan", "Faith Journal", "Prayer Starter", "Fast Devotional",
     "Small Group Generator", "Tailored Learning Path", "Bible Beta Mode",
-    "Pixar Bible Story for Kids"  # ✅ NEW MODE
+    "Pixar Story Animation"  # 👈 Make sure this is listed
 ])
 
 if mode == "Bible Lookup":
@@ -351,7 +351,8 @@ elif mode == "Tailored Learning Path":
 elif mode == "Bible Beta Mode":
     run_bible_beta()
 elif mode == "Pixar Story Animation":
-    run_pixar_story_animation()
+    run_pixar_story_animation()  # 👈 This line is required
 else:
     st.warning("This mode is under construction.")
+
 
