@@ -130,42 +130,46 @@ def run_chat_mode():
         st.markdown(f"**{speaker}:** {msg['content']}")
 
 def run_pixar_story_animation():
-    st.subheader("🎥 Pixar-Style Animated Bible Story")
-    st.info("Turn a Bible story into a Pixar-style visual storybook for kids, with biblically accurate and richly detailed imagery.")
+    st.subheader("🎥 Pixar-Studio Animated Bible Story")
+    st.info("Generate a biblically accurate Pixar-style short film scene-by-scene based on Scripture.")
 
-    book = st.text_input("📘 Enter Bible book (e.g., Daniel):")
+    book = st.text_input("📘 Bible book (e.g., Exodus):")
     chapter = st.text_input("🔢 Chapter (optional):")
-    tone = st.selectbox("🎭 Choose tone:", ["Funny", "Adventurous", "Heartwarming", "All Ages Pixar"])
-    theme = st.text_input("💡 Theme or lesson (e.g., courage, forgiveness):")
+    tone = st.selectbox("🎭 Pixar tone:", ["Adventurous", "Heartwarming", "Funny", "Epic", "All Ages"])
+    theme = st.text_input("💡 Lesson or theme (e.g., faith, obedience):")
 
-    if st.button("🎬 Generate Story") and book:
-        ref = f"{book} {chapter}" if chapter else book
+    if st.button("🎬 Generate Pixar Story") and book:
+        reference = f"{book} {chapter}" if chapter else book
         story_prompt = (
-            f"Turn the Bible story from {ref} into a Pixar-style story for kids. "
+            f"Turn the Bible story from {reference} into a Pixar-studio style film story for kids ages 4–10. "
             f"Tone: {tone}. Theme: {theme if theme else 'faith'}. "
-            "Break the story into 5 scenes. Each scene should be 1–2 sentences, colorful, imaginative, and visual. "
-            "Output as numbered list (1. ..., 2. ..., etc)."
+            "Break it into exactly 5 cinematic scenes with 1–2 sentences each. "
+            "Each scene should show a clear moment, visually imaginative, but true to the biblical setting. "
+            "Output as numbered list (1. ..., 2. ..., etc.)"
         )
         response = ask_gpt_conversation(story_prompt)
-        st.markdown("**📚 Story Scenes:**")
+        st.markdown("### 📚 Pixar-Style Bible Story Scenes")
 
         scenes = re.findall(r'\d+\.\s+(.*)', response)
-        dalle_images = []
+        if not scenes:
+            st.error("❌ Could not parse story scenes. Try different input.")
+            return
 
         for idx, scene in enumerate(scenes):
-            st.markdown(f"**Scene {idx + 1}:** {scene}")
+            st.markdown(f"#### 🎬 Scene {idx + 1}")
+            st.markdown(f"*{scene}*")
 
-            # 💡 Use GPT to enhance the prompt with biblical detail
+            # Enhanced prompt for DALLE with Pixar-studio film style and biblical setting
             prompt_enhancer = (
-                f"You are a prompt engineer for DALL·E. Convert the following Bible scene into a rich, historically and biblically accurate Pixar-style image prompt. "
-                f"Include setting, clothing, ethnicity, architecture, and spiritual emotion. Keep it imaginative but accurate to biblical context. "
-                f"End the prompt with: 'Pixar-style, colorful, animated, child-friendly'.\n\n"
-                f"Scene: {scene}"
+                f"You are creating a visual concept for a Pixar-studio animated Bible film. "
+                f"Turn this story scene into a DALL·E prompt with richly detailed, biblically accurate imagery, "
+                f"including cultural context (clothing, ethnicity, landscape, architecture). "
+                f"Make the style match a Pixar animated movie (like Soul, Moana, or Luca). "
+                f"Output only the final prompt. Scene:\n\n{scene}"
             )
 
             enhanced_prompt = ask_gpt_conversation(prompt_enhancer)
 
-            # 🎨 Generate image from DALL·E
             try:
                 image_response = client.images.generate(
                     model="dall-e-3",
@@ -174,10 +178,9 @@ def run_pixar_story_animation():
                     n=1
                 )
                 image_url = image_response.data[0].url
-                dalle_images.append(image_url)
-                st.image(image_url, caption=f"🎨 Scene {idx + 1}", use_column_width=True)
+                st.image(image_url, caption=f"🎞️ Scene {idx + 1}: Pixar-style", use_column_width=True)
             except Exception as e:
-                st.error(f"❌ Image generation failed: {e}")
+                st.error(f"❌ Error generating image: {e}")
 
 def run_practice_chat():
     st.subheader("🤠 Practice Chat")
