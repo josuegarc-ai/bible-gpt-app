@@ -161,12 +161,13 @@ def run_pixar_story_animation():
 
             # Enhanced prompt for DALLE with Pixar-studio film style and biblical setting
             prompt_enhancer = (
-                f"You are creating a visual concept for a Pixar-studio animated Bible film. "
-                f"Turn this story scene into a DALL·E prompt with richly detailed, biblically accurate imagery, "
-                f"including cultural context (clothing, ethnicity, landscape, architecture). "
-                f"Make the style match a Pixar animated movie (like Soul, Moana, or Luca). "
-                f"Output only the final prompt. Scene:\n\n{scene}"
+                f"You are creating a visual concept for a 3D animated Bible movie similar in style to Pixar films, "
+                f"but without directly referencing Pixar or Disney. Turn this Bible scene into a vivid image prompt. "
+                f"Include detailed biblical setting: clothing (ancient Middle Eastern), ethnicity (Hebrew/Egyptian/etc.), architecture (stone, desert, tents, temples), and landscape. "
+                f"Use phrases like '3D animated film still', 'cinematic lighting', 'soft shadows', 'bright, colorful palette', and 'expressive character poses'. "
+                f"Make it feel joyful, child-friendly, and like a still from a kids’ animated movie.\n\nScene: {scene}"
             )
+
 
             enhanced_prompt = ask_gpt_conversation(prompt_enhancer)
 
