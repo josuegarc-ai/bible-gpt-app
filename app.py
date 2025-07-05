@@ -112,6 +112,7 @@ def run_chat_mode():
             st.write(reflection)
             return
             return
+            return
 
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         history_messages = [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history]
