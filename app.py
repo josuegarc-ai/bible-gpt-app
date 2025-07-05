@@ -325,14 +325,23 @@ mode = st.sidebar.selectbox("Choose a mode:", [
     "Bible Lookup", "Chat with GPT", "Practice Chat", "Verse of the Day",
     "Study Plan", "Faith Journal", "Prayer Starter", "Fast Devotional",
     "Small Group Generator", "Tailored Learning Path", "Bible Beta Mode",
-    "Pixar Bible Story for Kids"  # ← NEW OPTION
+    "Pixar Bible Story for Kids"  # ✅ NEW MODE
 ])
 
-if mode == "Bible Lookup": run_bible_lookup()
-elif mode == "Chat with GPT": run_chat_mode()
-elif mode == "Practice Chat": run_practice_chat()
-elif mode == "Faith Journal": run_faith_journal()
-elif mode == "Tailored Learning Path": run_learning_path_mode()
-elif mode == "Bible Beta Mode": run_bible_beta()
-elif mode == "Pixar Bible Story for Kids": run_pixar_story_mode()  # ← NEW FUNCTION CALL
-else: st.warning("This mode is under construction.")
+if mode == "Bible Lookup":
+    run_bible_lookup()
+elif mode == "Chat with GPT":
+    run_chat_mode()
+elif mode == "Practice Chat":
+    run_practice_chat()
+elif mode == "Faith Journal":
+    run_faith_journal()
+elif mode == "Tailored Learning Path":
+    run_learning_path_mode()
+elif mode == "Bible Beta Mode":
+    run_bible_beta()
+elif mode == "Pixar Bible Story for Kids":  # ✅ CALL THE NEW FUNCTION
+    run_pixar_story_mode()
+else:
+    st.warning("This mode is under construction.")
+
