@@ -128,32 +128,42 @@ def run_chat_mode():
     for msg in st.session_state.chat_history:
         speaker = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
         st.markdown(f"**{speaker}:** {msg['content']}")
-def run_pixar_story_mode():
-    st.subheader("🎬 Pixar-Style Bible Story for Kids")
-    st.info("Generate a fun, engaging, Pixar-style retelling of a Bible story!")
 
-    book = st.text_input("Enter Bible book (e.g., Genesis):")
-    chapter = st.text_input("Enter chapter (optional):")
-    tone = st.selectbox("Choose tone:", ["Funny", "Adventurous", "Heartwarming", "All Ages Pixar"])
-    theme = st.text_input("Optional theme or moral (e.g., forgiveness, bravery):")
+def run_pixar_story_animation():
+    st.subheader("🎥 Pixar-Style Animated Bible Story")
+    st.info("Turn a Bible story into a Pixar-style visual storybook for kids!")
 
-    if st.button("🎨 Generate Pixar Story") and book:
-        reference = f"{book} {chapter}" if chapter else book
-        prompt = (
-            f"You are a creative Pixar-style storyteller for kids. Turn the story from {reference} "
-            f"into a short, engaging, animated-style Bible story appropriate for children ages 4–10. "
-            f"Use a {tone.lower()} tone and make it feel like a Pixar short film. "
+    book = st.text_input("📘 Enter Bible book (e.g., Daniel):")
+    chapter = st.text_input("🔢 Chapter (optional):")
+    tone = st.selectbox("🎭 Choose tone:", ["Funny", "Adventurous", "Heartwarming", "All Ages Pixar"])
+    theme = st.text_input("💡 Theme or lesson (e.g., courage, forgiveness):")
+
+    if st.button("🎬 Generate Story") and book:
+        ref = f"{book} {chapter}" if chapter else book
+        story_prompt = (
+            f"Turn the Bible story from {ref} into a Pixar-style story for kids. "
+            f"Tone: {tone}. Theme: {theme if theme else 'faith'}. "
+            "Break the story into 5 scenes. Each scene should be 1–2 sentences, colorful, imaginative, and visual. "
+            "Output as numbered list (1. ..., 2. ..., etc)."
         )
-        if theme:
-            prompt += f"Include a clear moral or lesson around the theme of '{theme}'. "
-        prompt += (
-            "Use imaginative language, colorful characters (like talking animals, funny angels, or silly villains), "
-            "and break the story into clear paragraphs or scenes. Keep the tone joyful and faith-filled, but accurate to the Scripture."
-        )
+        response = ask_gpt_conversation(story_prompt)
+        st.markdown("**📚 Story Scenes:**")
 
-        story = ask_gpt_conversation(prompt)
-        st.markdown("**📖 AI-Generated Pixar Bible Story:**")
-        st.write(story)
+        scenes = re.findall(r'\d+\.\s+(.*)', response)
+        dalle_images = []
+
+        for idx, scene in enumerate(scenes):
+            st.markdown(f"**Scene {idx + 1}:** {scene}")
+            dalle_prompt = f"{scene} Pixar-style, colorful, animated film still, soft lighting, child-friendly"
+            image_response = client.images.generate(
+                model="dall-e-3",
+                prompt=dalle_prompt,
+                size="1024x1024",
+                n=1
+            )
+            image_url = image_response.data[0].url
+            dalle_images.append(image_url)
+            st.image(image_url, caption=f"🎨 Scene {idx + 1}", use_column_width=True)
 
 def run_practice_chat():
     st.subheader("🤠 Practice Chat")
@@ -340,8 +350,8 @@ elif mode == "Tailored Learning Path":
     run_learning_path_mode()
 elif mode == "Bible Beta Mode":
     run_bible_beta()
-elif mode == "Pixar Bible Story for Kids":  # ✅ CALL THE NEW FUNCTION
-    run_pixar_story_mode()
+elif mode == "Pixar Story Animation":
+    run_pixar_story_animation()
 else:
     st.warning("This mode is under construction.")
 
