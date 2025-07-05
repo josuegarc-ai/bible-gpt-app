@@ -88,7 +88,7 @@ def run_bible_lookup():
                 st.markdown(f"- {item['pastor']}: {item['url']}")
         except Exception as e:
             st.error(str(e))
-        
+
 def run_chat_mode():
     st.subheader("💬 Chat with GPT")
     if "chat_history" not in st.session_state:
@@ -96,12 +96,16 @@ def run_chat_mode():
     user_input = st.text_input("Ask a question or share a thought:")
     if st.button("Send") and user_input:
         if user_input.lower().strip() in ["exit", "quit", "end", "stop"]:
-            full_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history])
+            full_context = "
+".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history])
             guidance_prompt = (
                 "You are a Christ-centered, pastoral guide. Based on the following conversation, write a short, encouraging reflection that gently sends the user off. "
                 "Do not pray for them directly. Instead, guide them to seek God's presence, remind them of Jesus' love, and create a related prayer for for the user. "
-                "Speak life, truth, and peace over them using Scripture and loving counsel. End with a hopeful, Spirit-led encouragement.\n\n"
-                f"Conversation:\n{full_context}"
+                "Speak life, truth, and peace over them using Scripture and loving counsel. End with a hopeful, Spirit-led encouragement.
+
+"
+                f"Conversation:
+{full_context}"
             )
             reflection = ask_gpt_conversation(guidance_prompt)
             st.markdown("**🙏 Final Encouragement:**")
@@ -246,6 +250,35 @@ def run_practice_chat():
         if st.button("Restart Practice"):
             state["restart_flag"] = True
             st.rerun()
+
+def run_verse_of_the_day():
+    st.subheader("🌅 Verse of the Day")
+    books = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges", "Ruth",
+             "1 Samuel", "2 Samuel", "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah",
+             "Esther", "Job", "Psalms", "Proverbs", "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
+             "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos", "Obadiah", "Jonah", "Micah",
+             "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi", "Matthew", "Mark", "Luke",
+             "John", "Acts", "Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+             "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians", "1 Timothy", "2 Timothy",
+             "Titus", "Philemon", "Hebrews", "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
+             "Jude", "Revelation"]
+    book = random.choice(books)
+    chapter = random.randint(1, 5)
+    verse_number = random.randint(1, 20)
+    verse = f"{book} {chapter}:{verse_number}"
+    translation = "web"
+    try:
+        verse_text = fetch_bible_verse(verse, translation)
+        st.markdown(f"**{verse}** — *{translation.upper()}*")
+        st.success(verse_text)
+        summary_prompt = (
+            f"Summarize and reflect on this daily verse with a theological perspective: '{verse_text}' ({verse}). Include encouragement and life application."
+        )
+        summary = ask_gpt_conversation(summary_prompt)
+        st.markdown("**💬 Reflection:**")
+        st.info(summary)
+    except Exception as e:
+        st.error(str(e))
 
 def run_faith_journal():
     st.subheader("📝 Faith Journal")
