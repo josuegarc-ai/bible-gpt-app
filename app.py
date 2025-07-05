@@ -163,7 +163,6 @@ def run_pixar_story_animation():
             prompt_enhancer = (
                 f"You are a creative visual designer generating a concept prompt for a 3D animated Bible movie for children. "
                 f"Turn the following scene into a rich, biblically accurate image prompt. "
-                f"Include detailed elements such as ancient Middle Eastern clothing, realistic ethnicity, architecture, desert or pastoral landscapes, and expressive emotional tone. "
                 f"The style should be: 'In a 3D modern animation style, reminiscent of early 21st century design principles like Final Fantasy for children'. "
                 f"Make it cinematic, colorful, soft-lit, and child-appropriate. Output only the final DALL·E-compatible prompt.\n\nScene: {scene}"
             )
