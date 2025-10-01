@@ -383,25 +383,34 @@ def run_bible_beta():
 
 ##NEWLY ADDED
 
+from pytube import YouTube
+from urllib.error import HTTPError
+import tempfile
+
 def download_youtube_audio(url):
     try:
         yt = YouTube(url)
-        stream = yt.streams.filter(only_audio=True).first()
+        
+        # Try audio stream first
+        audio_stream = yt.streams.filter(only_audio=True).first()
+        
+        if not audio_stream:
+            # Fallback to progressive stream (video+audio)
+            audio_stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('abr').desc().first()
+        
+        if not audio_stream:
+            raise Exception("❌ No audio stream available to download. Try a different video.")
 
-        if not stream:
-            raise Exception("No downloadable audio stream found.")
-
+        # Download to a temporary path
         temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-        stream.download(filename=temp_audio_path.name)
+        audio_stream.download(filename=temp_audio_path.name)
 
         return temp_audio_path.name, yt.author, yt.title
 
     except HTTPError as e:
-        raise Exception("YouTube audio download failed due to HTTP Error 400. "
-                        "This can happen if the video is age-restricted, copyrighted, "
-                        "or region-blocked. Please try a different video.") from e
+        raise Exception("❌ YouTube download failed due to HTTP 400. The video might be restricted, private, or region-locked.") from e
     except Exception as e:
-        raise Exception(f"YouTube audio download failed: {e}") from e
+        raise Exception(f"❌ General YouTube download failure: {e}") from e
 
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
