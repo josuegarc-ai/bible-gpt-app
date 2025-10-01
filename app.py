@@ -40,8 +40,8 @@ def fetch_bible_verse(passage: str, translation: str = "web") -> str:
 def ask_gpt_conversation(prompt: str) -> str:
     response = client.chat.completions.create(
         model=model,
-        temperature=0.4,
-        max_tokens=1000,
+        temperature=0.3,
+        max_tokens=3000,
         messages=[
             {"role": "system", "content": "You are a biblical mentor and teacher. You explain Scripture clearly, compassionately, and apply it to modern life with spiritual insight."},
             {"role": "user", "content": prompt}
