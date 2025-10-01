@@ -421,8 +421,8 @@ def run_sermon_transcriber():
                     sermon_title = "Untitled Sermon"
 
                 # ✅ Load Whisper model
-                model = whisper.load_model("base")  # or "small" for more accuracy
-                transcription = model.transcribe(audio_path)
+                whisper_model = whisper.load_model("base")  # or "small" for more accuracy
+                transcription = whisper_model.transcribe(audio_path)
                 transcript_text = transcription["text"].strip()
 
                 st.success("✅ Transcription complete.")
