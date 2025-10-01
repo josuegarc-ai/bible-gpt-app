@@ -9,3 +9,4 @@ pytube
 torch
 torchaudio
 ffmpeg-python
+yt_dlp
