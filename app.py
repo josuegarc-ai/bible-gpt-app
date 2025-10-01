@@ -13,6 +13,13 @@ from duckduckgo_search import DDGS
 from bs4 import BeautifulSoup  # ✅ Add this line
 import streamlit as st
 
+##NEWLY ADDED
+import tempfile
+import subprocess
+import urllib.request
+from pytube import YouTube
+import whisper
+
 # ================= CONFIG =================
 client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
 model = "gpt-4o"
