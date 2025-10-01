@@ -400,10 +400,13 @@ def run_sermon_transcriber():
 
     if st.button("⏺️ Transcribe & Summarize") and (yt_link or audio_file):
         with st.spinner("Transcribing... please wait."):
-
             audio_path = None
             try:
+                # ✅ Download or load audio
                 if yt_link:
+                    yt = YouTube(yt_link)
+                    if yt.length > 900:  # 15 minutes = 900 seconds
+                        raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
                     audio_path, preacher_name, sermon_title = download_youtube_audio(yt_link)
                 elif audio_file:
                     temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
@@ -412,7 +415,7 @@ def run_sermon_transcriber():
                     preacher_name = "Unknown"
                     sermon_title = "Untitled Sermon"
 
-                # Load Whisper model
+                # ✅ Load Whisper model
                 model = whisper.load_model("base")  # or "small" for more accuracy
                 transcription = model.transcribe(audio_path)
                 transcript_text = transcription["text"].strip()
@@ -421,8 +424,12 @@ def run_sermon_transcriber():
                 st.markdown("### 📝 Transcript")
                 st.text_area("Transcript", transcript_text, height=300)
 
-                # Summarize
-                prompt = f"""You are a sermon summarizer. From the transcript below, summarize the following:
+                # ✅ Trim transcript to prevent too-large prompt
+                max_transcript_chars = 2000
+                short_transcript = transcript_text[:max_transcript_chars]
+
+                # ✅ Safe prompt for GPT
+                safe_prompt = f"""You are a sermon summarizer. From the transcript below, summarize the following:
 - **Sermon Title**
 - **Preacher Name**
 - **Bible Verses Referenced**
@@ -434,14 +441,15 @@ Preacher: {preacher_name}
 Title: {sermon_title}
 
 Transcript:
-{transcript_text}
+{short_transcript}
 """
 
-                summary = ask_gpt_conversation(prompt)
+                # ✅ Summarize with GPT
+                summary = ask_gpt_conversation(safe_prompt)
                 st.markdown("### 🧠 Sermon Summary")
                 st.markdown(summary)
 
-                # Save both to local journal folder
+                # ✅ Save transcript + summary locally
                 os.makedirs("sermon_journal", exist_ok=True)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 with open(f"sermon_journal/transcript_{timestamp}.txt", "w") as f:
