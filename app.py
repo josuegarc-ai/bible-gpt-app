@@ -383,25 +383,35 @@ def run_bible_beta():
 
 ##NEWLY ADDED
 
+import yt_dlp
+import tempfile
+import os
+
 def download_youtube_audio(url):
     try:
-        # Patch pytube to avoid 403/400 errors
-        YouTube._request = staticmethod(default_range_request)
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        output_path = temp_file.name
 
-        yt = YouTube(url)
-        audio_stream = yt.streams.filter(only_audio=True).first()
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': output_path,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'quiet': True
+        }
 
-        if not audio_stream:
-            raise Exception("❌ No audio stream found. Try another video.")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=True)
+            title = info_dict.get('title', 'Untitled Sermon')
+            uploader = info_dict.get('uploader', 'Unknown')
 
-        # Download stream to temp path
-        temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-        audio_stream.download(filename=temp_audio_path.name)
-
-        return temp_audio_path.name, yt.author, yt.title
+        return output_path, uploader, title
 
     except Exception as e:
-        raise Exception(f"❌ YouTube download error: {str(e)}")
+        raise Exception(f"❌ yt_dlp download error: {e}")
 
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
