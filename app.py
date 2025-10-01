@@ -383,14 +383,6 @@ def run_bible_beta():
 
 ##NEWLY ADDED
 
-from pytube import YouTube
-from urllib.error import HTTPError
-import tempfile
-
-from pytube import YouTube
-from pytube.request import default_range_request
-import tempfile
-
 def download_youtube_audio(url):
     try:
         # Patch pytube to avoid 403/400 errors
