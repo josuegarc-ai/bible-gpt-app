@@ -471,7 +471,7 @@ elif mode == "Bible Beta Mode":
     run_bible_beta()
 elif mode == "Pixar Story Animation":
     run_pixar_story_animation() 
-    elif mode == "🎧 Sermon Transcriber & Summarizer":
+elif mode == "🎧 Sermon Transcriber & Summarizer":
     run_sermon_transcriber() # 👈 This line is required
 else:
     st.warning("This mode is under construction.")
