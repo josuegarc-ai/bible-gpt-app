@@ -6,3 +6,10 @@ beautifulsoup4
 pytube>=15.0.0
 whisper
 pytube
+
+torch
+torchaudio
+pyttsx3
+requests
+googlesearch-python
+ffmpeg-python
