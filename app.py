@@ -382,16 +382,19 @@ def run_bible_beta():
 ##NEWLY ADDED
 
 def download_youtube_audio(youtube_url):
-    """Download audio from YouTube and return the local file path, preacher name, and sermon title."""
-    yt = YouTube(youtube_url)
-    if yt.length > 900:
-        raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
-    stream = yt.streams.filter(only_audio=True).first()
-    if not stream:
-        raise Exception("❌ No audio stream found.")
-    temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    stream.download(filename=temp_audio_path.name)
-    return temp_audio_path.name, yt.author, yt.title
+    """Download audio from YouTube and return local file path, preacher name, and sermon title."""
+    try:
+        yt = YouTube(youtube_url, use_oauth=False, allow_oauth_cache=True)
+        stream = yt.streams.filter(only_audio=True).first()
+        if not stream:
+            raise Exception("❌ No audio stream found.")
+        temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+        stream.download(filename=temp_audio_path.name)
+        if os.path.getsize(temp_audio_path.name) < 1024:
+            raise Exception("❌ Downloaded file too small. Try another video or check the URL.")
+        return temp_audio_path.name, yt.author, yt.title
+    except Exception as e:
+        raise Exception(f"❌ Error downloading YouTube audio: {e}")
 
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
