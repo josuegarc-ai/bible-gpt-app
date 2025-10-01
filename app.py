@@ -454,7 +454,7 @@ mode = st.sidebar.selectbox("Choose a mode:", [
     "Bible Lookup", "Chat with GPT", "Practice Chat", "Verse of the Day",
     "Study Plan", "Faith Journal", "Prayer Starter", "Fast Devotional",
     "Small Group Generator", "Tailored Learning Path", "Bible Beta Mode",
-    "Pixar Story Animation"  # 👈 Make sure this is listed
+    "Pixar Story Animation", "Sermon Transcriber & Summarizer"   # 👈 Make sure this is listed
 ])
 
 if mode == "Bible Lookup":
