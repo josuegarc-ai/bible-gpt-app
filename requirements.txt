@@ -3,7 +3,7 @@ streamlit
 requests
 duckduckgo-search
 beautifulsoup4
-pytube>=12.1.2
+pytube>=15.0.0
 whisper
 pytube
 torch
