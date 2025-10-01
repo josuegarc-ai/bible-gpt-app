@@ -426,12 +426,16 @@ def run_sermon_transcriber():
                 st.markdown("### 📝 Transcript")
                 st.text_area("Transcript", transcript_text, height=300)
 
-                # ✅ Trim transcript to prevent too-large prompt
-                max_transcript_chars = 2000
+                # ✅ Trim transcript to prevent GPT overload
+                max_transcript_chars = 1800  # keep under token limit
                 short_transcript = transcript_text[:max_transcript_chars]
+
+                # ✅ Escape newlines & large content for GPT prompt
+                safe_transcript = short_transcript.replace("\n", " ").replace("\r", " ")
 
                 # ✅ Safe prompt for GPT
                 safe_prompt = f"""You are a sermon summarizer. From the transcript below, summarize the following:
+
 - **Sermon Title**
 - **Preacher Name**
 - **Bible Verses Referenced**
@@ -443,7 +447,7 @@ Preacher: {preacher_name}
 Title: {sermon_title}
 
 Transcript:
-{short_transcript}
+{safe_transcript}
 """
 
                 # ✅ Summarize with GPT
