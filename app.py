@@ -12,6 +12,8 @@ from datetime import datetime
 from duckduckgo_search import DDGS
 from bs4 import BeautifulSoup  # ✅ Add this line
 import streamlit as st
+from pytube import YouTube
+from urllib.error import HTTPError
 
 ##NEWLY ADDED
 import tempfile
