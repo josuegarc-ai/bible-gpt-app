@@ -3,3 +3,6 @@ streamlit
 requests
 duckduckgo-search
 beautifulsoup4
+pytube>=15.0.0
+whisper
+pytube
