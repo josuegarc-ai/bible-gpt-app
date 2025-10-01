@@ -381,6 +381,16 @@ def run_bible_beta():
 
 ##NEWLY ADDED
 
+def download_youtube_audio(youtube_url):
+    """Download audio from YouTube and return the local file path, preacher name, and sermon title."""
+    yt = YouTube(youtube_url)
+    stream = yt.streams.filter(only_audio=True).first()
+    if not stream:
+        raise Exception("❌ No audio stream found.")
+    temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    stream.download(filename=temp_audio_path.name)
+    return temp_audio_path.name, yt.author, yt.title
+
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
     st.info("Upload a sermon audio or paste a YouTube link. Max length: 15 minutes.")
