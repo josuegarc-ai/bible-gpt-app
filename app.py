@@ -48,8 +48,6 @@ def extract_json_from_response(response_text):
         return None
 
 # =============== SERMON SEARCH ===============
-from bs4 import BeautifulSoup
-import urllib.parse
 
 def search_sermons_online(passage):
     headers = {
