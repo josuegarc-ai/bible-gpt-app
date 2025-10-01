@@ -379,6 +379,76 @@ def run_bible_beta():
         except Exception as e:
             st.error(str(e))
 
+##NEWLY ADDED
+
+def run_sermon_transcriber():
+    st.subheader("🎧 Sermon Transcriber & Summarizer")
+    st.info("Upload a sermon audio or paste a YouTube link. Max length: 15 minutes.")
+
+    yt_link = st.text_input("📺 YouTube Link (15 mins max):")
+    audio_file = st.file_uploader("🎙️ Or upload sermon audio (MP3/WAV/M4A)", type=["mp3", "wav", "m4a"])
+
+    if st.button("⏺️ Transcribe & Summarize") and (yt_link or audio_file):
+        with st.spinner("Transcribing... please wait."):
+
+            audio_path = None
+            try:
+                if yt_link:
+                    yt = YouTube(yt_link)
+                    stream = yt.streams.filter(only_audio=True).first()
+                    temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+                    stream.download(filename=temp_audio_path.name)
+                    audio_path = temp_audio_path.name
+                    preacher_name = yt.author
+                    sermon_title = yt.title
+                elif audio_file:
+                    temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+                    temp_audio_path.write(audio_file.read())
+                    audio_path = temp_audio_path.name
+                    preacher_name = "Unknown"
+                    sermon_title = "Untitled Sermon"
+
+                # Load Whisper model
+                model = whisper.load_model("base")  # or "small" if more accurate
+                transcription = model.transcribe(audio_path)
+                transcript_text = transcription["text"].strip()
+
+                st.success("✅ Transcription complete.")
+                st.markdown("### 📝 Transcript")
+                st.text_area("Transcript", transcript_text, height=300)
+
+                # Summarize
+                prompt = f"""You are a sermon summarizer. From the transcript below, summarize the following:
+- **Sermon Title**
+- **Preacher Name**
+- **Bible Verses Referenced**
+- **Main Takeaways**
+- **Reflection Questions**
+- **Call to Action (if any)**
+
+Preacher: {preacher_name}
+Title: {sermon_title}
+
+Transcript:
+{transcript_text}
+"""
+
+                summary = ask_gpt_conversation(prompt)
+                st.markdown("### 🧠 Sermon Summary")
+                st.markdown(summary)
+
+                # Save both to local journal folder
+                os.makedirs("sermon_journal", exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                with open(f"sermon_journal/transcript_{timestamp}.txt", "w") as f:
+                    f.write(transcript_text)
+                with open(f"sermon_journal/summary_{timestamp}.txt", "w") as f:
+                    f.write(summary)
+
+                st.success("Saved transcript and summary to `sermon_journal/` folder.")
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+
 # =============== MAIN UI ===============
 mode = st.sidebar.selectbox("Choose a mode:", [
     "Bible Lookup", "Chat with GPT", "Practice Chat", "Verse of the Day",
