@@ -387,30 +387,29 @@ from pytube import YouTube
 from urllib.error import HTTPError
 import tempfile
 
+from pytube import YouTube
+from pytube.request import default_range_request
+import tempfile
+
 def download_youtube_audio(url):
     try:
-        yt = YouTube(url)
-        
-        # Try audio stream first
-        audio_stream = yt.streams.filter(only_audio=True).first()
-        
-        if not audio_stream:
-            # Fallback to progressive stream (video+audio)
-            audio_stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('abr').desc().first()
-        
-        if not audio_stream:
-            raise Exception("❌ No audio stream available to download. Try a different video.")
+        # Patch pytube to avoid 403/400 errors
+        YouTube._request = staticmethod(default_range_request)
 
-        # Download to a temporary path
+        yt = YouTube(url)
+        audio_stream = yt.streams.filter(only_audio=True).first()
+
+        if not audio_stream:
+            raise Exception("❌ No audio stream found. Try another video.")
+
+        # Download stream to temp path
         temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         audio_stream.download(filename=temp_audio_path.name)
 
         return temp_audio_path.name, yt.author, yt.title
 
-    except HTTPError as e:
-        raise Exception("❌ YouTube download failed due to HTTP 400. The video might be restricted, private, or region-locked.") from e
     except Exception as e:
-        raise Exception(f"❌ General YouTube download failure: {e}") from e
+        raise Exception(f"❌ YouTube download error: {str(e)}")
 
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
