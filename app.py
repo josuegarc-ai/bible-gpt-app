@@ -48,21 +48,47 @@ def extract_json_from_response(response_text):
         return None
 
 # =============== SERMON SEARCH ===============
+from bs4 import BeautifulSoup
+import urllib.parse
+
 def search_sermons_online(passage):
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
     pastors = ["Philip Anthony Mitchell", "TD Jakes", "Tony Evans", "Mike Todd"]
+    base_url = "https://www.youtube.com/results?search_query="
     results = []
-    ddgs = DDGS()
+
     for pastor in pastors:
-        query = f"{pastor} sermon on {passage} site:youtube.com"
+        query = f"{pastor} sermon on {passage}"
+        search_url = base_url + urllib.parse.quote(query)
         try:
-            search_results = ddgs.text(query, max_results=1)
-            if search_results:
-                url = search_results[0]['href']
-                results.append({"pastor": pastor, "url": url})
+            response = requests.get(search_url, headers=headers)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            scripts = soup.find_all("script")
+
+            for script in scripts:
+                if "var ytInitialData" in script.text:
+                    start = script.text.find("var ytInitialData") + len("var ytInitialData = ")
+                    end = script.text.find("};", start) + 1
+                    json_text = script.text[start:end]
+                    yt_data = json.loads(json_text)
+                    videos = yt_data['contents']['twoColumnSearchResultsRenderer']['primaryContents']['sectionListRenderer']['contents'][0]['itemSectionRenderer']['contents']
+                    
+                    # find the first video link
+                    for item in videos:
+                        if "videoRenderer" in item:
+                            video_id = item['videoRenderer']['videoId']
+                            video_url = f"https://www.youtube.com/watch?v={video_id}"
+                            results.append({"pastor": pastor, "url": video_url})
+                            break
+                    else:
+                        results.append({"pastor": pastor, "url": "❌ No result"})
+                    break
             else:
-                results.append({"pastor": pastor, "url": "❌ No result"})
+                results.append({"pastor": pastor, "url": "❌ Script not found"})
         except Exception as e:
-            results.append({"pastor": pastor, "url": f"❌ Error searching"})
+            results.append({"pastor": pastor, "url": f"❌ Error: {str(e)}"})
     return results
 
 # =============== MODES ===============
