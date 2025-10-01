@@ -385,7 +385,7 @@ def download_youtube_audio(youtube_url):
     """Download audio from YouTube and return the local file path, preacher name, and sermon title."""
     yt = YouTube(youtube_url)
     if yt.length > 900:
-    raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
+        raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
     stream = yt.streams.filter(only_audio=True).first()
     if not stream:
         raise Exception("❌ No audio stream found.")
