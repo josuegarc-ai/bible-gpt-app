@@ -9,8 +9,8 @@ import re
 import random
 from datetime import datetime
 from duckduckgo_search import DDGS
+from bs4 import BeautifulSoup  # ✅ Add this line
 import streamlit as st
-import urllib.parse
 
 # ================= CONFIG =================
 client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
