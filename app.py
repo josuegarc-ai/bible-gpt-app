@@ -394,13 +394,7 @@ def run_sermon_transcriber():
             audio_path = None
             try:
                 if yt_link:
-                    yt = YouTube(yt_link)
-                    stream = yt.streams.filter(only_audio=True).first()
-                    temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-                    stream.download(filename=temp_audio_path.name)
-                    audio_path = temp_audio_path.name
-                    preacher_name = yt.author
-                    sermon_title = yt.title
+                    audio_path, preacher_name, sermon_title = download_youtube_audio(yt_link)
                 elif audio_file:
                     temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
                     temp_audio_path.write(audio_file.read())
@@ -409,7 +403,7 @@ def run_sermon_transcriber():
                     sermon_title = "Untitled Sermon"
 
                 # Load Whisper model
-                model = whisper.load_model("base")  # or "small" if more accurate
+                model = whisper.load_model("base")  # or "small" for more accuracy
                 transcription = model.transcribe(audio_path)
                 transcript_text = transcription["text"].strip()
 
