@@ -7,6 +7,7 @@ import requests
 import json
 import re
 import random
+import urllib.parse
 from datetime import datetime
 from duckduckgo_search import DDGS
 from bs4 import BeautifulSoup  # ✅ Add this line
