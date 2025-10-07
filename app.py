@@ -22,6 +22,12 @@ import urllib.request
 from pytube import YouTube
 import whisper
 
+import imageio_ffmpeg
+import os
+
+# Ensure ffmpeg path is accessible
+os.environ["PATH"] += os.pathsep + os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
+
 # ================= CONFIG =================
 client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
 model = "gpt-4o"
