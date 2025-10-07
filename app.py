@@ -594,17 +594,53 @@ Transcript:
 # SIMPLE STUDY PLAN (Mode 5)
 # ================================================================
 def run_study_plan():
-    st.subheader("📅 Generate a Bible Study Plan")
-    goal = st.text_input("What's your study goal? (e.g., 'Understand forgiveness in 14 days')")
-    if st.button("Create Plan") and goal:
-        plan = ask_gpt_conversation(
-            "Design a theologically sound Bible study plan:\n"
-            f"Goal: {goal}\n"
-            "- Break into daily readings/passages with brief purpose notes.\n"
-            "- Include cross-references and 1 reflection question per day.\n"
-            "- Keep it pastoral, clear, and rooted in Scripture.\n"
-        )
-        st.text_area("Study Plan", plan, height=450)
+    st.subheader("📅 Personalized Bible Study Plan")
+
+    goal = st.text_input("Study goal (e.g., 'Grow in faith', 'Understand forgiveness'):")
+    duration = st.slider("How many days do you want your plan to last?", 7, 60, 14)
+    focus = st.text_input("Focus area (optional):")
+    level = st.selectbox("Knowledge level:", ["Beginner", "Intermediate", "Advanced"])
+    include_reflections = st.checkbox("Include daily reflection questions?", True)
+
+    if st.button("Generate Study Plan") and goal:
+        with st.spinner("✍️ Creating your personalized study plan..."):
+            prompt = f"""
+You are a mature Bible mentor creating a detailed, Scripture-based daily study plan.
+
+**Parameters:**
+- Goal: {goal}
+- Duration: {duration} days
+- Focus area: {focus or 'General spiritual growth'}
+- Knowledge level: {level}
+
+**Instructions:**
+Design a day-by-day Bible study plan.
+For each day:
+- Give a short **title or theme**
+- Suggest **1–2 Bible passages to read**
+- Write a **summary** (3–5 sentences) explaining the meaning and relevance
+- Include a **cross-reference verse**
+- Provide a **practical life application**
+{"- Add a reflection question for journaling." if include_reflections else ""}
+End with a brief closing paragraph encouraging the reader to stay consistent.
+
+The tone should be pastoral, warm, and theologically sound.
+Make sure it feels like a devotional guide.
+"""
+            try:
+                plan = ask_gpt_conversation(prompt)
+                st.markdown("### 📘 Your Study Plan")
+                st.text_area("", plan, height=600)
+
+                # Save locally
+                os.makedirs("study_plans", exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                file_path = f"study_plans/study_plan_{timestamp}.txt"
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(plan)
+                st.success(f"✅ Study plan saved to `{file_path}`.")
+            except Exception as e:
+                st.error(f"❌ Error generating study plan: {e}")
 
 # ================================================================
 # VERSE OF THE DAY, PRAYER STARTER, FAST DEVOTIONAL, SMALL GROUP
