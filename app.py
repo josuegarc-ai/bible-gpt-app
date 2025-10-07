@@ -13,8 +13,15 @@ os.environ["FFPROBE_LOCATION"] = ffmpeg_dir  # 👈 same here
 
 # ✅ Diagnostic
 print("FFmpeg binary:", ffmpeg_path)
-print("FFmpeg exists:", shutil.which("ffmpeg"))
-print("FFprobe exists:", shutil.which("ffprobe"))
+import shutil, os
+
+# ✅ Confirm ffmpeg is installed and on PATH
+print("FFmpeg:", shutil.which("ffmpeg"))
+print("FFprobe:", shutil.which("ffprobe"))
+
+if not shutil.which("ffmpeg"):
+    raise RuntimeError("❌ ffmpeg not found on PATH. Check your requirements.txt includes 'ffmpeg'.")
+
 # ✅ Bible GPT — Restored + Enhanced with New Features
 # Amazing working option v2.3 — Now with conversational chat, AI insight fixes, enhanced practice, mixed learning path, and 'Bible Beta' (AI voices + highlights)
 
@@ -410,7 +417,6 @@ import tempfile
 import os
 
 def download_youtube_audio(url):
-    """Download YouTube sermon audio with reliable ffmpeg/ffprobe path."""
     try:
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
         output_path = temp_file.name
@@ -418,16 +424,13 @@ def download_youtube_audio(url):
         ydl_opts = {
             "format": "bestaudio/best",
             "outtmpl": output_path,
-            "geo_bypass": True,
-            "ffmpeg_location": os.environ["FFMPEG_LOCATION"],  # ✅ directory path
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
-            "retries": 3,
             "quiet": True,
-            "noprogress": True,
+            "retries": 3,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -439,7 +442,6 @@ def download_youtube_audio(url):
 
     except Exception as e:
         raise Exception(f"❌ yt_dlp download error: {e}")
-
 
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
