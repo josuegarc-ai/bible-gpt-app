@@ -12,6 +12,7 @@ import subprocess
 import requests
 from datetime import datetime
 import streamlit as st
+import shutil
 
 # ==== AI / NLP ====
 import openai
