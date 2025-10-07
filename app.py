@@ -415,8 +415,8 @@ import os
 
 def download_youtube_audio(url: str):
     """
-    Download best available audio WITHOUT postprocessing (no mp3 convert, no ffprobe).
-    Returns: (file_path, uploader, title)
+    Download best available audio WITHOUT postprocessing.
+    Uses a modern user agent and updated extractor args to bypass 403 errors.
     """
     tmp_dir = tempfile.mkdtemp(prefix="yt_")
     outtmpl = os.path.join(tmp_dir, "%(id)s.%(ext)s")
@@ -428,18 +428,31 @@ def download_youtube_audio(url: str):
         "restrictfilenames": True,
         "quiet": True,
         "no_warnings": True,
-        "ffmpeg_location": FFMPEG_DIR,   # use only ffmpeg (provided above)
-        # 🔒 NO postprocessors -> avoids ffprobe completely
+        "ffmpeg_location": FFMPEG_DIR,
+        "http_headers": {
+            # ✅ Spoof a real desktop browser to avoid 403 Forbidden
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+        # ✅ Use a stable extractor and retry logic
+        "extractor_args": {"youtube": {"player_skip": ["configs"]}},
+        "retries": 5,
+        "fragment_retries": 10,
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        # Final path yt_dlp wrote (no postprocessing, so this is the actual file)
-        file_path = ydl.prepare_filename(info)  # e.g., /tmp/yt_abc/VIDEOID.webm or .m4a
-        title = info.get("title", "Untitled Sermon")
-        uploader = info.get("uploader", "Unknown")
-
-    return file_path, uploader, title
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            file_path = ydl.prepare_filename(info)
+            title = info.get("title", "Untitled Sermon")
+            uploader = info.get("uploader", "Unknown")
+        return file_path, uploader, title
+    except Exception as e:
+        raise Exception(f"❌ yt_dlp download error: {e}")
 
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
