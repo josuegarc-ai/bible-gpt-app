@@ -730,29 +730,31 @@ MODE = st.sidebar.selectbox(
     ],
 )
 
-if MODE == "Bible Lookup":
+if mode == "Bible Lookup":
     run_bible_lookup()
-elif MODE == "Chat with GPT":
+elif mode == "Chat with GPT":
     run_chat_mode()
-elif MODE == "Practice Chat":
+elif mode == "Practice Chat":
     run_practice_chat()
-elif MODE == "Verse of the Day":
+elif mode == "Verse of the Day":
     run_verse_of_the_day()
-elif MODE == "Study Plan":
-    run_study_plan()
-elif MODE == "Faith Journal":
+elif mode == "Study Plan":
+    run_study_plan()  # ✅ THIS LINE ENSURES IT RUNS
+elif mode == "Faith Journal":
     run_faith_journal()
-elif MODE == "Prayer Starter":
+elif mode == "Prayer Starter":
     run_prayer_starter()
-elif MODE == "Fast Devotional":
+elif mode == "Fast Devotional":
     run_fast_devotional()
-elif MODE == "Small Group Generator":
+elif mode == "Small Group Generator":
     run_small_group_generator()
-elif MODE == "Tailored Learning Path":
+elif mode == "Tailored Learning Path":
     run_learning_path_mode()
-elif MODE == "Bible Beta Mode":
+elif mode == "Bible Beta Mode":
     run_bible_beta()
-elif MODE == "Pixar Story Animation":
+elif mode == "Pixar Story Animation":
     run_pixar_story_animation()
-elif MODE == "Sermon Transcriber & Summarizer":
+elif mode == "Sermon Transcriber & Summarizer":
     run_sermon_transcriber()
+else:
+    st.warning("This mode is under construction.")
