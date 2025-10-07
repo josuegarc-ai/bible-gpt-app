@@ -711,7 +711,7 @@ def run_small_group_generator():
 # ================================================================
 # MAIN UI
 # ================================================================
-MODE = st.sidebar.selectbox(
+mode = st.sidebar.selectbox(
     "Choose a mode:",
     [
         "Bible Lookup",
@@ -726,7 +726,7 @@ MODE = st.sidebar.selectbox(
         "Tailored Learning Path",
         "Bible Beta Mode",
         "Pixar Story Animation",
-        "Sermon Transcriber & Summarizer",
+        "Sermon Transcriber & Summarizer"
     ],
 )
 
