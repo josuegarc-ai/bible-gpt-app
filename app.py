@@ -24,18 +24,22 @@ import whisper
 
 import imageio_ffmpeg
 import os
-import yt_dlp
+import shutil
 
-# ✅ Force yt_dlp to use ffmpeg & ffprobe from imageio_ffmpeg
+# ✅ Get ffmpeg binary path from imageio
 ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-ffprobe_path = ffmpeg_path.replace("ffmpeg", "ffprobe")  # works for bundled binary
+ffprobe_path = ffmpeg_path.replace("ffmpeg", "ffprobe")
 
+# ✅ Ensure yt_dlp & other tools can find them
 os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)
-os.environ["FFMPEG_LOCATION"] = os.path.dirname(ffmpeg_path)
-os.environ["FFPROBE_LOCATION"] = os.path.dirname(ffprobe_path)
+os.environ["FFMPEG_LOCATION"] = ffmpeg_path
+os.environ["FFPROBE_LOCATION"] = ffprobe_path
 
-yt_dlp.utils.FFMPEG.set_executable_path("ffmpeg", ffmpeg_path)
-yt_dlp.utils.FFMPEG.set_executable_path("ffprobe", ffprobe_path)
+# ✅ Double-check they’re accessible
+print("FFmpeg path:", ffmpeg_path)
+print("FFprobe path:", ffprobe_path)
+print("FFmpeg exists:", shutil.which("ffmpeg"))
+print("FFprobe exists:", shutil.which("ffprobe"))
 
 # =============== UTILITIES ===============
 def fetch_bible_verse(passage: str, translation: str = "web") -> str:
