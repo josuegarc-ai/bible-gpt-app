@@ -1,3 +1,20 @@
+import os, shutil, imageio_ffmpeg
+
+# ✅ Get bundled ffmpeg binary path
+ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+ffmpeg_dir = os.path.dirname(ffmpeg_path)
+
+# ✅ Make sure PATH, FFMPEG, and FFPROBE envs are visible to all subprocesses
+os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
+os.environ["FFMPEG_BINARY"] = ffmpeg_path
+os.environ["FFPROBE_BINARY"] = ffmpeg_path
+os.environ["FFMPEG_LOCATION"] = ffmpeg_dir   # 👈 yt_dlp prefers a directory, not the exe file
+os.environ["FFPROBE_LOCATION"] = ffmpeg_dir  # 👈 same here
+
+# ✅ Diagnostic
+print("FFmpeg binary:", ffmpeg_path)
+print("FFmpeg exists:", shutil.which("ffmpeg"))
+print("FFprobe exists:", shutil.which("ffprobe"))
 # ✅ Bible GPT — Restored + Enhanced with New Features
 # Amazing working option v2.3 — Now with conversational chat, AI insight fixes, enhanced practice, mixed learning path, and 'Bible Beta' (AI voices + highlights)
 
@@ -25,23 +42,6 @@ from duckduckgo_search import DDGS
 # ==== Media & YouTube ====
 import yt_dlp
 import imageio_ffmpeg
-
-# =======================
-# ✅ UNIVERSAL FFMPEG SETUP (clean + stable)
-# =======================
-ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)
-os.environ["FFMPEG_BINARY"] = ffmpeg_path
-os.environ["FFPROBE_BINARY"] = ffmpeg_path
-os.environ["FFMPEG_LOCATION"] = ffmpeg_path
-os.environ["FFPROBE_LOCATION"] = ffmpeg_path
-
-FFMPEG_BIN = ffmpeg_path  # global variable for use in subprocess calls
-
-# ✅ Confirm setup in logs
-print("FFmpeg path:", ffmpeg_path)
-print("FFmpeg exists:", shutil.which("ffmpeg"))
-print("FFprobe exists:", shutil.which("ffprobe"))
 
 # ================= CONFIG =================
 bible_api_base = "https://bible-api.com/"
