@@ -426,10 +426,18 @@ def run_sermon_transcriber():
             try:
                 # ✅ Download or load audio
                 if yt_link:
-                    yt = YouTube(yt_link)
-                    if yt.length > 900:  # 15 minutes = 900 seconds
+                # Extract info using yt_dlp
+                with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                    info_dict = ydl.extract_info(yt_link, download=False)
+                    duration = info_dict.get("duration", 0)
+                    if duration > 900:
                         raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
-                    audio_path, preacher_name, sermon_title = download_youtube_audio(yt_link)
+                    preacher_name = info_dict.get("uploader", "Unknown")
+                    sermon_title = info_dict.get("title", "Untitled Sermon")
+                
+                # Now download
+                audio_path, _, _ = download_youtube_audio(yt_link)
+
                 elif audio_file:
                     temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
                     temp_audio_path.write(audio_file.read())
