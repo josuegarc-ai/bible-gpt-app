@@ -41,6 +41,10 @@ print("FFprobe path:", ffprobe_path)
 print("FFmpeg exists:", shutil.which("ffmpeg"))
 print("FFprobe exists:", shutil.which("ffprobe"))
 
+# ================= CONFIG =================
+bible_api_base = "https://bible-api.com/"
+valid_translations = ["web", "kjv", "asv", "bbe", "oeb-us"]
+
 # =============== UTILITIES ===============
 def fetch_bible_verse(passage: str, translation: str = "web") -> str:
     if translation not in valid_translations:
@@ -413,7 +417,18 @@ def download_youtube_audio(url):
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }],
-            'quiet': True
+            'ffmpeg_location': os.environ.get("FFMPEG_LOCATION", "ffmpeg"),
+            'prefer_ffmpeg': True,
+            'postprocessor_args': [
+                '-nostats', '-loglevel', '0'
+            ],
+            'quiet': True,
+            'no_warnings': True,
+            # 🚀 Disable metadata writes that trigger ffprobe
+            'writethumbnail': False,
+            'writeinfojson': False,
+            'skip_download': False,
+            'progress_hooks': [],
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
