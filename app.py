@@ -26,6 +26,14 @@ from duckduckgo_search import DDGS
 import yt_dlp
 import imageio_ffmpeg
 
+import imageio_ffmpeg
+
+# ✅ Ensure ffmpeg is discoverable
+ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)
+os.environ["FFMPEG_BINARY"] = ffmpeg_path
+os.environ["FFPROBE_BINARY"] = ffmpeg_path  # 👈 Whisper & yt_dlp use this
+
 # ==== Ensure FFmpeg is discoverable ====
 FFMPEG_DIR = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
 os.environ["PATH"] += os.pathsep + FFMPEG_DIR
@@ -416,7 +424,7 @@ import tempfile
 import os
 
 def download_youtube_audio(url):
-    """Download YouTube sermon audio safely using yt_dlp with header spoofing + geo bypass."""
+    """Download YouTube sermon audio with correct ffmpeg + headers."""
     try:
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
         output_path = temp_file.name
@@ -424,8 +432,9 @@ def download_youtube_audio(url):
         ydl_opts = {
             "format": "bestaudio/best",
             "outtmpl": output_path,
-            "geo_bypass": True,  # ✅ skip geo restrictions
-            "http_headers": {    # ✅ spoof a real browser
+            "geo_bypass": True,
+            "ffmpeg_location": os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe()),  # ✅ key line
+            "http_headers": {
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -441,14 +450,14 @@ def download_youtube_audio(url):
                 "preferredquality": "192",
             }],
             "quiet": True,
+            "retries": 3,
             "noprogress": True,
-            "retries": 5,  # retry a few times if YouTube throttles
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=True)
-            title = info_dict.get("title", "Untitled Sermon")
-            uploader = info_dict.get("uploader", "Unknown")
+            info = ydl.extract_info(url, download=True)
+            title = info.get("title", "Untitled Sermon")
+            uploader = info.get("uploader", "Unknown")
 
         return output_path, uploader, title
 
