@@ -7,4 +7,5 @@ whisper
 torch
 torchaudio
 ffmpeg-python
+imageio[ffmpeg]
 yt_dlp
