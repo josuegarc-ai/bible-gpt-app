@@ -730,6 +730,8 @@ mode = st.sidebar.selectbox(
     ],
 )
 
+st.sidebar.write(f"DEBUG MODE SELECTED → [{mode}]")  # ✅ Add this line
+
 if mode == "Bible Lookup":
     run_bible_lookup()
 elif mode == "Chat with GPT":
@@ -738,8 +740,8 @@ elif mode == "Practice Chat":
     run_practice_chat()
 elif mode == "Verse of the Day":
     run_verse_of_the_day()
-elif mode == "Study Plan":
-    run_study_plan()  # ✅ THIS LINE ENSURES IT RUNS
+elif mode == "Study Plan":   # ✅ This line is fine
+    run_study_plan()
 elif mode == "Faith Journal":
     run_faith_journal()
 elif mode == "Prayer Starter":
