@@ -424,19 +424,18 @@ def run_sermon_transcriber():
         with st.spinner("Transcribing... please wait."):
             audio_path = None
             try:
-                # ✅ Download or load audio
+                # ✅ Use yt_dlp to fetch video info (check duration before downloading)
                 if yt_link:
-                # Extract info using yt_dlp
-                with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-                    info_dict = ydl.extract_info(yt_link, download=False)
-                    duration = info_dict.get("duration", 0)
-                    if duration > 900:
-                        raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
-                    preacher_name = info_dict.get("uploader", "Unknown")
-                    sermon_title = info_dict.get("title", "Untitled Sermon")
-                
-                # Now download
-                audio_path, _, _ = download_youtube_audio(yt_link)
+                    with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+                        info_dict = ydl.extract_info(yt_link, download=False)
+                        duration = info_dict.get("duration", 0)
+                        if duration > 900:
+                            raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
+                        preacher_name = info_dict.get("uploader", "Unknown")
+                        sermon_title = info_dict.get("title", "Untitled Sermon")
+
+                    # Now download the audio using yt_dlp
+                    audio_path, _, _ = download_youtube_audio(yt_link)
 
                 elif audio_file:
                     temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
@@ -445,8 +444,8 @@ def run_sermon_transcriber():
                     preacher_name = "Unknown"
                     sermon_title = "Untitled Sermon"
 
-                # ✅ Load Whisper model
-                whisper_model = whisper.load_model("base")  # or "small" for more accuracy
+                # ✅ Transcribe using Whisper
+                whisper_model = whisper.load_model("base")  # or "small"
                 transcription = whisper_model.transcribe(audio_path)
                 transcript_text = transcription["text"].strip()
 
@@ -454,15 +453,11 @@ def run_sermon_transcriber():
                 st.markdown("### 📝 Transcript")
                 st.text_area("Transcript", transcript_text, height=300)
 
-                # ✅ Trim transcript to prevent GPT overload
-                max_transcript_chars = 1800  # keep under token limit
-                short_transcript = transcript_text[:max_transcript_chars]
+                # ✅ Shorten for GPT if needed
+                short_transcript = transcript_text[:1800].replace("\n", " ").replace("\r", " ")
 
-                # ✅ Escape newlines & large content for GPT prompt
-                safe_transcript = short_transcript.replace("\n", " ").replace("\r", " ")
-
-                # ✅ Safe prompt for GPT
-                safe_prompt = f"""You are a sermon summarizer. From the transcript below, summarize the following:
+                prompt = f"""
+You are a sermon summarizer. From the transcript below, summarize the following:
 
 - **Sermon Title**
 - **Preacher Name**
@@ -475,15 +470,14 @@ Preacher: {preacher_name}
 Title: {sermon_title}
 
 Transcript:
-{safe_transcript}
+{short_transcript}
 """
 
-                # ✅ Summarize with GPT
-                summary = ask_gpt_conversation(safe_prompt)
+                summary = ask_gpt_conversation(prompt)
                 st.markdown("### 🧠 Sermon Summary")
                 st.markdown(summary)
 
-                # ✅ Save transcript + summary locally
+                # ✅ Save outputs
                 os.makedirs("sermon_journal", exist_ok=True)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 with open(f"sermon_journal/transcript_{timestamp}.txt", "w") as f:
