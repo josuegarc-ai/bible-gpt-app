@@ -415,48 +415,46 @@ import yt_dlp
 import tempfile
 import os
 
-def download_youtube_audio(url: str):
-    """
-    Download best available audio WITHOUT postprocessing.
-    Uses a modern user agent and updated extractor args to bypass 403 errors.
-    """
-    tmp_dir = tempfile.mkdtemp(prefix="yt_")
-    outtmpl = os.path.join(tmp_dir, "%(id)s.%(ext)s")
-
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": outtmpl,
-        "noplaylist": True,
-        "restrictfilenames": True,
-        "quiet": True,
-        "no_warnings": True,
-        "ffmpeg_location": FFMPEG_DIR,
-        "http_headers": {
-            # ✅ Spoof a real desktop browser to avoid 403 Forbidden
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/125.0.0.0 Safari/537.36"
-            ),
-            "Accept-Language": "en-US,en;q=0.9",
-        },
-        # ✅ Use a stable extractor and retry logic
-        "extractor_args": {"youtube": {"player_skip": ["configs"]}},
-        "retries": 5,
-        "fragment_retries": 10,
-        
-        "cookiefile": "cookies.txt"
-    }
-
+def download_youtube_audio(url):
+    """Download YouTube sermon audio safely using yt_dlp with header spoofing + geo bypass."""
     try:
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        output_path = temp_file.name
+
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "outtmpl": output_path,
+            "geo_bypass": True,  # ✅ skip geo restrictions
+            "http_headers": {    # ✅ spoof a real browser
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept": "*/*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.youtube.com/",
+            },
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }],
+            "quiet": True,
+            "noprogress": True,
+            "retries": 5,  # retry a few times if YouTube throttles
+        }
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            file_path = ydl.prepare_filename(info)
-            title = info.get("title", "Untitled Sermon")
-            uploader = info.get("uploader", "Unknown")
-        return file_path, uploader, title
+            info_dict = ydl.extract_info(url, download=True)
+            title = info_dict.get("title", "Untitled Sermon")
+            uploader = info_dict.get("uploader", "Unknown")
+
+        return output_path, uploader, title
+
     except Exception as e:
         raise Exception(f"❌ yt_dlp download error: {e}")
+
 
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
