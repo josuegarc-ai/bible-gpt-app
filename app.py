@@ -24,15 +24,18 @@ import whisper
 
 import imageio_ffmpeg
 import os
+import yt_dlp
 
-# Ensure ffmpeg path is accessible
-os.environ["PATH"] += os.pathsep + os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
+# ✅ Force yt_dlp to use ffmpeg & ffprobe from imageio_ffmpeg
+ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+ffprobe_path = ffmpeg_path.replace("ffmpeg", "ffprobe")  # works for bundled binary
 
-# ================= CONFIG =================
-client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
-model = "gpt-4o"
-bible_api_base = "https://bible-api.com/"
-valid_translations = ["web", "kjv", "asv", "bbe", "oeb-us"]
+os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)
+os.environ["FFMPEG_LOCATION"] = os.path.dirname(ffmpeg_path)
+os.environ["FFPROBE_LOCATION"] = os.path.dirname(ffprobe_path)
+
+yt_dlp.utils.FFMPEG.set_executable_path("ffmpeg", ffmpeg_path)
+yt_dlp.utils.FFMPEG.set_executable_path("ffprobe", ffprobe_path)
 
 # =============== UTILITIES ===============
 def fetch_bible_verse(passage: str, translation: str = "web") -> str:
