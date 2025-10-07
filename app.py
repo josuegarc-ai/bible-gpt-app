@@ -45,6 +45,9 @@ print("FFprobe exists:", shutil.which("ffprobe"))
 bible_api_base = "https://bible-api.com/"
 valid_translations = ["web", "kjv", "asv", "bbe", "oeb-us"]
 
+client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
+model = "gpt-4o"
+
 # =============== UTILITIES ===============
 def fetch_bible_verse(passage: str, translation: str = "web") -> str:
     if translation not in valid_translations:
