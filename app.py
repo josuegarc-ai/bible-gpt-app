@@ -1,32 +1,34 @@
 # ✅ Bible GPT — Restored + Enhanced with New Features
 # Amazing working option v2.3 — Now with conversational chat, AI insight fixes, enhanced practice, mixed learning path, and 'Bible Beta' (AI voices + highlights)
 
+# ==== Core imports ====
 import os
-import openai
-import requests
-import json
 import re
+import json
 import random
 import urllib.parse
-from datetime import datetime
-from duckduckgo_search import DDGS
-from bs4 import BeautifulSoup  # ✅ Add this line
-import streamlit as st
-from urllib.error import HTTPError
-
-##NEWLY ADDED
 import tempfile
 import subprocess
-import urllib.request
-from pytube import YouTube
+import requests
+from datetime import datetime
+import streamlit as st
+
+# ==== AI / NLP ====
+import openai
 import whisper
 
-import imageio_ffmpeg
-import os
-import shutil
+# ==== Web scraping ====
+from bs4 import BeautifulSoup
+from duckduckgo_search import DDGS
 
-# ---- FFmpeg (no ffprobe) setup ----
-import imageio_ffmpeg, os
+# ==== Media & YouTube ====
+import yt_dlp
+import imageio_ffmpeg
+
+# ==== Ensure FFmpeg is discoverable ====
+FFMPEG_DIR = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
+os.environ["PATH"] += os.pathsep + FFMPEG_DIR
+
 FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()           # path to ffmpeg binary bundled with imageio-ffmpeg
 FFMPEG_DIR = os.path.dirname(FFMPEG_BIN)
 os.environ["PATH"] = FFMPEG_DIR + os.pathsep + os.environ.get("PATH", "")
