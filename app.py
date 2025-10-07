@@ -26,6 +26,12 @@ import imageio_ffmpeg
 import os
 import shutil
 
+# ---- FFmpeg (no ffprobe) setup ----
+import imageio_ffmpeg, os
+FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()           # path to ffmpeg binary bundled with imageio-ffmpeg
+FFMPEG_DIR = os.path.dirname(FFMPEG_BIN)
+os.environ["PATH"] = FFMPEG_DIR + os.pathsep + os.environ.get("PATH", "")
+
 # ✅ Get ffmpeg binary path from imageio
 ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 ffprobe_path = ffmpeg_path.replace("ffmpeg", "ffprobe")
@@ -407,42 +413,33 @@ import yt_dlp
 import tempfile
 import os
 
-def download_youtube_audio(url):
-    try:
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-        output_path = temp_file.name
+def download_youtube_audio(url: str):
+    """
+    Download best available audio WITHOUT postprocessing (no mp3 convert, no ffprobe).
+    Returns: (file_path, uploader, title)
+    """
+    tmp_dir = tempfile.mkdtemp(prefix="yt_")
+    outtmpl = os.path.join(tmp_dir, "%(id)s.%(ext)s")
 
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': output_path,
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'ffmpeg_location': os.environ.get("FFMPEG_LOCATION", "ffmpeg"),
-            'prefer_ffmpeg': True,
-            'postprocessor_args': [
-                '-nostats', '-loglevel', '0'
-            ],
-            'quiet': True,
-            'no_warnings': True,
-            # 🚀 Disable metadata writes that trigger ffprobe
-            'writethumbnail': False,
-            'writeinfojson': False,
-            'skip_download': False,
-            'progress_hooks': [],
-        }
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "outtmpl": outtmpl,
+        "noplaylist": True,
+        "restrictfilenames": True,
+        "quiet": True,
+        "no_warnings": True,
+        "ffmpeg_location": FFMPEG_DIR,   # use only ffmpeg (provided above)
+        # 🔒 NO postprocessors -> avoids ffprobe completely
+    }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=True)
-            title = info_dict.get('title', 'Untitled Sermon')
-            uploader = info_dict.get('uploader', 'Unknown')
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        # Final path yt_dlp wrote (no postprocessing, so this is the actual file)
+        file_path = ydl.prepare_filename(info)  # e.g., /tmp/yt_abc/VIDEOID.webm or .m4a
+        title = info.get("title", "Untitled Sermon")
+        uploader = info.get("uploader", "Unknown")
 
-        return output_path, uploader, title
-
-    except Exception as e:
-        raise Exception(f"❌ yt_dlp download error: {e}")
+    return file_path, uploader, title
 
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
@@ -454,30 +451,41 @@ def run_sermon_transcriber():
     if st.button("⏺️ Transcribe & Summarize") and (yt_link or audio_file):
         with st.spinner("Transcribing... please wait."):
             audio_path = None
+            preacher_name, sermon_title = "Unknown", "Untitled Sermon"
+
             try:
-                # ✅ Use yt_dlp to fetch video info (check duration before downloading)
+                # ✅ If YouTube link: check duration first WITHOUT downloading
                 if yt_link:
-                    with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
-                        info_dict = ydl.extract_info(yt_link, download=False)
-                        duration = info_dict.get("duration", 0)
+                    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+                        info = ydl.extract_info(yt_link, download=False)
+                        duration = int(info.get("duration", 0) or 0)
                         if duration > 900:
                             raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
-                        preacher_name = info_dict.get("uploader", "Unknown")
-                        sermon_title = info_dict.get("title", "Untitled Sermon")
+                        preacher_name = info.get("uploader", "Unknown")
+                        sermon_title = info.get("title", "Untitled Sermon")
 
-                    # Now download the audio using yt_dlp
+                    # ✅ Now download bestaudio without postprocessing (no ffprobe)
                     audio_path, _, _ = download_youtube_audio(yt_link)
 
                 elif audio_file:
-                    temp_audio_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                    temp_audio_path.write(audio_file.read())
-                    audio_path = temp_audio_path.name
-                    preacher_name = "Unknown"
-                    sermon_title = "Untitled Sermon"
+                    # ✅ Save uploaded file as-is
+                    suffix = os.path.splitext(audio_file.name)[1].lower() or ".wav"
+                    temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                    temp_audio.write(audio_file.read())
+                    temp_audio.flush()
+                    audio_path = temp_audio.name
 
-                # ✅ Transcribe using Whisper
-                whisper_model = whisper.load_model("base")  # or "small"
-                transcription = whisper_model.transcribe(audio_path)
+                # ✅ Transcribe using Whisper (reads webm/m4a via ffmpeg only — no ffprobe)
+                whisper_model = whisper.load_model("base")  # or "small" if you need more accuracy
+                try:
+                    transcription = whisper_model.transcribe(audio_path)
+                except Exception:
+                    # 🔁 Fallback: convert to WAV with ffmpeg if container is odd
+                    wav_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
+                    cmd = [FFMPEG_BIN, "-y", "-i", audio_path, "-ar", "16000", "-ac", "1", wav_path]
+                    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                    transcription = whisper_model.transcribe(wav_path)
+
                 transcript_text = transcription["text"].strip()
 
                 st.success("✅ Transcription complete.")
@@ -517,6 +525,7 @@ Transcript:
                     f.write(summary)
 
                 st.success("Saved transcript and summary to `sermon_journal/` folder.")
+
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
