@@ -8,4 +8,4 @@ torch
 torchaudio
 ffmpeg-python
 imageio-ffmpeg
-yt-dlp @ git+https://github.com/yt-dlp/yt-dlp.git
+yt-dlp
