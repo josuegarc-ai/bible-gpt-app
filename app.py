@@ -10,9 +10,9 @@ import urllib.parse
 import tempfile
 import subprocess
 import requests
+import shutil
 from datetime import datetime
 import streamlit as st
-import shutil
 
 # ==== AI / NLP ====
 import openai
@@ -26,34 +26,20 @@ from duckduckgo_search import DDGS
 import yt_dlp
 import imageio_ffmpeg
 
-import imageio_ffmpeg
-
-# ✅ Ensure ffmpeg is discoverable
+# =======================
+# ✅ UNIVERSAL FFMPEG SETUP (clean + stable)
+# =======================
 ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)
 os.environ["FFMPEG_BINARY"] = ffmpeg_path
-os.environ["FFPROBE_BINARY"] = ffmpeg_path  # 👈 Whisper & yt_dlp use this
-
-# ==== Ensure FFmpeg is discoverable ====
-FFMPEG_DIR = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
-os.environ["PATH"] += os.pathsep + FFMPEG_DIR
-
-FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()           # path to ffmpeg binary bundled with imageio-ffmpeg
-FFMPEG_DIR = os.path.dirname(FFMPEG_BIN)
-os.environ["PATH"] = FFMPEG_DIR + os.pathsep + os.environ.get("PATH", "")
-
-# ✅ Get ffmpeg binary path from imageio
-ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-ffprobe_path = ffmpeg_path.replace("ffmpeg", "ffprobe")
-
-# ✅ Ensure yt_dlp & other tools can find them
-os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)
+os.environ["FFPROBE_BINARY"] = ffmpeg_path
 os.environ["FFMPEG_LOCATION"] = ffmpeg_path
-os.environ["FFPROBE_LOCATION"] = ffprobe_path
+os.environ["FFPROBE_LOCATION"] = ffmpeg_path
 
-# ✅ Double-check they’re accessible
+FFMPEG_BIN = ffmpeg_path  # global variable for use in subprocess calls
+
+# ✅ Confirm setup in logs
 print("FFmpeg path:", ffmpeg_path)
-print("FFprobe path:", ffprobe_path)
 print("FFmpeg exists:", shutil.which("ffmpeg"))
 print("FFprobe exists:", shutil.which("ffprobe"))
 
