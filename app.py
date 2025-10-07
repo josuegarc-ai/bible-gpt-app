@@ -442,6 +442,8 @@ def download_youtube_audio(url: str):
         "extractor_args": {"youtube": {"player_skip": ["configs"]}},
         "retries": 5,
         "fragment_retries": 10,
+        
+        "cookiefile": "cookies.txt"
     }
 
     try:
