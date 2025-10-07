@@ -410,7 +410,7 @@ import tempfile
 import os
 
 def download_youtube_audio(url):
-    """Download YouTube sermon audio with correct ffmpeg + headers."""
+    """Download YouTube sermon audio with reliable ffmpeg/ffprobe path."""
     try:
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
         output_path = temp_file.name
@@ -419,24 +419,14 @@ def download_youtube_audio(url):
             "format": "bestaudio/best",
             "outtmpl": output_path,
             "geo_bypass": True,
-            "ffmpeg_location": os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe()),  # ✅ key line
-            "http_headers": {
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                ),
-                "Accept": "*/*",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": "https://www.youtube.com/",
-            },
+            "ffmpeg_location": os.environ["FFMPEG_LOCATION"],  # ✅ directory path
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
-            "quiet": True,
             "retries": 3,
+            "quiet": True,
             "noprogress": True,
         }
 
