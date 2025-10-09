@@ -1,5 +1,5 @@
 # ================================================================
-# ✅ Bible GPT — v2.4 (Fully Fixed + All Modes Restored)
+# ✅ Bible GPT — v2.5 (File Handling Fixed)
 # ================================================================
 
 # ==== Core imports ====
@@ -457,26 +457,37 @@ def run_bible_beta():
 # ================================================================
 # SERMON TRANSCRIBER & SUMMARIZER (YouTube or file upload)
 # ================================================================
+# ✅ FIX APPLIED HERE
 def _convert_to_wav_if_needed(src_path: str) -> str:
     """If Whisper has trouble with container, convert to 16k mono WAV using ffmpeg (no ffprobe)."""
-    wav_path = tempfile.NamedTemporaryFile(delete=False, suffix=".wav").name
+    # Use a 'with' statement to ensure the temporary file is closed before ffmpeg uses it.
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+        wav_path = tmp_file.name
+
     cmd = [_FFMPEG_BIN, "-y", "-i", src_path, "-ar", "16000", "-ac", "1", wav_path]
-    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    try:
+        # Capture output for better debugging if something goes wrong.
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        # Raise a more informative error message.
+        raise Exception(f"ffmpeg failed with exit code {e.returncode}: {e.stderr}")
+        
     return wav_path
 
-
+# ✅ FIX APPLIED HERE
 def download_youtube_audio(url: str) -> tuple[str, str, str]:
     """
     Download audio *without* postprocessing (so yt_dlp won't call ffprobe).
     Return (local_path, uploader, title).
     If repo has cookies.txt, yt_dlp will use it (helps with 403).
     """
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".m4a")
-    output_path = temp_file.name
+    # Use 'with' statement to create and automatically close the temporary file.
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as temp_file:
+        output_path = temp_file.name
 
     ydl_opts = {
         "format": "bestaudio[ext=m4a]/bestaudio/best",
-        "outtmpl": output_path,
+        "outtmpl": output_path, # yt-dlp will write to this now-closed path
         "ffmpeg_location": os.environ.get("FFMPEG_LOCATION", _FFMPEG_DIR),
         "quiet": True,
         "retries": 3,
@@ -516,6 +527,7 @@ def run_sermon_transcriber():
             try:
                 preacher = "Unknown"
                 title = "Untitled Sermon"
+                audio_path = None # Initialize audio_path
 
                 if yt_link:
                     # Check metadata & length WITHOUT downloading first
@@ -530,13 +542,13 @@ def run_sermon_transcriber():
                     # Download audio *without* postprocessing (no ffprobe)
                     audio_path, _, _ = download_youtube_audio(yt_link)
 
-                else:
-                    # Save uploaded file as-is
+                elif audio_file:
+                    # ✅ FIX APPLIED HERE
+                    # Save uploaded file correctly using a 'with' statement.
                     suffix = os.path.splitext(audio_file.name)[1].lower() or ".wav"
-                    temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-                    temp_audio.write(audio_file.read())
-                    temp_audio.flush()
-                    audio_path = temp_audio.name
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
+                        temp_audio.write(audio_file.getvalue())
+                        audio_path = temp_audio.name
 
                 # Transcribe with Whisper
                 model = whisper.load_model("base")
@@ -711,11 +723,15 @@ def run_small_group_generator():
 # ================================================================
 # MAIN UI
 # ================================================================
+st.set_page_config(page_title="Bible GPT", layout="wide")
+st.title("✅ Bible GPT")
+
 mode = st.sidebar.selectbox(
     "Choose a mode:",
     [
         "Bible Lookup",
         "Chat with GPT",
+        "Sermon Transcriber & Summarizer",
         "Practice Chat",
         "Verse of the Day",
         "Study Plan",
@@ -726,21 +742,20 @@ mode = st.sidebar.selectbox(
         "Tailored Learning Path",
         "Bible Beta Mode",
         "Pixar Story Animation",
-        "Sermon Transcriber & Summarizer"
     ],
 )
-
-st.sidebar.write(f"DEBUG MODE SELECTED → [{mode}]")  # ✅ Add this line
 
 if mode == "Bible Lookup":
     run_bible_lookup()
 elif mode == "Chat with GPT":
     run_chat_mode()
+elif mode == "Sermon Transcriber & Summarizer":
+    run_sermon_transcriber()
 elif mode == "Practice Chat":
     run_practice_chat()
 elif mode == "Verse of the Day":
     run_verse_of_the_day()
-elif mode == "Study Plan":   # ✅ This line is fine
+elif mode == "Study Plan":
     run_study_plan()
 elif mode == "Faith Journal":
     run_faith_journal()
@@ -756,7 +771,5 @@ elif mode == "Bible Beta Mode":
     run_bible_beta()
 elif mode == "Pixar Story Animation":
     run_pixar_story_animation()
-elif mode == "Sermon Transcriber & Summarizer":
-    run_sermon_transcriber()
 else:
     st.warning("This mode is under construction.")
