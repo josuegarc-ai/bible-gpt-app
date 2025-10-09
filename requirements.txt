@@ -4,8 +4,7 @@ requests
 beautifulsoup4
 duckduckgo-search
 yt_dlp
-whisper
+openai-whisper
 torch
 torchaudio
-imageio
 imageio-ffmpeg
