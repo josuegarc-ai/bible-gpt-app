@@ -481,13 +481,12 @@ def download_youtube_audio(url: str) -> tuple[str, str, str]:
     Return (local_path, uploader, title).
     If repo has cookies.txt, yt_dlp will use it (helps with 403).
     """
-    # Use 'with' statement to create and automatically close the temporary file.
     with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as temp_file:
         output_path = temp_file.name
 
     ydl_opts = {
         "format": "bestaudio[ext=m4a]/bestaudio/best",
-        "outtmpl": output_path, # yt-dlp will write to this now-closed path
+        "outtmpl": output_path,
         "ffmpeg_location": os.environ.get("FFMPEG_LOCATION", _FFMPEG_DIR),
         "quiet": True,
         "retries": 3,
@@ -501,7 +500,6 @@ def download_youtube_audio(url: str) -> tuple[str, str, str]:
             "Accept-Language": "en-US,en;q=0.9",
             "Referer": "https://www.youtube.com/",
         },
-        # If you add a cookies.txt at repo root, yt_dlp will use it:
         **({"cookiefile": "cookies.txt"} if os.path.exists("cookies.txt") else {}),
     }
 
@@ -510,9 +508,16 @@ def download_youtube_audio(url: str) -> tuple[str, str, str]:
             info = ydl.extract_info(url, download=True)
             title = info.get("title", "Untitled Sermon")
             uploader = info.get("uploader", "Unknown")
+
+        # ✅ FIX APPLIED HERE: Check if the downloaded file is empty.
+        # If the file size is 0, the download failed silently.
+        if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+            raise Exception("Audio download failed, resulting in an empty file. The video might be private, age-restricted, or unavailable.")
+
         return output_path, uploader, title
     except Exception as e:
-        raise Exception(f"❌ yt_dlp download error: {e}")
+        # This will now catch our custom error above or other yt-dlp errors.
+        raise Exception(f"❌ Failed during YouTube audio processing: {e}")
 
 
 def run_sermon_transcriber():
