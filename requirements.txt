@@ -3,7 +3,7 @@ openai>=1.2.3
 requests
 beautifulsoup4
 duckduckgo-search
-yt_dlp
+yt-dlp>=2024.07.25
 openai-whisper
 torch
 torchaudio
