@@ -15,6 +15,11 @@ import shutil
 from datetime import datetime
 import streamlit as st
 
+import streamlit as st, os
+
+st.write("🔑 API Key loaded:", bool(st.secrets.get("OPENAI_API_KEY")))
+st.write("🔑 API Key env:", bool(os.getenv("OPENAI_API_KEY")))
+
 # Page config should be set early in Streamlit apps
 st.set_page_config(page_title="Bible GPT", layout="wide")
 
