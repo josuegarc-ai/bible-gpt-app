@@ -1,5 +1,5 @@
 # ================================================================
-# ✅ Bible GPT — v2.5 (File Handling Fixed)
+# ✅ Bible GPT — v2.9 (Syntax Fixes Applied)
 # ================================================================
 
 # ==== Core imports ====
@@ -92,7 +92,7 @@ def ask_gpt_conversation(prompt: str) -> str:
     r = client.chat.completions.create(
         model=MODEL,
         temperature=0.3,
-        max_tokens=2000, # Increased max_tokens for lessons/quizzes
+        max_tokens=2500, # Increased max_tokens for lessons/quizzes
         messages=[
             {
                 "role": "system",
@@ -106,24 +106,45 @@ def ask_gpt_conversation(prompt: str) -> str:
     )
     return r.choices[0].message.content.strip()
 
-
 def extract_json_from_response(response_text: str):
-    try:
-        # Use regex to find the JSON string that starts with { and ends with }
-        # This is more robust if there's leading/trailing text outside the JSON
-        json_match = re.search(r"```json\n(\{.*?\})\n```", response_text, re.DOTALL)
-        if json_match:
-            json_text = json_match.group(1)
-            return json.loads(json_text)
-        else:
-            # Fallback for when the markdown isn't used
-            json_text = re.search(r"(\{.*?\})", response_text, re.DOTALL)
-            if json_text:
-                return json.loads(json_text.group(0))
+    """
+    Extracts a JSON object or array from a string, supporting markdown code fences.
+    """
+    # 1. Look for a JSON block inside ```json ... ```
+    match = re.search(r"```json\s*({{.*}}|\[.*\])\s*```", response_text, re.DOTALL)
+    if match:
+        json_str = match.group(1)
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            st.error(f"Error decoding JSON from markdown block: {e}")
             return None
-    except Exception as e:
-        st.error(f"Error extracting or parsing JSON: {e}\nResponse text: {response_text[:500]}...")
-        return None
+
+    # 2. Fallback: find the first '{' or '[' and try to parse from there.
+    first_char_pos = -1
+    if '{' in response_text:
+        first_char_pos = response_text.find('{')
+    if '[' in response_text:
+        bracket_pos = response_text.find('[')
+        if first_char_pos == -1 or bracket_pos < first_char_pos:
+            first_char_pos = bracket_pos
+
+    if first_char_pos != -1:
+        potential_json = response_text[first_char_pos:]
+        try:
+            return json.loads(potential_json)
+        except json.JSONDecodeError:
+            last_bracket = '}' if potential_json.startswith('{') else ']'
+            last_bracket_pos = potential_json.rfind(last_bracket)
+            if last_bracket_pos != -1:
+                try:
+                    return json.loads(potential_json[:last_bracket_pos+1])
+                except json.JSONDecodeError as e:
+                    st.error(f"Error decoding JSON from fallback: {e}")
+                    return None
+    
+    st.error("No valid JSON object or array found in the response.")
+    return None
 
 # ================================================================
 # SERMON SEARCH (YouTube result links via HTML scrape)
@@ -689,11 +710,18 @@ def run_verse_of_the_day():
     ]
     try:
         book = random.choice(books)
-        chapter = random.randint(1, 4)
-        verse = random.randint(1, 20)
+        # Random chapter and verse for common books, adjust ranges as needed
+        chapter_map = {
+            "John": (1, 21), "Psalm": (1, 150), "Romans": (1, 16), "Genesis": (1, 50),
+            "Matthew": (1, 28), "Proverbs": (1, 31)
+        }
+        chapter_range = chapter_map.get(book, (1, 5)) # Default for smaller books
+        chapter = random.randint(chapter_range[0], chapter_range[1])
+        verse = random.randint(1, 20) # Assume most chapters have at least 20 verses
+
         ref = f"{book} {chapter}:{verse}"
         text = fetch_bible_verse(ref, "web")
-        st.success(f"{ref} — {text}")
+        st.success(f"**{ref}** — {text}")
         reflection = ask_gpt_conversation(
             f"Offer a warm, practical reflection on this verse with 1 actionable takeaway: {text} ({ref})"
         )
@@ -742,6 +770,7 @@ def run_small_group_generator():
 
 def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str) -> str:
     """Generates the prompt for GPT to create a single lesson with embedded knowledge checks."""
+    # Corrected f-string with escaped curly braces for JSON
     return f"""
 You are an expert AI, Python coder, pastor, and theologian teacher. Your task is to generate a single, biblically sound Christian lesson for a learning app, tailored to the user's preferences.
 
@@ -805,7 +834,6 @@ Your entire response MUST be a single JSON object, wrapped in triple backticks a
       "type": "text",
       "content": "More lesson content, leading to the next check or conclusion."
     }}
-    // ... add more text and knowledge checks (2-3 checks per lesson, 5-10 sections total)
   ],
   "summary_points": [
     "Key takeaway 1 from the lesson.",
