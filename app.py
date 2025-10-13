@@ -48,7 +48,7 @@ BIBLE_API_BASE = "https://bible-api.com/"
 VALID_TRANSLATIONS = ["web", "kjv", "asv", "bbe", "oeb-us"]
 
 # OpenAI
-client = OpenAI(api_key=st.secrets.get("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"))
+client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY"))
 MODEL = "gpt-4o"
 
 # ================================================================
