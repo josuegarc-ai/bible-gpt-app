@@ -1,7 +1,5 @@
-Python
-
 # ================================================================
-# ✅ Bible GPT — v4.0 (Definitive Build)
+# ✅ Bible GPT — v5.1 (Final Syntax & Block Fix)
 # ================================================================
 
 # ==== Core imports ====
@@ -17,8 +15,11 @@ import shutil
 from datetime import datetime
 import streamlit as st
 
+# Page config should be set early in Streamlit apps
+st.set_page_config(page_title="Bible GPT", layout="wide")
+
 # ==== AI / NLP ====
-import openai
+from openai import OpenAI
 import whisper
 
 # ==== Web scraping ====
@@ -47,7 +48,7 @@ BIBLE_API_BASE = "https://bible-api.com/"
 VALID_TRANSLATIONS = ["web", "kjv", "asv", "bbe", "oeb-us"]
 
 # OpenAI
-client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
+client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY"))
 MODEL = "gpt-4o"
 
 # ================================================================
@@ -112,6 +113,29 @@ def extract_json_from_response(response_text: str):
             st.error("Found a JSON block in the response, but it was malformed.")
             return None
     
+    # Fallback for responses that might not include the markdown block
+    try:
+        # Find the first '{' or '['
+        start_index = -1
+        first_brace = response_text.find('{')
+        first_bracket = response_text.find('[')
+
+        if first_brace != -1 and (first_bracket == -1 or first_brace < first_bracket):
+            start_index = first_brace
+            end_char = '}'
+        elif first_bracket != -1:
+            start_index = first_bracket
+            end_char = ']'
+
+        if start_index != -1:
+            # Find the last corresponding closing character
+            end_index = response_text.rfind(end_char)
+            if end_index > start_index:
+                potential_json = response_text[start_index : end_index + 1]
+                return json.loads(potential_json)
+    except (json.JSONDecodeError, IndexError):
+        pass  # If fallback fails, just proceed to the error
+
     st.error("No valid JSON block found in the AI response.")
     return None
 
@@ -130,10 +154,9 @@ def search_sermons_online(passage: str):
         try:
             response = requests.get(search_url, headers=headers, timeout=12)
             soup = BeautifulSoup(response.text, "html.parser")
-            video_results = soup.find_all("a", {"id": "video-title"})
+            video_results = soup.find("a", {"id": "video-title"})
             if video_results:
-                first_result = video_results[0]
-                video_url = "https://www.youtube.com" + first_result['href']
+                video_url = "https://www.youtube.com" + video_results['href']
                 results.append({"pastor": pastor, "url": video_url})
             else:
                 results.append({"pastor": pastor, "url": "❌ No result"})
@@ -170,7 +193,6 @@ def run_chat_mode():
             st.session_state.chat_history.append({"role": "assistant", "content": reply})
             st.rerun()
     for msg in st.session_state.chat_history:
-        who = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
@@ -205,7 +227,7 @@ def run_practice_chat():
                     st.error("Failed to generate valid questions. Please try again.")
     elif S["current"] < len(S["questions"]):
         q = S["questions"][S["current"]]
-        st.markdown(f"**Question {S['current'] + 1}:** {q.get('question', 'N/A')}")
+        st.markdown(f"**Question {S['current'] + 1}:** {q.get('question', 'No question text found.')}")
         choices = q.get('choices', [])
         if choices:
             ans = st.radio("Choose:", choices, key=f"q_{S['current']}")
@@ -339,7 +361,6 @@ def run_small_group_generator():
 # NEW LEARNING MODULE (DEFINITIVE, CORRECTED VERSION)
 # ================================================================
 
-# <<< FIX: Escaped all curly braces in the f-string to resolve the SyntaxError.
 def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str) -> str:
     """Generates the prompt for GPT to create a single lesson with embedded knowledge checks."""
     return f"""
@@ -387,271 +408,3 @@ Your entire response MUST be a single JSON object, wrapped in triple backticks a
     "Key takeaway 2 from the lesson."
   ]
 }}
-"""
-
-<<< FIX: Escaped all curly braces in the f-string to resolve the SyntaxError.
-def create_level_quiz_prompt(level_topic: str) -> str:
-"""Generates the prompt for GPT to create a 10-question final quiz for a level."""
-return f"""
-You are an expert AI, pastor, and theologian teacher. Your task is to create a 10-question final quiz for a Christian learning app, covering the level topic: "{level_topic}".
-The quiz should include a mix of multiple choice, true/false, matching, and fill-in-the-blank questions.
-
-Output Format (Strict JSON Array):
-Your entire response MUST be a single JSON array of question objects.
-
-JSON
-
-[
-  {{
-    "question_type": "multiple_choice",
-    "question": "Which book details the exodus from Egypt?",
-    "options": ["Genesis", "Exodus", "Leviticus", "Numbers"],
-    "correct_answer": "Exodus",
-    "biblical_reference": "Exodus 1:1"
-  }},
-  {{
-    "question_type": "true_false",
-    "question": "The greatest commandment is to love your neighbor.",
-    "correct_answer": "False",
-    "biblical_reference": "Matthew 22:36-40"
-  }},
-  {{
-    "question_type": "fill_in_the_blank",
-    "question": "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have ____________________.",
-    "correct_answer": "everlasting life",
-    "biblical_reference": "John 3:16"
-  }},
-  {{
-    "question_type": "matching",
-    "question": "Match the biblical figures with their roles:",
-    "options": [
-      {{"term": "Moses", "match": "Led Israelites out of Egypt"}},
-      {{"term": "David", "match": "King of Israel"}},
-      {{"term": "Paul", "match": "Apostle to the Gentiles"}}
-    ],
-    "correct_answer": {{
-      "Moses": "Led Israelites out of Egypt",
-      "David": "King of Israel",
-      "Paul": "Apostle to the Gentiles"
-    }},
-    "biblical_reference": "Various"
-  }}
-]
-"""
-
-def display_knowledge_check_question(S):
-current_lesson_sections = S["levels"][S["current_level"]]["lessons"][S["current_lesson_index"]]["lesson_content_sections"]
-q = current_lesson_sections[S["current_section_index"]]
-
-st.markdown("---")
-st.markdown(f"#### ✅ Knowledge Check")
-st.markdown(f"**{q.get('question', 'Missing question text.')}**")
-
-user_answer = None
-input_key = f"kc_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"
-
-if q.get('question_type') == 'multiple_choice':
-    user_answer = st.radio("Select your answer:", q.get('options', []), key=input_key)
-elif q.get('question_type') == 'true_false':
-    user_answer = st.radio("True or False?", ['True', 'False'], key=input_key)
-elif q.get('question_type') == 'fill_in_the_blank':
-    user_answer = st.text_input("Fill in the blank:", key=input_key)
-
-if st.button("Submit Answer", key=f"submit_{input_key}"):
-    is_correct = user_answer and str(user_answer).strip().lower() == str(q.get('correct_answer')).strip().lower()
-    if is_correct:
-        st.success("Correct! Moving on.")
-        S["current_section_index"] += 1
-        if "kc_answered_incorrectly" in S:
-            del S["kc_answered_incorrectly"]
-        st.rerun()
-    else:
-        S["kc_answered_incorrectly"] = True
-        st.rerun()
-
-if S.get("kc_answered_incorrectly"):
-    st.error(f"Not quite. The correct answer is: **{q.get('correct_answer')}**")
-    st.info(f"See {q.get('biblical_reference')} for more context.")
-    if st.button("Continue", key=f"continue_{input_key}"):
-        del S["kc_answered_incorrectly"]
-        S["current_section_index"] += 1
-        st.rerun()
-def run_level_quiz(S):
-level_data = S["levels"][S["current_level"]]
-quiz_questions = level_data.get("quiz_questions", [])
-q_index = S.get("current_question_index", 0)
-
-st.markdown("### 📝 Final Level Quiz")
-if not quiz_questions:
-    st.warning("Quiz questions are not available."); return
-
-st.progress((q_index) / len(quiz_questions))
-st.markdown(f"**Score: {S.get('user_score', 0)}/{len(quiz_questions)}**")
-
-if q_index < len(quiz_questions):
-    q = quiz_questions[q_index]
-    st.markdown(f"**Question {q_index + 1}:** {q.get('question', '')}")
-    
-    user_answer = None
-    q_key = f"quiz_{S['current_level']}_{q_index}"
-    
-    if q.get('question_type') == 'multiple_choice':
-        user_answer = st.radio("Answer:", q.get('options', []), key=q_key)
-    elif q.get('question_type') == 'true_false':
-        user_answer = st.radio("Answer:", ["True", "False"], key=q_key)
-    elif q.get('question_type') == 'fill_in_the_blank':
-        user_answer = st.text_input("Answer:", key=q_key)
-    
-    if st.button("Submit Quiz Answer", key=f"submit_{q_key}"):
-        if user_answer and str(user_answer).strip().lower() == str(q.get('correct_answer')).strip().lower():
-            st.success("Correct!")
-            S["user_score"] = S.get("user_score", 0) + 1
-        else:
-            st.error(f"Incorrect. The correct answer was: {q.get('correct_answer')}")
-        S["current_question_index"] = q_index + 1
-        st.rerun()
-else:
-    st.success(f"### Quiz Completed! Final Score: {S.get('user_score', 0)}/{len(quiz_questions)}")
-    if S.get('user_score', 0) >= len(quiz_questions) * 0.7:
-        st.balloons()
-        st.markdown(f"Congratulations! You passed Level {S['current_level'] + 1}!")
-        if st.button("Next Level ▶️"):
-            S["current_level"] += 1
-            S["current_lesson_index"] = 0
-            S["current_section_index"] = 0
-            S["current_question_index"] = 0
-            S["user_score"] = 0
-            S["quiz_mode"] = False
-            st.rerun()
-    else:
-        st.error("Please review the lessons and try the quiz again.")
-        if st.button("Retake Quiz"):
-            S["current_question_index"] = 0
-            S["user_score"] = 0
-            st.rerun()
-def run_learn_module():
-st.subheader("📚 Learn Biblical Truths")
-if "learn_state" not in st.session_state:
-st.session_state.learn_state = {}
-S = st.session_state.learn_state
-
-if "levels" not in S:
-    st.info("Welcome! Let's tailor your learning journey.")
-    style = st.selectbox("Preferred learning style:", ["storytelling", "analytical", "practical application"])
-    time = st.selectbox("Daily time commitment:", ["15 minutes", "30 minutes", "45 minutes"])
-    if st.button("Start Learning Journey 🚀"):
-        S.update({
-            "levels": [{"name": "Level 1: Foundations of Faith", "topic": "Faith and Grace"},
-                       {"name": "Level 2: The Person of Christ", "topic": "Who Jesus Is"},
-                       {"name": "Level 3: The Holy Spirit", "topic": "The Role of the Holy Spirit"}],
-            "current_level": 0, "current_lesson_index": 0, "current_section_index": 0,
-            "user_learning_style": style, "time_commitment_per_day": time,
-            "quiz_mode": False
-        })
-        st.rerun()
-    return
-
-if S["current_level"] >= len(S["levels"]):
-    st.success("🎉 You've completed all available levels!"); return
-
-level_data = S["levels"][S["current_level"]]
-st.markdown(f"## {level_data['name']}")
-
-if S.get("quiz_mode"):
-    run_level_quiz(S); return
-
-MAX_LESSONS = 5
-if S["current_lesson_index"] >= MAX_LESSONS:
-    st.info("You've completed all lessons for this level.")
-    if st.button("Start Final Quiz"):
-        S["quiz_mode"] = True
-        if "quiz_questions" not in level_data or not level_data["quiz_questions"]:
-            with st.spinner("Generating quiz..."):
-                quiz_prompt = create_level_quiz_prompt(level_data["topic"])
-                quiz_resp = ask_gpt_conversation(quiz_prompt)
-                level_data["quiz_questions"] = extract_json_from_response(quiz_resp)
-                S["current_question_index"] = 0
-                S["user_score"] = 0
-        st.rerun()
-    return
-
-if "lessons" not in level_data: level_data["lessons"] = []
-if S["current_lesson_index"] >= len(level_data["lessons"]):
-    with st.spinner("Generating your next lesson..."):
-        lesson_prompt = create_lesson_prompt(level_data["topic"], S["current_lesson_index"] + 1, S["user_learning_style"], S["time_commitment_per_day"])
-        lesson_resp = ask_gpt_conversation(lesson_prompt)
-        lesson_data = extract_json_from_response(lesson_resp)
-        if lesson_data:
-            level_data["lessons"].append(lesson_data)
-            S["current_section_index"] = 0
-            st.rerun()
-        else:
-            st.error("Failed to generate lesson. Please try again."); return
-
-lesson = level_data["lessons"][S["current_lesson_index"]]
-sections = lesson.get("lesson_content_sections", [])
-st.markdown(f"### Lesson {S['current_lesson_index'] + 1}: {lesson.get('lesson_title', '')}")
-st.progress((S["current_section_index"]) / len(sections) if sections else 0)
-
-sec_index = S["current_section_index"]
-if sec_index < len(sections):
-    section = sections[sec_index]
-    if section.get("type") == "text":
-        st.write(section.get("content"))
-        if st.button("Continue", key=f"cont_{sec_index}"):
-            S["current_section_index"] += 1
-            st.rerun()
-    elif section.get("type") == "knowledge_check":
-        display_knowledge_check_question(S)
-else:
-    st.success(f"Lesson {S['current_lesson_index'] + 1} complete!")
-    if st.button("Next Lesson"):
-        S["current_lesson_index"] += 1
-        S["current_section_index"] = 0
-        st.rerun()
-================================================================
-MAIN UI
-================================================================
-st.set_page_config(page_title="Bible GPT", layout="wide")
-st.title("✅ Bible GPT")
-
-mode = st.sidebar.selectbox(
-"Choose a mode:",
-[
-"Learn Module", "Bible Lookup", "Chat with GPT", "Sermon Transcriber & Summarizer",
-"Practice Chat", "Verse of the Day", "Study Plan", "Faith Journal", "Prayer Starter",
-"Fast Devotional", "Small Group Generator", "Tailored Learning Path", "Bible Beta Mode",
-"Pixar Story Animation",
-],
-)
-
-if mode == "Learn Module":
-run_learn_module()
-elif mode == "Bible Lookup":
-run_bible_lookup()
-elif mode == "Chat with GPT":
-run_chat_mode()
-elif mode == "Sermon Transcriber & Summarizer":
-run_sermon_transcriber()
-elif mode == "Practice Chat":
-run_practice_chat()
-elif mode == "Verse of the Day":
-run_verse_of_the_day()
-elif mode == "Study Plan":
-run_study_plan()
-elif mode == "Faith Journal":
-run_faith_journal()
-elif mode == "Prayer Starter":
-run_prayer_starter()
-elif mode == "Fast Devotional":
-run_fast_devotional()
-elif mode == "Small Group Generator":
-run_small_group_generator()
-elif mode == "Tailored Learning Path":
-run_learning_path_mode()
-elif mode == "Bible Beta Mode":
-run_bible_beta()
-elif mode == "Pixar Story Animation":
-run_pixar_story_animation()
-else:
-st.warning("This mode is under construction.")
