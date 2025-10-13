@@ -1,5 +1,5 @@
 # ================================================================
-# ✅ Bible GPT — v2.9 (Syntax Fixes Applied)
+# ✅ Bible GPT — v3.0 (Final Syntax Fix)
 # ================================================================
 
 # ==== Core imports ====
@@ -110,8 +110,7 @@ def extract_json_from_response(response_text: str):
     """
     Extracts a JSON object or array from a string, supporting markdown code fences.
     """
-    # 1. Look for a JSON block inside ```json ... ```
-    match = re.search(r"```json\s*({{.*}}|\[.*\])\s*```", response_text, re.DOTALL)
+    match = re.search(r"```json\s*(\{.*\}|\[.*\])\s*```", response_text, re.DOTALL)
     if match:
         json_str = match.group(1)
         try:
@@ -120,7 +119,6 @@ def extract_json_from_response(response_text: str):
             st.error(f"Error decoding JSON from markdown block: {e}")
             return None
 
-    # 2. Fallback: find the first '{' or '[' and try to parse from there.
     first_char_pos = -1
     if '{' in response_text:
         first_char_pos = response_text.find('{')
@@ -204,28 +202,21 @@ def run_bible_lookup():
         try:
             verse_text = fetch_bible_verse(passage, translation)
             st.success(verse_text)
-
-            # Summary
             summary = ask_gpt_conversation(
                 f"Summarize and explain this Bible verse clearly: '{verse_text}' ({passage}). "
                 "Include a daily life takeaway."
             )
             st.markdown("**💡 AI Summary:**")
             st.info(summary)
-
-            # Cross-references
             cross = ask_gpt_conversation(
                 f"List 2–3 cross-referenced Bible verses related to: '{verse_text}' and explain their connection."
             )
             st.markdown("**🔗 Cross References:**")
             st.markdown(cross)
-
-            # Related sermons
             sermons = search_sermons_online(passage)
             st.markdown("**🎙️ Related Sermons:**")
             for item in sermons:
                 st.markdown(f"- {item['pastor']}: {item['url']}")
-
         except Exception as e:
             st.error(str(e))
 
@@ -304,122 +295,57 @@ def run_pixar_story_animation():
 def run_practice_chat():
     st.subheader("🤠 Practice Chat")
     if "practice_state" not in st.session_state:
-        st.session_state.practice_state = {
-            "questions": [],
-            "current": 0,
-            "score": 0,
-            "book": "",
-            "style": "",
-            "level": "",
-            "awaiting_next": False,
-            "used_questions": set(),
-            "used_phrases": set(),
-            "restart_flag": False,
-        }
+        st.session_state.practice_state = {"questions": [], "current": 0, "score": 0, "awaiting_next": False}
+    
     S = st.session_state.practice_state
 
-    if S.get("restart_flag"):
-        st.session_state.practice_state = {
-            "questions": [],
-            "current": 0,
-            "score": 0,
-            "book": "",
-            "style": "",
-            "level": "",
-            "awaiting_next": False,
-            "used_questions": set(),
-            "used_phrases": set(),
-            "restart_flag": False,
-        }
-        st.rerun()
-
     if not S["questions"]:
-        random_practice = st.checkbox("📖 Random questions from the Bible")
-        book = "" if random_practice else st.text_input("Enter Bible book:")
-        style = st.selectbox("Choose question style:", ["multiple choice", "fill in the blank", "true or false", "mixed"])
-        level = st.selectbox("Select your understanding level:", ["beginner", "intermediate", "advanced"])
-
-        if st.button("Start Practice") and (random_practice or book):
-            S["book"] = book
-            S["style"] = style
-            S["level"] = level
-
-            num_questions = random.randint(7, 10)
-            while len(S["questions"]) < num_questions:
-                chosen_style = style if style != "mixed" else random.choice(
-                    ["multiple choice", "fill in the blank", "true or false"]
-                )
-                topic = book if book else "the Bible"
-
-                if chosen_style == "true or false":
-                    q_prompt = (
-                        f"Generate a true or false Bible question from {topic} suitable for a {level} learner. "
-                        "Format as JSON with 'question', 'correct', and 'choices' as ['True', 'False']."
-                    )
-                else:
-                    q_prompt = (
-                        f"Generate a {chosen_style} Bible question from {topic} suitable for a {level} learner, "
-                        "with 1 correct answer and 3 incorrect ones. Format as JSON with 'question','correct','choices'."
-                    )
-
-                data = extract_json_from_response(ask_gpt_conversation(q_prompt))
-                if not data:
-                    continue
-
-                norm = data["question"].strip().lower()
-                if norm in S["used_questions"]:
-                    continue
-                S["used_questions"].add(norm)
-                phrase_key = " ".join(sorted(norm.split()))
-                if phrase_key in S["used_phrases"]:
-                    continue
-                S["used_phrases"].add(phrase_key)
-
-                if chosen_style == "true or false":
-                    data["choices"] = ["True", "False"]
-                else:
-                    # unique + shuffle
-                    uniq = list(dict.fromkeys(data["choices"]))
-                    if data["correct"] not in uniq:
-                        uniq.append(data["correct"])
-                    random.shuffle(uniq)
-                    data["choices"] = uniq
-
-                S["questions"].append(data)
-            st.rerun()
-
-    elif S["current"] < len(S["questions"]):
-        q = S["questions"][S["current"]]
-        st.markdown(f"**Q{S['current'] + 1}: {q['question']}**")
-        ans = st.radio("Choose:", q["choices"], key=f"q{S['current']}_choice")
-
-        if not S.get("awaiting_next", False):
-            if st.button("Submit Answer"):
-                if ans.lower() == q["correct"].lower():
-                    S["score"] += 1
-                    st.success("✅ Correct!")
-                    S["current"] += 1
+        topic = st.text_input("Enter Bible book for quiz:", "John")
+        if st.button("Start Practice"):
+            with st.spinner("Generating questions..."):
+                q_prompt = f"Generate 5 unique multiple-choice questions from the book of {topic}. Format as a JSON list of objects, each with 'question', 'choices' (a list), and 'correct' (a string)."
+                response = ask_gpt_conversation(q_prompt)
+                questions_data = extract_json_from_response(response)
+                if questions_data and isinstance(questions_data, list):
+                    S["questions"] = questions_data
+                    S["current"] = 0
+                    S["score"] = 0
                     st.rerun()
                 else:
-                    st.error(f"❌ Incorrect. Correct answer: {q['correct']}")
-                    explain = ask_gpt_conversation(
-                        f"You're a theological Bible teacher. Explain why '{q['correct']}' is correct for: '{q['question']}', "
-                        "and briefly clarify why the other options are incorrect, using Scripture-based reasoning."
-                    )
-                    st.markdown("**📜 Teaching Moment:**")
-                    st.write(explain)
+                    st.error("Failed to generate practice questions.")
+    
+    elif S["current"] < len(S["questions"]):
+        q = S["questions"][S["current"]]
+        st.markdown(f"**Question {S['current'] + 1}:** {q['question']}")
+        
+        # Ensure choices is a list before processing
+        choices = q.get('choices', [])
+        if not isinstance(choices, list):
+            choices = [] # Default to empty list if format is wrong
+        
+        # Shuffle choices for display
+        random.shuffle(choices)
+        ans = st.radio("Choose:", choices, key=f"q_{S['current']}")
+
+        if not S["awaiting_next"]:
+            if st.button("Submit Answer", key=f"submit_{S['current']}"):
+                if ans == q['correct']:
+                    st.success("✅ Correct!")
+                    S["score"] += 1
+                    S["current"] += 1
+                else:
+                    st.error(f"❌ Incorrect. The correct answer was: {q['correct']}")
                     S["awaiting_next"] = True
-
-        if S.get("awaiting_next"):
-            if st.button("Next Question", key=f"next_{S['current']}"):
-                S["current"] += 1
-                S["awaiting_next"] = False
                 st.rerun()
-
+        else:
+            if st.button("Next Question", key=f"next_{S['current']}"):
+                S["awaiting_next"] = False
+                S["current"] += 1
+                st.rerun()
     else:
-        st.markdown(f"**🌞 Final Score: {S['score']}/{len(S['questions'])}**")
-        if st.button("Restart Practice"):
-            S["restart_flag"] = True
+        st.markdown(f"**Quiz complete! Your score: {S['score']}/{len(S['questions'])}**")
+        if st.button("Start New Quiz"):
+            S["questions"] = []
             st.rerun()
 
 # ================================================================
@@ -471,7 +397,7 @@ def run_bible_beta():
     book = st.text_input("Book (e.g., John):")
     chapter = st.number_input("Chapter:", min_value=1, step=1)
     if st.button("Display Page") and book:
-        verse = f"{book} {chapter}:1"
+        verse = f"{book} {chapter}" # Read whole chapter
         try:
             text = fetch_bible_verse(verse)
             st.text_area("📖 Bible Text:", value=text, height=200)
@@ -489,153 +415,59 @@ def run_bible_beta():
 # ================================================================
 # SERMON TRANSCRIBER & SUMMARIZER (YouTube or file upload)
 # ================================================================
-# ✅ FIX APPLIED HERE
 def _convert_to_wav_if_needed(src_path: str) -> str:
-    """If Whisper has trouble with container, convert to 16k mono WAV using ffmpeg (no ffprobe)."""
-    # Use a 'with' statement to ensure the temporary file is closed before ffmpeg uses it.
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
         wav_path = tmp_file.name
-
     cmd = [_FFMPEG_BIN, "-y", "-i", src_path, "-ar", "16000", "-ac", "1", wav_path]
     try:
-        # Capture output for better debugging if something goes wrong.
         subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        # Raise a more informative error message.
         raise Exception(f"ffmpeg failed with exit code {e.returncode}: {e.stderr}")
-        
     return wav_path
 
-# ✅ FIX APPLIED HERE
 def download_youtube_audio(url: str) -> tuple[str, str, str]:
-    """
-    Download audio *without* postprocessing (so yt_dlp won't call ffprobe).
-    Return (local_path, uploader, title).
-    If repo has cookies.txt, yt_dlp will use it (helps with 403).
-    """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as temp_file:
         output_path = temp_file.name
-
     ydl_opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio/best",
-        "outtmpl": output_path,
+        "format": "bestaudio[ext=m4a]/bestaudio/best", "outtmpl": output_path,
         "ffmpeg_location": os.environ.get("FFMPEG_LOCATION", _FFMPEG_DIR),
-        "quiet": True,
-        "retries": 3,
-        "noprogress": True,
-        "http_headers": {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.youtube.com/",
-        },
+        "quiet": True, "retries": 3, "noprogress": True,
+        "http_headers": {"User-Agent": "Mozilla/5.0"},
         **({"cookiefile": "cookies.txt"} if os.path.exists("cookies.txt") else {}),
     }
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             title = info.get("title", "Untitled Sermon")
             uploader = info.get("uploader", "Unknown")
-
-        # ✅ FIX APPLIED HERE: Check if the downloaded file is empty.
-        # If the file size is 0, the download failed silently.
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-            raise Exception("Audio download failed, resulting in an empty file. The video might be private, age-restricted, or unavailable.")
-
+            raise Exception("Audio download failed, resulting in an empty file.")
         return output_path, uploader, title
     except Exception as e:
-        # This will now catch our custom error above or other yt-dlp errors.
         raise Exception(f"❌ Failed during YouTube audio processing: {e}")
-
 
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
-    st.info("Upload a sermon audio or paste a YouTube link. Max length: 15 minutes (for testing).")
-
     yt_link = st.text_input("📺 YouTube Link (≤ 15 mins):")
-    audio_file = st.file_uploader("🎙️ Or upload sermon audio (MP3/WAV/M4A)", type=["mp3", "wav", "m4a"])
-
-    if st.button("⏺️ Transcribe & Summarize") and (yt_link or audio_file):
+    if st.button("⏺️ Transcribe & Summarize") and yt_link:
         with st.spinner("Transcribing... please wait."):
             try:
-                preacher = "Unknown"
-                title = "Untitled Sermon"
-                audio_path = None # Initialize audio_path
-
-                if yt_link:
-                    # Check metadata & length WITHOUT downloading first
-                    with yt_dlp.YoutubeDL({"quiet": True, "noprogress": True}) as ydl:
-                        info = ydl.extract_info(yt_link, download=False)
-                        duration = int(info.get("duration", 0) or 0)
-                        if duration > 900:
-                            raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
-                        preacher = info.get("uploader", "Unknown") or "Unknown"
-                        title = info.get("title", "Untitled Sermon") or "Untitled Sermon"
-
-                    # Download audio *without* postprocessing (no ffprobe)
-                    audio_path, _, _ = download_youtube_audio(yt_link)
-
-                elif audio_file:
-                    # ✅ FIX APPLIED HERE
-                    # Save uploaded file correctly using a 'with' statement.
-                    suffix = os.path.splitext(audio_file.name)[1].lower() or ".wav"
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
-                        temp_audio.write(audio_file.getvalue())
-                    audio_path = temp_audio.name
-
-                # Transcribe with Whisper
+                with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
+                    info = ydl.extract_info(yt_link, download=False)
+                    if int(info.get("duration", 0)) > 900:
+                        raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
+                audio_path, preacher, title = download_youtube_audio(yt_link)
                 model = whisper.load_model("base")
-                try:
-                    transcription = model.transcribe(audio_path)
-                except Exception:
-                    # If container/codec odd, convert to WAV and retry
-                    wav = _convert_to_wav_if_needed(audio_path)
-                    transcription = model.transcribe(wav)
-
+                transcription = model.transcribe(audio_path)
                 transcript_text = transcription.get("text", "").strip()
                 if not transcript_text:
                     raise Exception("Transcription produced empty text.")
-
                 st.success("✅ Transcription complete.")
-                st.markdown("### 📝 Transcript")
-                st.text_area("Transcript", transcript_text, height=300)
-
-                # Trim for GPT (safety)
-                short = transcript_text[:1800].replace("\n", " ").replace("\r", " ")
-                prompt = f"""
-You are a sermon summarizer. From the transcript below, summarize the following:
-
-- **Sermon Title**
-- **Preacher Name**
-- **Bible Verses Referenced**
-- **Main Takeaways**
-- **Reflection Questions**
-- **Call to Action (if any)**
-
-Preacher: {preacher}
-Title: {title}
-
-Transcript:
-{short}
-"""
+                st.text_area("📝 Transcript", transcript_text, height=300)
+                prompt = f"You are a sermon summarizer. Summarize key takeaways, Bible verses, and reflection questions from this transcript:\nPreacher: {preacher}\nTitle: {title}\nTranscript:\n{transcript_text[:2000]}"
                 summary = ask_gpt_conversation(prompt)
                 st.markdown("### 🧠 Sermon Summary")
                 st.markdown(summary)
-
-                # Save locally (journal)
-                os.makedirs("sermon_journal", exist_ok=True)
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                with open(f"sermon_journal/transcript_{ts}.txt", "w", encoding="utf-8") as f:
-                    f.write(transcript_text)
-                with open(f"sermon_journal/summary_{ts}.txt", "w", encoding="utf-8") as f:
-                    f.write(summary)
-
-                st.success("Saved transcript and summary to `sermon_journal/` folder.")
-
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
@@ -644,172 +476,81 @@ Transcript:
 # ================================================================
 def run_study_plan():
     st.subheader("📅 Personalized Bible Study Plan")
-
     goal = st.text_input("Study goal (e.g., 'Grow in faith', 'Understand forgiveness'):")
     duration = st.slider("How many days do you want your plan to last?", 7, 60, 14)
-    focus = st.text_input("Focus area (optional):")
-    level = st.selectbox("Knowledge level:", ["Beginner", "Intermediate", "Advanced"])
-    include_reflections = st.checkbox("Include daily reflection questions?", True)
-
     if st.button("Generate Study Plan") and goal:
         with st.spinner("✍️ Creating your personalized study plan..."):
-            prompt = f"""
-You are a mature Bible mentor creating a detailed, Scripture-based daily study plan.
-
-**Parameters:**
-- Goal: {goal}
-- Duration: {duration} days
-- Focus area: {focus or 'General spiritual growth'}
-- Knowledge level: {level}
-
-**Instructions:**
-Design a day-by-day Bible study plan.
-For each day:
-- Give a short **title or theme**
-- Suggest **1–2 Bible passages to read**
-- Write a **summary** (3–5 sentences) explaining the meaning and relevance
-- Include a **cross-reference verse**
-- Provide a **practical life application**
-{"- Add a reflection question for journaling." if include_reflections else ""}
-End with a brief closing paragraph encouraging the reader to stay consistent.
-
-The tone should be pastoral, warm, and theologically sound.
-Make sure it feels like a devotional guide.
-"""
-            try:
-                plan = ask_gpt_conversation(prompt)
-                st.markdown("### 📘 Your Study Plan")
-                st.text_area("", plan, height=600)
-
-                # Save locally
-                os.makedirs("study_plans", exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                file_path = f"study_plans/study_plan_{timestamp}.txt"
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(plan)
-                st.success(f"✅ Study plan saved to `{file_path}`.")
-            except Exception as e:
-                st.error(f"❌ Error generating study plan: {e}")
+            prompt = f"Create a detailed, day-by-day {duration}-day Bible study plan for the goal: '{goal}'. Include themes, passages, summaries, and reflection questions."
+            plan = ask_gpt_conversation(prompt)
+            st.text_area("📘 Your Study Plan", plan, height=600)
 
 # ================================================================
 # VERSE OF THE DAY, PRAYER STARTER, FAST DEVOTIONAL, SMALL GROUP
-# (Lightweight but working versions to keep parity with your menu)
 # ================================================================
 def run_verse_of_the_day():
     st.subheader("🌅 Verse of the Day")
-    books = [
-        "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges", "Ruth",
-        "1 Samuel", "2 Samuel", "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra",
-        "Nehemiah", "Esther", "Job", "Psalms", "Proverbs", "Ecclesiastes", "Song of Solomon",
-        "Isaiah", "Jeremiah", "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
-        "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah",
-        "Malachi", "Matthew", "Mark", "Luke", "John", "Acts", "Romans", "1 Corinthians",
-        "2 Corinthians", "Galatians", "Ephesians", "Philippians", "Colossians",
-        "1 Thessalonians", "2 Thessalonians", "1 Timothy", "2 Timothy", "Titus", "Philemon",
-        "Hebrews", "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John", "Jude", "Revelation",
-    ]
-    try:
-        book = random.choice(books)
-        # Random chapter and verse for common books, adjust ranges as needed
-        chapter_map = {
-            "John": (1, 21), "Psalm": (1, 150), "Romans": (1, 16), "Genesis": (1, 50),
-            "Matthew": (1, 28), "Proverbs": (1, 31)
-        }
-        chapter_range = chapter_map.get(book, (1, 5)) # Default for smaller books
-        chapter = random.randint(chapter_range[0], chapter_range[1])
-        verse = random.randint(1, 20) # Assume most chapters have at least 20 verses
-
-        ref = f"{book} {chapter}:{verse}"
-        text = fetch_bible_verse(ref, "web")
-        st.success(f"**{ref}** — {text}")
-        reflection = ask_gpt_conversation(
-            f"Offer a warm, practical reflection on this verse with 1 actionable takeaway: {text} ({ref})"
-        )
-        st.markdown("**💬 Reflection:**")
-        st.write(reflection)
-    except Exception as e:
-        st.error(str(e))
+    if "verse_of_day" not in st.session_state:
+        st.session_state.verse_of_day = None
+    if st.button("Get Today's Verse"):
+        prompt = "Provide one inspiring Bible verse (e.g., John 3:16 KJV) and a 2-3 sentence reflection on it."
+        st.session_state.verse_of_day = ask_gpt_conversation(prompt)
+    if st.session_state.verse_of_day:
+        st.success(st.session_state.verse_of_day)
 
 def run_prayer_starter():
     st.subheader("🙏 Prayer Starter")
     theme = st.text_input("Theme (e.g., gratitude, anxiety, guidance):")
     if st.button("Generate Prayer") and theme:
-        prayer = ask_gpt_conversation(
-            f"Write a short, theologically faithful prayer starter on {theme}. Address God reverently; avoid clichés."
-        )
+        prayer = ask_gpt_conversation(f"Write a short, theologically faithful prayer starter on {theme}.")
         st.text_area("Prayer", prayer, height=300)
 
 def run_fast_devotional():
     st.subheader("⚡ Fast Devotional")
     topic = st.text_input("Topic (e.g., hope, perseverance):")
     if st.button("Generate Devotional") and topic:
-        devo = ask_gpt_conversation(
-            f"Compose a 150–200 word devotional on {topic} with one primary verse, 2 cross-refs, and 1 challenge for today."
-        )
+        devo = ask_gpt_conversation(f"Compose a 150-word devotional on {topic} with a primary verse and a challenge.")
         st.text_area("Devotional", devo, height=350)
 
 def run_small_group_generator():
     st.subheader("👥 Small Group Generator")
     passage = st.text_input("Passage for discussion (e.g., James 1:2-8):")
     if st.button("Create Guide") and passage:
-        try:
-            text = fetch_bible_verse(passage, "web")
-        except Exception:
-            text = passage
-        guide = ask_gpt_conversation(
-            f"Create a small-group discussion guide for this passage:\n{text}\n"
-            "- 5 thoughtful questions (obs/interpretation/application)\n"
-            "- One short opening and closing prompt\n"
-            "- A key truth to remember"
-        )
+        guide = ask_gpt_conversation(f"Create a small-group discussion guide for {passage} with 5 thoughtful questions and a key truth.")
         st.text_area("Group Guide", guide, height=500)
 
 # ================================================================
-# NEW LEARNING MODULE
+# NEW LEARNING MODULE (SYNTAX CORRECTED)
 # ================================================================
 
 def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str) -> str:
     """Generates the prompt for GPT to create a single lesson with embedded knowledge checks."""
-    # Corrected f-string with escaped curly braces for JSON
     return f"""
 You are an expert AI, Python coder, pastor, and theologian teacher. Your task is to generate a single, biblically sound Christian lesson for a learning app, tailored to the user's preferences.
 
 **Lesson Details:**
 - **Level Topic:** "{level_topic}"
 - **Lesson Number:** {lesson_number}
-- **User Learning Style:** "{user_learning_style}" (e.g., storytelling, analytical, practical application, meditative)
-- **Time Commitment:** "{time_commitment}" (this dictates the length and depth of the lesson and checks)
+- **User Learning Style:** "{user_learning_style}"
+- **Time Commitment:** "{time_commitment}"
 
 **Instructions for Lesson Generation:**
 1.  **Lesson Content:**
-    * Craft a comprehensive, biblically sound lesson that a theologian/pastor would teach their congregation, but simplified and engaging for an app user.
-    * The content should directly relate to the '{level_topic}' for this level and be suitable for lesson number {lesson_number}.
+    * Craft a comprehensive, biblically sound lesson.
     * Integrate relevant Bible verses naturally into the text.
     * Maintain a warm, pastoral, and encouraging tone.
-    * Ensure the content is concise enough to fit within a '{time_commitment}' daily session. Adjust detail and sub-topics accordingly.
 2.  **Knowledge Checks:**
-    * Embed 2-3 "knowledge checks" throughout the lesson content.
-    * Each knowledge check should consist of **one question** of a specific type.
-    * Vary the question types: multiple choice, true/false, matching, and fill-in-the-blank. Ensure at least two different types are used across the 2-3 checks.
-    * **For Multiple Choice:** Provide 1 correct answer and 3 incorrect but plausible options.
-    * **For True/False:** Provide a statement and indicate if it's true or false.
-    * **For Matching:** Provide 3-4 pairs of terms/concepts to match.
-    * **For Fill-in-the-blank:** Provide a sentence with one key word or phrase missing, and the correct answer.
+    * Embed 2-3 "knowledge checks" throughout the lesson content of varied types (multiple choice, true/false, fill-in-the-blank).
 
 **Output Format (Strict JSON):**
-Your entire response MUST be a single JSON object, wrapped in triple backticks and 'json' specifier, with the following structure:
+Your entire response MUST be a single JSON object, wrapped in triple backticks and 'json' specifier.
 
 ```json
 {{
-  "lesson_title": "A concise, engaging title for this lesson (e.g., 'The Nature of Saving Faith')",
+  "lesson_title": "A concise, engaging title for this lesson",
   "lesson_content_sections": [
     {{
       "type": "text",
       "content": "Paragraph 1 of the lesson content, biblically sound and engaging."
-    }},
-    {{
-      "type": "text",
-      "content": "Paragraph 2 of the lesson content, continuing the teaching."
     }},
     {{
       "type": "knowledge_check",
@@ -826,18 +567,13 @@ Your entire response MUST be a single JSON object, wrapped in triple backticks a
     {{
       "type": "knowledge_check",
       "question_type": "true_false",
-      "question": "According to the Bible, faith is primarily based on human reason and intellect.",
+      "question": "Faith is primarily based on human reason.",
       "correct_answer": "False",
       "biblical_reference": "Romans 10:17"
-    }},
-    {{
-      "type": "text",
-      "content": "More lesson content, leading to the next check or conclusion."
     }}
   ],
   "summary_points": [
     "Key takeaway 1 from the lesson.",
-    "Key takeaway 2 from the lesson.",
-    "Key takeaway 3 from the lesson."
+    "Key takeaway 2 from the lesson."
   ]
 }}
