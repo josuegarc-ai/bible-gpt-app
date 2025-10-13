@@ -92,7 +92,7 @@ def ask_gpt_conversation(prompt: str) -> str:
     r = client.chat.completions.create(
         model=MODEL,
         temperature=0.3,
-        max_tokens=600,
+        max_tokens=2000, # Increased max_tokens for lessons/quizzes
         messages=[
             {
                 "role": "system",
@@ -109,9 +109,20 @@ def ask_gpt_conversation(prompt: str) -> str:
 
 def extract_json_from_response(response_text: str):
     try:
-        json_text = re.search(r"\{.*\}", response_text, re.DOTALL).group(0)
-        return json.loads(json_text)
-    except Exception:
+        # Use regex to find the JSON string that starts with { and ends with }
+        # This is more robust if there's leading/trailing text outside the JSON
+        json_match = re.search(r"```json\n(\{.*?\})\n```", response_text, re.DOTALL)
+        if json_match:
+            json_text = json_match.group(1)
+            return json.loads(json_text)
+        else:
+            # Fallback for when the markdown isn't used
+            json_text = re.search(r"(\{.*?\})", response_text, re.DOTALL)
+            if json_text:
+                return json.loads(json_text.group(0))
+            return None
+    except Exception as e:
+        st.error(f"Error extracting or parsing JSON: {e}\nResponse text: {response_text[:500]}...")
         return None
 
 # ================================================================
@@ -151,7 +162,7 @@ def search_sermons_online(passage: str):
                                 results.append({"pastor": pastor, "url": video_url})
                                 found = True
                                 break
-                    break
+                        break
 
             if not found:
                 results.append({"pastor": pastor, "url": "❌ No result"})
@@ -553,7 +564,7 @@ def run_sermon_transcriber():
                     suffix = os.path.splitext(audio_file.name)[1].lower() or ".wav"
                     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
                         temp_audio.write(audio_file.getvalue())
-                        audio_path = temp_audio.name
+                    audio_path = temp_audio.name
 
                 # Transcribe with Whisper
                 model = whisper.load_model("base")
@@ -726,55 +737,79 @@ def run_small_group_generator():
         st.text_area("Group Guide", guide, height=500)
 
 # ================================================================
-# MAIN UI
+# NEW LEARNING MODULE
 # ================================================================
-st.set_page_config(page_title="Bible GPT", layout="wide")
-st.title("✅ Bible GPT")
 
-mode = st.sidebar.selectbox(
-    "Choose a mode:",
-    [
-        "Bible Lookup",
-        "Chat with GPT",
-        "Sermon Transcriber & Summarizer",
-        "Practice Chat",
-        "Verse of the Day",
-        "Study Plan",
-        "Faith Journal",
-        "Prayer Starter",
-        "Fast Devotional",
-        "Small Group Generator",
-        "Tailored Learning Path",
-        "Bible Beta Mode",
-        "Pixar Story Animation",
-    ],
-)
+def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str) -> str:
+    """Generates the prompt for GPT to create a single lesson with embedded knowledge checks."""
+    return f"""
+You are an expert AI, Python coder, pastor, and theologian teacher. Your task is to generate a single, biblically sound Christian lesson for a learning app, tailored to the user's preferences.
 
-if mode == "Bible Lookup":
-    run_bible_lookup()
-elif mode == "Chat with GPT":
-    run_chat_mode()
-elif mode == "Sermon Transcriber & Summarizer":
-    run_sermon_transcriber()
-elif mode == "Practice Chat":
-    run_practice_chat()
-elif mode == "Verse of the Day":
-    run_verse_of_the_day()
-elif mode == "Study Plan":
-    run_study_plan()
-elif mode == "Faith Journal":
-    run_faith_journal()
-elif mode == "Prayer Starter":
-    run_prayer_starter()
-elif mode == "Fast Devotional":
-    run_fast_devotional()
-elif mode == "Small Group Generator":
-    run_small_group_generator()
-elif mode == "Tailored Learning Path":
-    run_learning_path_mode()
-elif mode == "Bible Beta Mode":
-    run_bible_beta()
-elif mode == "Pixar Story Animation":
-    run_pixar_story_animation()
-else:
-    st.warning("This mode is under construction.")
+**Lesson Details:**
+- **Level Topic:** "{level_topic}"
+- **Lesson Number:** {lesson_number}
+- **User Learning Style:** "{user_learning_style}" (e.g., storytelling, analytical, practical application, meditative)
+- **Time Commitment:** "{time_commitment}" (this dictates the length and depth of the lesson and checks)
+
+**Instructions for Lesson Generation:**
+1.  **Lesson Content:**
+    * Craft a comprehensive, biblically sound lesson that a theologian/pastor would teach their congregation, but simplified and engaging for an app user.
+    * The content should directly relate to the '{level_topic}' for this level and be suitable for lesson number {lesson_number}.
+    * Integrate relevant Bible verses naturally into the text.
+    * Maintain a warm, pastoral, and encouraging tone.
+    * Ensure the content is concise enough to fit within a '{time_commitment}' daily session. Adjust detail and sub-topics accordingly.
+2.  **Knowledge Checks:**
+    * Embed 2-3 "knowledge checks" throughout the lesson content.
+    * Each knowledge check should consist of **one question** of a specific type.
+    * Vary the question types: multiple choice, true/false, matching, and fill-in-the-blank. Ensure at least two different types are used across the 2-3 checks.
+    * **For Multiple Choice:** Provide 1 correct answer and 3 incorrect but plausible options.
+    * **For True/False:** Provide a statement and indicate if it's true or false.
+    * **For Matching:** Provide 3-4 pairs of terms/concepts to match.
+    * **For Fill-in-the-blank:** Provide a sentence with one key word or phrase missing, and the correct answer.
+
+**Output Format (Strict JSON):**
+Your entire response MUST be a single JSON object, wrapped in triple backticks and 'json' specifier, with the following structure:
+
+```json
+{{
+  "lesson_title": "A concise, engaging title for this lesson (e.g., 'The Nature of Saving Faith')",
+  "lesson_content_sections": [
+    {{
+      "type": "text",
+      "content": "Paragraph 1 of the lesson content, biblically sound and engaging."
+    }},
+    {{
+      "type": "text",
+      "content": "Paragraph 2 of the lesson content, continuing the teaching."
+    }},
+    {{
+      "type": "knowledge_check",
+      "question_type": "multiple_choice",
+      "question": "What is the biblical definition of faith?",
+      "options": ["A feeling of hope", "Trusting in human ability", "Confidence in what we hope for and assurance about what we do not see", "Blind belief"],
+      "correct_answer": "Confidence in what we hope for and assurance about what we do not see",
+      "biblical_reference": "Hebrews 11:1"
+    }},
+    {{
+      "type": "text",
+      "content": "Further lesson content, building on previous points."
+    }},
+    {{
+      "type": "knowledge_check",
+      "question_type": "true_false",
+      "question": "According to the Bible, faith is primarily based on human reason and intellect.",
+      "correct_answer": "False",
+      "biblical_reference": "Romans 10:17"
+    }},
+    {{
+      "type": "text",
+      "content": "More lesson content, leading to the next check or conclusion."
+    }}
+    // ... add more text and knowledge checks (2-3 checks per lesson, 5-10 sections total)
+  ],
+  "summary_points": [
+    "Key takeaway 1 from the lesson.",
+    "Key takeaway 2 from the lesson.",
+    "Key takeaway 3 from the lesson."
+  ]
+}}
