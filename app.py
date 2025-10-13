@@ -160,14 +160,31 @@ def run_bible_lookup():
     st.subheader("📖 Bible Lookup")
     passage = st.text_input("Enter a Bible passage (e.g., John 3:16):")
     translation = st.selectbox("Choose translation:", VALID_TRANSLATIONS)
+
     if st.button("Fetch Verse") and passage:
         with st.spinner("Fetching and analyzing..."):
             try:
+                # Fetch the verse
                 verse_text = fetch_bible_verse(passage, translation)
                 st.success(f"**{passage.strip().title()} ({translation.upper()})**\n\n> {verse_text}")
-                summary = ask_gpt_conversation(f"Summarize and explain this Bible verse clearly: '{verse_text}' ({passage}). Include a daily life takeaway.")
+
+                # Sermons related to the passage
+                sermon_results = search_sermons_online(passage)
+                if sermon_results:
+                    st.markdown("### 🎧 Sermons on this Passage")
+                    for s in sermon_results:
+                        if s['url'].startswith("http"):
+                            st.markdown(f"- **{s['pastor']}**: [Watch here]({s['url']})")
+                        else:
+                            st.markdown(f"- **{s['pastor']}**: {s['url']}")
+
+                # GPT Summary
+                summary = ask_gpt_conversation(
+                    f"Summarize and explain this Bible verse clearly: '{verse_text}' ({passage}). Include a daily life takeaway."
+                )
                 st.markdown("**💡 AI Summary:**")
                 st.info(summary)
+
             except Exception as e:
                 st.error(str(e))
 
