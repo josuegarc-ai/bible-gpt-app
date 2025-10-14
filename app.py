@@ -1139,32 +1139,6 @@ Return ONLY a JSON array (no prose), e.g.:
                 S["current_section_index"] = 0
                 st.rerun()
 
-
-def _ensure_lesson_depth(lesson_data: dict, time_commitment: str) -> dict:
-    """
-    Ensures the lesson roughly matches the expected number of sections/questions
-    for the selected time commitment. If the model returns too shallow a lesson,
-    this function can pad or re-ask later (for now, it just returns lesson_data as-is).
-    """
-    if not isinstance(lesson_data, dict):
-        return {}
-
-    sections = lesson_data.get("lesson_content_sections", [])
-    expected_min_sections = {
-        "15 minutes": 4,   # 2 text + 2 checks
-        "30 minutes": 7,   # deeper content
-        "45 minutes": 10,  # full exegesis, more checks
-    }
-
-    min_sections = expected_min_sections.get(time_commitment, 4)
-
-    # If too shallow, we can either regenerate or just mark it
-    if len(sections) < min_sections:
-        lesson_data["lesson_title"] += " (Regenerated for Depth)"
-        # TODO: optionally re-call the model to regenerate or expand content
-
-    return lesson_data
-
 # ================================================================
 # MAIN UI
 # ================================================================
