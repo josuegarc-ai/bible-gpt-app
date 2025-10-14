@@ -730,23 +730,21 @@ def run_small_group_generator():
 # ================================================================
 # LEARN MODULE (DYNAMIC, USER-DEFINED LEVELS/LESSONS)
 # ================================================================
+
 # Robust extractor for objects OR arrays (used by Learn Module only)
 def _learn_extract_json_any(response_text: str):
-    # Try fenced ```json ... ```
     m = re.search(r"```json\s*(\{[\s\S]*?\}|\[[\s\S]*?\])\s*```", response_text, re.IGNORECASE)
     if m:
         try:
             return json.loads(m.group(1))
         except Exception:
             pass
-    # Try top-level object
     m = re.search(r"\{[\s\S]*\}", response_text)
     if m:
         try:
             return json.loads(m.group(0))
         except Exception:
             pass
-    # Try top-level array
     m = re.search(r"\[[\s\S]*\]", response_text)
     if m:
         try:
@@ -755,8 +753,102 @@ def _learn_extract_json_any(response_text: str):
             pass
     return None
 
+# -------------------------
+# 🔧 Helper functions for Learn Module
+# -------------------------
+TOKENS_BY_TIME = {
+    "15 minutes": 1200,
+    "30 minutes": 2600,
+    "45 minutes": 3400,
+}
+
+def _normalize_answer(val: str) -> str:
+    if val is None:
+        return ""
+    s = str(val).strip().lower()
+    if s in {"t", "true", "yes", "y"}: s = "true"
+    elif s in {"f", "false", "no", "n"}: s = "false"
+    s = re.sub(r"[^\w\s]", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+def _answers_match(user_answer, correct_answer) -> bool:
+    return _normalize_answer(user_answer) == _normalize_answer(correct_answer)
+
+def _expected_minima(time_commitment: str):
+    if time_commitment == "15 minutes":
+        return (6, 3)
+    if time_commitment == "30 minutes":
+        return (8, 4)
+    if time_commitment == "45 minutes":
+        return (12, 6)
+    return (6, 3)
+
+def ask_gpt_json(prompt: str, max_tokens: int) -> str:
+    try:
+        r = client.chat.completions.create(
+            model=MODEL,
+            temperature=0.2,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": "You are a biblical mentor and teacher. Output valid JSON only."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return r.choices[0].message.content.strip()
+    except Exception:
+        r = client.chat.completions.create(
+            model=MODEL,
+            temperature=0.2,
+            max_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": "You are a biblical mentor and teacher. Output valid JSON only."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return r.choices[0].message.content.strip()
+
+def _ensure_lesson_depth(lesson_obj: dict, time_commitment: str,
+                         level_topic: str, goal: str, user_learning_style: str) -> dict:
+    try:
+        sections = lesson_obj.get("lesson_content_sections", []) or []
+        kc_count = sum(1 for s in sections if (s.get("type") or "").lower() == "knowledge_check")
+        min_sections, min_kc = _expected_minima(time_commitment)
+        if len(sections) >= min_sections and kc_count >= min_kc:
+            return lesson_obj
+        expand_prompt = f"""
+You previously produced this lesson JSON (DO NOT change its schema keys):
+{json.dumps(lesson_obj, ensure_ascii=False)}
+
+Goal: "{goal}"
+Level Topic: "{level_topic}"
+Learning Style: "{user_learning_style}"
+Time Commitment: "{time_commitment}"
+
+The lesson is too short. Expand it to meet or exceed these minima:
+- Min total sections: {min_sections}
+- Min knowledge_check count: {min_kc}
+
+Rules:
+- Keep the same JSON schema.
+- Do NOT add prose outside JSON.
+- Ensure every knowledge_check includes: question_type, question, (options if MC), correct_answer, biblical_reference.
+- Ensure teaching sections are Bible-first (passages, exegesis, cross-references), then doctrine, then application.
+Return ONLY the updated JSON object.
+"""
+        expanded = ask_gpt_json(expand_prompt, max_tokens=TOKENS_BY_TIME.get(time_commitment, 2000))
+        expanded_obj = _learn_extract_json_any(expanded)
+        if isinstance(expanded_obj, dict):
+            return expanded_obj
+    except Exception:
+        pass
+    return lesson_obj
+
+# -------------------------
+# PROMPTS
+# -------------------------
 def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str, goal: str) -> str:
-    """Robust prompt asking the model to generate a theologically grounded lesson with depth based on time commitment."""
     return f"""
 You are an expert theologian and Bible teacher. Generate full lessons that are grounded in the Word of God, for a Christian learning app.
 
@@ -791,7 +883,6 @@ Return ONLY valid JSON (no prose, no markdown). Use the structure:
 """
 
 def create_level_quiz_prompt(level_topic: str) -> str:
-    """Prompt for generating a full 10-question quiz tied to the level topic."""
     return f"""
 You are a Bible teacher creating a level quiz for a Christian learning app.
 
@@ -814,7 +905,9 @@ For each question, return a JSON object with:
 Return ONLY a JSON array of 10 objects. No prose, no code fences, no markdown.
 """
 
-
+# -------------------------
+# KNOWLEDGE CHECK
+# -------------------------
 def display_knowledge_check_question(S):
     current_lesson_sections = S["levels"][S["current_level"]]["lessons"][S["current_lesson_index"]]["lesson_content_sections"]
     q = current_lesson_sections[S["current_section_index"]]
@@ -834,7 +927,7 @@ def display_knowledge_check_question(S):
         user_answer = st.text_input("Fill in the blank:", key=input_key)
 
     if st.button("Submit Answer", key=f"submit_{input_key}"):
-        is_correct = user_answer and str(user_answer).strip().lower() == str(q.get('correct_answer')).strip().lower()
+        is_correct = _answers_match(user_answer, q.get('correct_answer'))
         if is_correct:
             st.success("Correct! Moving on.")
             S["current_section_index"] += 1
@@ -853,6 +946,9 @@ def display_knowledge_check_question(S):
             S["current_section_index"] += 1
             st.rerun()
 
+# -------------------------
+# LEVEL QUIZ
+# -------------------------
 def run_level_quiz(S):
     level_data = S["levels"][S["current_level"]]
     quiz_questions = level_data.get("quiz_questions", [])
@@ -869,19 +965,19 @@ def run_level_quiz(S):
     if q_index < len(quiz_questions):
         q = quiz_questions[q_index]
         st.markdown(f"**Question {q_index + 1}:** {q.get('question', '')}")
-        
+
         user_answer = None
         q_key = f"quiz_{S['current_level']}_{q_index}"
-        
+
         if q.get('question_type') == 'multiple_choice':
             user_answer = st.radio("Answer:", q.get('options', []), key=q_key)
         elif q.get('question_type') == 'true_false':
             user_answer = st.radio("Answer:", ["True", "False"], key=q_key)
         elif q.get('question_type') == 'fill_in_the_blank':
             user_answer = st.text_input("Answer:", key=q_key)
-        
+
         if st.button("Submit Quiz Answer", key=f"submit_{q_key}"):
-            if user_answer and str(user_answer).strip().lower() == str(q.get('correct_answer')).strip().lower():
+            if _answers_match(user_answer, q.get('correct_answer')):
                 st.success("Correct!")
                 S["user_score"] = S.get("user_score", 0) + 1
             else:
@@ -908,6 +1004,9 @@ def run_level_quiz(S):
                 S["user_score"] = 0
                 st.rerun()
 
+# -------------------------
+# MAIN LEARN MODULE FLOW
+# -------------------------
 def run_learn_module():
     st.subheader("📚 Learn Module — Personalized Bible Learning")
 
@@ -976,54 +1075,13 @@ Return ONLY a JSON array (no prose), e.g.:
                 time_commitment=S["time_commitment"],
                 goal=S["goal"],
             )
-            lesson_resp = ask_gpt_conversation(lesson_prompt)
+            max_toks = TOKENS_BY_TIME.get(S["time_commitment"], 2000)
+            lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=max_toks)
             lesson_data = _learn_extract_json_any(lesson_resp)
             if lesson_data:
-                level_data["lessons"].append(lesson_data)
-                S["current_section_index"] = 0
-                st.rerun()
-            else:
-                st.error("Failed to generate lesson. Please try again.")
-                return
-
-    # Render current lesson section
-    lesson = level_data["lessons"][S["current_lesson_index"]]
-    sections = lesson.get("lesson_content_sections", [])
-    st.markdown(f"### Lesson {S['current_lesson_index'] + 1}: {lesson.get('lesson_title', '')}")
-    st.progress((S["current_section_index"]) / len(sections) if sections else 0)
-
-    sec_index = S["current_section_index"]
-    if sec_index < len(sections):
-        section = sections[sec_index]
-        if section.get("type") == "text":
-            st.write(section.get("content"))
-            if st.button("Continue", key=f"cont_{sec_index}"):
-                S["current_section_index"] += 1
-                st.rerun()
-        elif section.get("type") == "knowledge_check":
-            display_knowledge_check_question(S)
-    else:
-        st.success(f"Lesson {S['current_lesson_index'] + 1} complete!")
-        # Offer next lesson OR quiz start
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Next Lesson ▶️"):
-                S["current_lesson_index"] += 1
-                S["current_section_index"] = 0
-                st.rerun()
-        with col2:
-            if st.button("Start Final Quiz for This Level 📝"):
-                # Generate quiz if not already present
-                if "quiz_questions" not in level_data or not level_data["quiz_questions"]:
-                    with st.spinner("Generating quiz..."):
-                        quiz_prompt = create_level_quiz_prompt(level_data.get("topic", "General"))
-                        quiz_resp = ask_gpt_conversation(quiz_prompt)
-                        level_data["quiz_questions"] = _learn_extract_json_any(quiz_resp) or []
-                        S["current_question_index"] = 0
-                        S["user_score"] = 0
-                S["quiz_mode"] = True
-                st.rerun()
-
+                lesson_data = _ensure_lesson_depth(
+                    lesson_data,
+                    
 # ================================================================
 # MAIN UI
 # ================================================================
