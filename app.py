@@ -770,7 +770,7 @@ def summarize_lesson_content(lesson_data: dict) -> str:
         response = client.chat.completions.create(
             model=MODEL,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=100,
+            max_tokens=150,
             temperature=0.2
         )
         return response.choices[0].message.content.strip()
@@ -784,9 +784,9 @@ def summarize_lesson_content(lesson_data: dict) -> str:
 def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str, goal: str, previous_lesson_summary: str = None) -> str:
     
     length_instructions = {
-        "15 minutes": "Generate exactly 3 teaching sections, each about 150-200 words long. The lesson must include exactly 2 knowledge check questions.",
-        "30 minutes": "Generate exactly 5 teaching sections, each about 200-250 words long, with deeper commentary. The lesson must include exactly 4 knowledge check questions.",
-        "45 minutes": "Generate exactly 7 teaching sections, each about 250-300 words long, including exegesis and historical context. The lesson must include exactly 6 knowledge check questions."
+        "15 minutes": "Generate exactly 5 teaching sections, each about 200-250 words long. The lesson must include at least 3 knowledge check questions.",
+        "30 minutes": "Generate exactly 7 teaching sections, each about 300-375 words long, with deeper commentary. The lesson must include exactly 4 knowledge check questions.",
+        "45 minutes": "Generate exactly 10 teaching sections, each about 400-500 words long, including exegesis and historical context. The lesson must include exactly 6 knowledge check questions."
     }
     
     context_clause = ""
