@@ -153,7 +153,7 @@ def search_sermons_online(passage: str):
                                 results.append({"pastor": pastor, "url": video_url})
                                 found = True
                                 break
-                    break
+                        break
 
             if not found:
                 results.append({"pastor": pastor, "url": "❌ No result"})
@@ -497,7 +497,7 @@ def download_youtube_audio(url: str) -> tuple[str, str, str]:
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
+                "Chrome/124.0.0.0 Safari/557.36"
             ),
             "Accept-Language": "en-US,en;q=0.9",
             "Referer": "https://www.youtube.com/",
@@ -731,38 +731,54 @@ def run_small_group_generator():
 # LEARN MODULE (DYNAMIC, USER-DEFINED LEVELS/LESSONS)
 # ================================================================
 
-# Robust extractor for objects OR arrays (used by Learn Module only)
-def _learn_extract_json_any(response_text: str):
-    m = re.search(r"```json\s*(\{[\s\S]*?\}|\[[\s\S]*?\])\s*```", response_text, re.IGNORECASE)
-    if m:
-        try:
-            return json.loads(m.group(1))
-        except Exception:
-            pass
-    m = re.search(r"\{[\s\S]*\}", response_text)
-    if m:
-        try:
-            return json.loads(m.group(0))
-        except Exception:
-            pass
-    m = re.search(r"\[[\s\S]*\]", response_text)
-    if m:
-        try:
-            return json.loads(m.group(0))
-        except Exception:
-            pass
-    return None
-
-# ============================
-# LEARN MODULE SUPPORT HELPERS
-# ============================
-
+# --- ONLY ONE DEFINITION OF TOKENS_BY_TIME ---
 TOKENS_BY_TIME = {
     "15 minutes": 1800,
     "30 minutes": 3000,
     "45 minutes": 4000
 }
 
+# Robust extractor for objects OR arrays (used by Learn Module only)
+def _learn_extract_json_any(response_text: str):
+    # Try to find JSON within triple backticks first
+    m = re.search(r"```json\s*(\{[\s\S]*?\}|\[[\s\S]*?\])\s*```", response_text, re.IGNORECASE)
+    if m:
+        try:
+            return json.loads(m.group(1))
+        except json.JSONDecodeError as e:
+            st.warning(f"Failed to parse JSON within backticks. Error: {e}")
+            pass # Try other methods
+
+    # If no backticks, try to parse the entire response if it looks like JSON
+    response_text_stripped = response_text.strip()
+    if response_text_stripped.startswith('{') and response_text_stripped.endswith('}'):
+        try:
+            return json.loads(response_text_stripped)
+        except json.JSONDecodeError as e:
+            st.warning(f"Failed to parse full object JSON. Error: {e}")
+            pass
+    elif response_text_stripped.startswith('[') and response_text_stripped.endswith(']'):
+        try:
+            return json.loads(response_text_stripped)
+        except json.JSONDecodeError as e:
+            st.warning(f"Failed to parse full array JSON. Error: {e}")
+            pass
+
+    # Fallback to finding any JSON object or array in the text (less strict, more prone to partial matches)
+    m = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", response_text, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError as e:
+            st.warning(f"Failed to parse fallback JSON. Error: {e}")
+            pass
+            
+    st.error("❌ No valid JSON could be extracted from the AI response for the lesson. Please try again.")
+    return None
+
+# ============================
+# LEARN MODULE SUPPORT HELPERS
+# ============================
 def ask_gpt_json(prompt: str, max_tokens: int = 3000):
     """Wrapper around the OpenAI API to return raw text for JSON parsing."""
     try:
@@ -777,7 +793,7 @@ def ask_gpt_json(prompt: str, max_tokens: int = 3000):
         )
         return resp.choices[0].message.content
     except Exception as e:
-        st.error(f"GPT JSON call failed: {e}")
+        st.error(f"❌ GPT JSON API call failed: {e}. Check your OpenAI API key and network connection.")
         return None
 
 def _ensure_lesson_depth(lesson_data: dict, time_commitment: str) -> dict:
@@ -791,14 +807,14 @@ def _ensure_lesson_depth(lesson_data: dict, time_commitment: str) -> dict:
 
     sections = lesson_data.get("lesson_content_sections", [])
     expected_min_sections = {
-        "15 minutes": 4,   # 2 text + 2 checks
-        "30 minutes": 7,   # deeper content
-        "45 minutes": 10,  # full exegesis, more checks
+        "15 minutes": 4,    # 2 text + 2 checks
+        "30 minutes": 7,    # deeper content
+        "45 minutes": 10,   # full exegesis, more checks
     }
 
     min_sections = expected_min_sections.get(time_commitment, 4)
     if len(sections) < min_sections:
-        lesson_data["lesson_title"] += " (Regenerated for Depth)"
+        lesson_data["lesson_title"] += " (Regenerated for Depth)" # Small indicator, can be expanded
     return lesson_data
 
 def _answers_match(user_answer, correct_answer) -> bool:
@@ -851,12 +867,15 @@ Return ONLY a JSON array (no prose), e.g.:
                 })
                 st.rerun()
             else:
-                st.error("Failed to generate levels. Please try again.")
+                st.error("❌ Failed to generate levels. Please try again, or check the model's response format.")
         return
 
     # 2) When levels exist — normal lesson/quiz flow
     if S["current_level"] >= len(S["levels"]):
         st.success("🎉 You've completed all levels!")
+        if st.button("Start a new Learning Journey"):
+            del st.session_state.learn_state # Reset entire module
+            st.rerun()
         return
 
     level_data = S["levels"][S["current_level"]]
@@ -879,14 +898,70 @@ Return ONLY a JSON array (no prose), e.g.:
                 time_commitment=S["time_commitment"],
                 goal=S["goal"],
             )
-            max_toks = TOKENS_BY_TIME.get(S["time_commitment"], 2000)
-            lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=max_toks)
-            lesson_data = _learn_extract_json_any(lesson_resp)
-            if lesson_data:
-                lesson_data = _ensure_lesson_depth(lesson_data, S["time_commitment"])
-                level_data["lessons"].append(lesson_data)
+            max_toks = TOKENS_BY_TIME.get(S["time_commitment"], 2000) # Ensure default for safety
+            lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=max_toks) # Use max_toks for consistency
+            
+            lesson_data_from_model = None
+            if lesson_resp: # Only attempt to parse if the API call returned something
+                lesson_data_from_model = _learn_extract_json_any(lesson_resp)
+            
+            if lesson_data_from_model:
+                lesson_data_from_model = _ensure_lesson_depth(lesson_data_from_model, S["time_commitment"])
+                level_data["lessons"].append(lesson_data_from_model)
                 S["current_section_index"] = 0
                 st.rerun()
+            else:
+                st.warning("Could not generate a valid lesson. Trying again with a new prompt or check previous errors.")
+                # Increment current_lesson_index to avoid infinite loop if subsequent retries are desired, or simply rerun to retry the same one.
+                # For now, rerun to retry the same index. The error messages from _learn_extract_json_any should help.
+                # If you want to skip to next lesson or level, you'd increment S["current_lesson_index"] or S["current_level"] here.
+                # st.rerun() # This is already happening implicitly if no lesson is added, causing the spin.
+                # Adding an explicit error and stopping here to avoid infinite loading.
+                st.error("Failed to generate a lesson. Please review previous error messages or try adjusting your learning goal.")
+                return # Stop processing to avoid infinite loop
+
+    # Display lesson content
+    current_lesson = level_data["lessons"][S["current_lesson_index"]]
+    st.markdown(f"### Lesson {S['current_lesson_index'] + 1}: {current_lesson.get('lesson_title', 'Untitled Lesson')}")
+
+    current_lesson_sections = current_lesson.get("lesson_content_sections", [])
+    if S["current_section_index"] < len(current_lesson_sections):
+        section = current_lesson_sections[S["current_section_index"]]
+        if section.get("type") == "text":
+            st.markdown(section.get("content", "Empty content section."))
+            if st.button("Next Section"):
+                S["current_section_index"] += 1
+                st.rerun()
+        elif section.get("type") == "knowledge_check":
+            display_knowledge_check_question(S)
+    else:
+        st.success("Lesson Completed! Review the summary points.")
+        for point in current_lesson.get("summary_points", []):
+            st.markdown(f"- {point}")
+
+        if S["current_lesson_index"] < len(level_data["lessons"]) - 1:
+            if st.button("Next Lesson"):
+                S["current_lesson_index"] += 1
+                S["current_section_index"] = 0
+                st.rerun()
+        else:
+            if st.button("Start Level Quiz"):
+                # Generate quiz questions here if not already generated
+                if "quiz_questions" not in level_data or not level_data["quiz_questions"]:
+                    with st.spinner("Generating quiz questions..."):
+                        quiz_prompt = create_level_quiz_prompt(level_data.get("topic", "General"))
+                        quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2000) # Quiz max tokens
+                        quiz_questions_data = _learn_extract_json_any(quiz_resp)
+                        if quiz_questions_data and isinstance(quiz_questions_data, list):
+                            level_data["quiz_questions"] = quiz_questions_data
+                        else:
+                            st.error("❌ Failed to generate quiz questions. Please try again.")
+                            return
+                S["quiz_mode"] = True
+                S["current_question_index"] = 0
+                S["user_score"] = 0
+                st.rerun()
+
 
 # -------------------------
 # PROMPTS
@@ -931,7 +1006,7 @@ You are a Bible teacher creating a level quiz for a Christian learning app.
 
 Topic: "{level_topic}"
 
-Create a 10-question quiz to assess the learner's comprehension of the entire level. 
+Create a 10-question quiz to assess the learner's comprehension of the entire level.
 The questions should be theologically sound, contextually rooted in Scripture, and cover a mix of:
 - Multiple choice (4 options, 1 correct)
 - True/false
@@ -1045,141 +1120,6 @@ def run_level_quiz(S):
             if st.button("Retake Quiz"):
                 S["current_question_index"] = 0
                 S["user_score"] = 0
-                st.rerun()
-
-# ============================
-# LEARN MODULE SUPPORT HELPERS
-# ============================
-
-TOKENS_BY_TIME = {
-    "15 minutes": 1800,
-    "30 minutes": 3000,
-    "45 minutes": 4000
-}
-
-def ask_gpt_json(prompt: str, max_tokens: int = 3000):
-    """Wrapper around the OpenAI API to return raw text for JSON parsing."""
-    try:
-        resp = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=max_tokens,
-            temperature=0
-        )
-        return resp.choices[0].message.content
-    except Exception as e:
-        st.error(f"GPT JSON call failed: {e}")
-        return None
-
-def _ensure_lesson_depth(lesson_data: dict, time_commitment: str) -> dict:
-    """
-    Ensures the lesson roughly matches the expected number of sections/questions
-    for the selected time commitment. If the model returns too shallow a lesson,
-    this function can pad or re-ask later (for now, it just returns lesson_data as-is).
-    """
-    if not isinstance(lesson_data, dict):
-        return {}
-
-    sections = lesson_data.get("lesson_content_sections", [])
-    expected_min_sections = {
-        "15 minutes": 4,   # 2 text + 2 checks
-        "30 minutes": 7,   # deeper content
-        "45 minutes": 10,  # full exegesis, more checks
-    }
-
-    min_sections = expected_min_sections.get(time_commitment, 4)
-    if len(sections) < min_sections:
-        lesson_data["lesson_title"] += " (Regenerated for Depth)"
-    return lesson_data
-
-def _answers_match(user_answer, correct_answer) -> bool:
-    """More flexible answer matching for knowledge checks and quizzes."""
-    if user_answer is None or correct_answer is None:
-        return False
-    return str(user_answer).strip().lower() == str(correct_answer).strip().lower()
-
-
-# -------------------------
-# MAIN LEARN MODULE FLOW
-# -------------------------
-def run_learn_module():
-    st.subheader("📚 Learn Module — Personalized Bible Learning")
-
-    if "learn_state" not in st.session_state:
-        st.session_state.learn_state = {}
-    S = st.session_state.learn_state
-
-    # 1) Initial setup — user defines goal & levels; levels are generated organically by GPT
-    if "levels" not in S:
-        goal = st.text_input("What do you want to learn? (e.g., 'Understanding grace', 'Life of David')")
-        num_levels = st.number_input("How many levels do you want?", min_value=1, max_value=10, value=3)
-        learning_style = st.selectbox("Preferred learning style:", ["storytelling", "analytical", "practical"])
-        time_commitment = st.selectbox("Daily time commitment:", ["15 minutes", "30 minutes", "45 minutes"])
-
-        if st.button("🚀 Generate Your Learning Journey") and goal:
-            level_prompt = f"""
-Create exactly {int(num_levels)} progressive Bible learning levels for the goal: "{goal}".
-For each level, provide a concise "name" and a short "topic" the level will cover.
-Return ONLY a JSON array (no prose), e.g.:
-[
-  {{"name":"Level 1: <Tailored Title>","topic":"<Focused Topic>"}},
-  ...
-]
-"""
-            levels_json = _learn_extract_json_any(ask_gpt_conversation(level_prompt))
-            if isinstance(levels_json, list) and all(isinstance(x, dict) for x in levels_json):
-                S.update({
-                    "goal": goal,
-                    "levels": levels_json,
-                    "current_level": 0,
-                    "current_lesson_index": 0,
-                    "current_section_index": 0,
-                    "current_question_index": 0,
-                    "user_score": 0,
-                    "quiz_mode": False,
-                    "user_learning_style": learning_style,
-                    "time_commitment": time_commitment
-                })
-                st.rerun()
-            else:
-                st.error("Failed to generate levels. Please try again.")
-        return
-
-    # 2) When levels exist — normal lesson/quiz flow
-    if S["current_level"] >= len(S["levels"]):
-        st.success("🎉 You've completed all levels!")
-        return
-
-    level_data = S["levels"][S["current_level"]]
-    st.markdown(f"## {level_data.get('name','Current Level')}")
-
-    if S.get("quiz_mode"):
-        run_level_quiz(S)
-        return
-
-    # Generate lesson on-the-fly if needed
-    if "lessons" not in level_data:
-        level_data["lessons"] = []
-
-    if S["current_lesson_index"] >= len(level_data["lessons"]):
-        with st.spinner("Generating lesson..."):
-            lesson_prompt = create_lesson_prompt(
-                level_topic=level_data.get("topic", "General"),
-                lesson_number=S["current_lesson_index"] + 1,
-                user_learning_style=S["user_learning_style"],
-                time_commitment=S["time_commitment"],
-                goal=S["goal"],
-            )
-            max_toks = TOKENS_BY_TIME.get(S["time_commitment"], 2000)
-            lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=TOKENS_BY_TIME[S["time_commitment"]])
-            lesson_data = _learn_extract_json_any(lesson_resp)
-            if lesson_data:
-                lesson_data = _ensure_lesson_depth(lesson_data, S["time_commitment"])
-                level_data["lessons"].append(lesson_data)
-                S["current_section_index"] = 0
                 st.rerun()
 
 # ================================================================
