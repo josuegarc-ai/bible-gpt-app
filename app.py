@@ -560,7 +560,7 @@ def create_full_learning_plan_prompt(form_data: dict) -> str:
     num_lessons_per_level = pacing_to_lessons_per_level.get(form_data['pacing'], 2) # Default to 2 for steady
 
     return f"""
-You are an expert theologian and personalized curriculum designer. A user has provided this profile:
+You are an expert theologian, bible teacher, Christian education pastor and personalized curriculum designer. A user has provided this profile:
 - Topics of Interest: {form_data['topics']}
 - Current Knowledge: {form_data['knowledge_level']}
 - Learning Goal: {", ".join(form_data['objectives'])}
