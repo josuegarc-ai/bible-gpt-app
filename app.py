@@ -1,6 +1,5 @@
-
 # ================================================================
-# ✅ Bible GPT — v2.5 (File Handling Fixed) + Learn Module (Added non-invasively)
+# ✅ Bible GPT — v2.5 (File Handling Fixed) + Dynamic Learn Module
 # ================================================================
 
 # ==== Core imports ====
@@ -73,8 +72,10 @@ def fetch_bible_verse(passage: str, translation: str = "web") -> str:
 
     # bible-api.com returns 404 for unknown passages
     if resp.status_code != 200:
-        raise Exception(f"❌ Error {resp.status_code}: Unable to fetch passage. "
-                        f"Check the reference formatting, e.g. 'John 3:16' or 'Psalm 23:1-3'.")
+        raise Exception(
+            f"❌ Error {resp.status_code}: Unable to fetch passage. "
+            f"Check the reference formatting, e.g. 'John 3:16' or 'Psalm 23:1-3'."
+        )
 
     try:
         data = resp.json()
@@ -533,7 +534,7 @@ def run_sermon_transcriber():
             try:
                 preacher = "Unknown"
                 title = "Untitled Sermon"
-                audio_path = None # Initialize audio_path
+                audio_path = None  # Initialize audio_path
 
                 if yt_link:
                     # Check metadata & length WITHOUT downloading first
@@ -727,109 +728,99 @@ def run_small_group_generator():
         st.text_area("Group Guide", guide, height=500)
 
 # ================================================================
-# LEARN MODULE (added without modifying other features)
+# LEARN MODULE (DYNAMIC, USER-DEFINED LEVELS/LESSONS)
 # ================================================================
-
-# Helper for this module only: robust JSON/array extractor (does not replace existing extract_json_from_response)
+# Robust extractor for objects OR arrays (used by Learn Module only)
 def _learn_extract_json_any(response_text: str):
-    # Try fenced JSON first
-    m = re.search(r"```json\s*(\{.*?\}|\[.*?\])\s*```", response_text, re.DOTALL)
+    # Try fenced ```json ... ```
+    m = re.search(r"```json\s*(\{[\s\S]*?\}|\[[\s\S]*?\])\s*```", response_text, re.IGNORECASE)
     if m:
         try:
             return json.loads(m.group(1))
         except Exception:
             pass
-    # Try object
-    try:
-        obj = re.search(r"\{[\s\S]*\}", response_text)
-        if obj:
-            return json.loads(obj.group(0))
-    except Exception:
-        pass
-    # Try array
-    try:
-        arr = re.search(r"\[[\s\S]*\]", response_text)
-        if arr:
-            return json.loads(arr.group(0))
-    except Exception:
-        pass
+    # Try top-level object
+    m = re.search(r"\{[\s\S]*\}", response_text)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except Exception:
+            pass
+    # Try top-level array
+    m = re.search(r"\[[\s\S]*\]", response_text)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except Exception:
+            pass
     return None
 
-
-def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str) -> str:
+def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str, goal: str) -> str:
     """Prompt asking the model to return STRICT JSON for one lesson with embedded knowledge checks."""
     return f"""
-You are an expert AI, Python coder, pastor, and theologian teacher. Your task is to generate a single, biblically sound Christian lesson for a learning app.
+You are an expert theologian and Bible teacher. Generate a single lesson for a Christian learning app.
 
-**Lesson Details:**
-- **Level Topic:** "{level_topic}"
-- **Lesson Number:** {lesson_number}
-- **User Learning Style:** "{user_learning_style}"
-- **Time Commitment:** "{time_commitment}"
+Goal: "{goal}"
+Level Topic: "{level_topic}"
+Lesson Number: {lesson_number}
+Learning Style: "{user_learning_style}"
+Time Commitment: "{time_commitment}"
 
-**Output Format (Strict JSON):**
-Your entire response MUST be a single JSON object.
+Your response MUST be ONLY a JSON object (no prose, no code fences):
 
 {{
-  "lesson_title": "A concise, engaging title for this lesson",
+  "lesson_title": "A concise, engaging, biblically sound title",
   "lesson_content_sections": [
     {{
       "type": "text",
-      "content": "Paragraph 1 of the lesson content, biblically sound and engaging."
+      "content": "Open with clear, pastoral teaching that is faithful to Scripture."
     }},
     {{
       "type": "knowledge_check",
       "question_type": "multiple_choice",
-      "question": "What is the biblical definition of faith?",
-      "options": ["A feeling of hope", "Trusting in human ability", "Confidence in what we hope for and assurance about what we do not see", "Blind belief"],
-      "correct_answer": "Confidence in what we hope for and assurance about what we do not see",
-      "biblical_reference": "Hebrews 11:1"
+      "question": "Write a sound, unambiguous check question.",
+      "options": ["Option A","Option B","Option C","Option D"],
+      "correct_answer": "Option B",
+      "biblical_reference": "Provide a verse reference, e.g., Romans 5:1"
     }},
     {{
       "type": "text",
-      "content": "Further lesson content, building on previous points."
+      "content": "Build on the idea with practical application."
     }},
     {{
       "type": "knowledge_check",
       "question_type": "true_false",
-      "question": "Faith is primarily based on human reason.",
-      "correct_answer": "False",
-      "biblical_reference": "Romans 10:17"
+      "question": "Write a true/false check question.",
+      "correct_answer": "True",
+      "biblical_reference": "Provide a verse reference"
     }}
   ],
   "summary_points": [
-    "Key takeaway 1 from the lesson.",
-    "Key takeaway 2 from the lesson."
+    "One precise takeaway",
+    "Another precise takeaway"
   ]
 }}
 """
 
-
 def create_level_quiz_prompt(level_topic: str) -> str:
     return f"""
-You are an expert AI, pastor, and theologian teacher. Create a 10-question final quiz for a Christian learning app, covering the level topic: "{level_topic}".
-Include a mix of multiple choice, true/false, matching, and fill-in-the-blank questions.
-
-Output MUST be a single JSON array of question objects.
-
-[
-  {{
-    "question_type": "multiple_choice",
-    "question": "Which book details the exodus from Egypt?",
-    "options": ["Genesis", "Exodus", "Leviticus", "Numbers"],
-    "correct_answer": "Exodus",
-    "biblical_reference": "Exodus 1:1"
-  }}
-]
+Create a 10-question quiz (strict JSON array) for the level topic: "{level_topic}".
+Mix of question types: multiple_choice, true_false, fill_in_the_blank, matching.
+Each object must include:
+- "question_type"
+- "question"
+- If multiple_choice: "options" (array)
+- "correct_answer"
+- "biblical_reference"
+Return ONLY JSON (no prose, no code fences).
 """
-
 
 def display_knowledge_check_question(S):
     current_lesson_sections = S["levels"][S["current_level"]]["lessons"][S["current_lesson_index"]]["lesson_content_sections"]
     q = current_lesson_sections[S["current_section_index"]]
 
     st.markdown("---")
-    st.markdown("#### ✅ Knowledge Check")
+    st.markdown(f"#### ✅ Knowledge Check")
     st.markdown(f"**{q.get('question', 'Missing question text.')}**")
 
     user_answer = None
@@ -862,7 +853,6 @@ def display_knowledge_check_question(S):
             S["current_section_index"] += 1
             st.rerun()
 
-
 def run_level_quiz(S):
     level_data = S["levels"][S["current_level"]]
     quiz_questions = level_data.get("quiz_questions", [])
@@ -879,17 +869,17 @@ def run_level_quiz(S):
     if q_index < len(quiz_questions):
         q = quiz_questions[q_index]
         st.markdown(f"**Question {q_index + 1}:** {q.get('question', '')}")
-
+        
         user_answer = None
         q_key = f"quiz_{S['current_level']}_{q_index}"
-
+        
         if q.get('question_type') == 'multiple_choice':
             user_answer = st.radio("Answer:", q.get('options', []), key=q_key)
         elif q.get('question_type') == 'true_false':
             user_answer = st.radio("Answer:", ["True", "False"], key=q_key)
         elif q.get('question_type') == 'fill_in_the_blank':
             user_answer = st.text_input("Answer:", key=q_key)
-
+        
         if st.button("Submit Quiz Answer", key=f"submit_{q_key}"):
             if user_answer and str(user_answer).strip().lower() == str(q.get('correct_answer')).strip().lower():
                 st.success("Correct!")
@@ -902,7 +892,7 @@ def run_level_quiz(S):
         st.success(f"### Quiz Completed! Final Score: {S.get('user_score', 0)}/{len(quiz_questions)}")
         if S.get('user_score', 0) >= len(quiz_questions) * 0.7:
             st.balloons()
-            st.markdown(f"Congratulations! You passed Level {S['current_level'] + 1}!")
+            st.markdown(f"Congratulations! You passed {level_data.get('name','this level')}!")
             if st.button("Next Level ▶️"):
                 S["current_level"] += 1
                 S["current_lesson_index"] = 0
@@ -918,66 +908,74 @@ def run_level_quiz(S):
                 S["user_score"] = 0
                 st.rerun()
 
-
 def run_learn_module():
-    st.subheader("📚 Learn Module")
+    st.subheader("📚 Learn Module — Personalized Bible Learning")
+
     if "learn_state" not in st.session_state:
         st.session_state.learn_state = {}
     S = st.session_state.learn_state
 
+    # 1) Initial setup — user defines goal & levels; levels are generated organically by GPT
     if "levels" not in S:
-        st.info("Welcome! Let's tailor your learning journey.")
-        style = st.selectbox("Preferred learning style:", ["storytelling", "analytical", "practical application"])
-        time = st.selectbox("Daily time commitment:", ["15 minutes", "30 minutes", "45 minutes"])
-        if st.button("Start Learning Journey 🚀"):
-            S.update({
-                "levels": [
-                    {"name": "Level 1: Foundations of Faith", "topic": "Faith and Grace"},
-                    {"name": "Level 2: The Person of Christ", "topic": "Who Jesus Is"},
-                    {"name": "Level 3: The Holy Spirit", "topic": "The Role of the Holy Spirit"}
-                ],
-                "current_level": 0,
-                "current_lesson_index": 0,
-                "current_section_index": 0,
-                "user_learning_style": style,
-                "time_commitment_per_day": time,
-                "quiz_mode": False
-            })
-            st.rerun()
+        goal = st.text_input("What do you want to learn? (e.g., 'Understanding grace', 'Life of David')")
+        num_levels = st.number_input("How many levels do you want?", min_value=1, max_value=10, value=3)
+        learning_style = st.selectbox("Preferred learning style:", ["storytelling", "analytical", "practical"])
+        time_commitment = st.selectbox("Daily time commitment:", ["15 minutes", "30 minutes", "45 minutes"])
+
+        if st.button("🚀 Generate Your Learning Journey") and goal:
+            level_prompt = f"""
+Create exactly {int(num_levels)} progressive Bible learning levels for the goal: "{goal}".
+For each level, provide a concise "name" and a short "topic" the level will cover.
+Return ONLY a JSON array (no prose), e.g.:
+[
+  {{"name":"Level 1: <Tailored Title>","topic":"<Focused Topic>"}},
+  ...
+]
+"""
+            levels_json = _learn_extract_json_any(ask_gpt_conversation(level_prompt))
+            if isinstance(levels_json, list) and all(isinstance(x, dict) for x in levels_json):
+                S.update({
+                    "goal": goal,
+                    "levels": levels_json,
+                    "current_level": 0,
+                    "current_lesson_index": 0,
+                    "current_section_index": 0,
+                    "current_question_index": 0,
+                    "user_score": 0,
+                    "quiz_mode": False,
+                    "user_learning_style": learning_style,
+                    "time_commitment": time_commitment
+                })
+                st.rerun()
+            else:
+                st.error("Failed to generate levels. Please try again.")
         return
 
+    # 2) When levels exist — normal lesson/quiz flow
     if S["current_level"] >= len(S["levels"]):
-        st.success("🎉 You've completed all available levels!")
+        st.success("🎉 You've completed all levels!")
         return
 
     level_data = S["levels"][S["current_level"]]
-    st.markdown(f"## {level_data['name']}")
+    st.markdown(f"## {level_data.get('name','Current Level')}")
 
     if S.get("quiz_mode"):
         run_level_quiz(S)
         return
 
-    MAX_LESSONS = 5
-    if S["current_lesson_index"] >= MAX_LESSONS:
-        st.info("You've completed all lessons for this level.")
-        if st.button("Start Final Quiz"):
-            S["quiz_mode"] = True
-            if "quiz_questions" not in level_data or not level_data["quiz_questions"]:
-                with st.spinner("Generating quiz..."):
-                    quiz_prompt = create_level_quiz_prompt(level_data["topic"])
-                    quiz_resp = ask_gpt_conversation(quiz_prompt)
-                    level_data["quiz_questions"] = _learn_extract_json_any(quiz_resp)
-                    S["current_question_index"] = 0
-                    S["user_score"] = 0
-            st.rerun()
-        return
-
+    # Generate lesson on-the-fly if needed
     if "lessons" not in level_data:
         level_data["lessons"] = []
 
     if S["current_lesson_index"] >= len(level_data["lessons"]):
-        with st.spinner("Generating your next lesson..."):
-            lesson_prompt = create_lesson_prompt(level_data["topic"], S["current_lesson_index"] + 1, S["user_learning_style"], S["time_commitment_per_day"])
+        with st.spinner("Generating lesson..."):
+            lesson_prompt = create_lesson_prompt(
+                level_topic=level_data.get("topic", "General"),
+                lesson_number=S["current_lesson_index"] + 1,
+                user_learning_style=S["user_learning_style"],
+                time_commitment=S["time_commitment"],
+                goal=S["goal"],
+            )
             lesson_resp = ask_gpt_conversation(lesson_prompt)
             lesson_data = _learn_extract_json_any(lesson_resp)
             if lesson_data:
@@ -988,6 +986,7 @@ def run_learn_module():
                 st.error("Failed to generate lesson. Please try again.")
                 return
 
+    # Render current lesson section
     lesson = level_data["lessons"][S["current_lesson_index"]]
     sections = lesson.get("lesson_content_sections", [])
     st.markdown(f"### Lesson {S['current_lesson_index'] + 1}: {lesson.get('lesson_title', '')}")
@@ -1005,10 +1004,25 @@ def run_learn_module():
             display_knowledge_check_question(S)
     else:
         st.success(f"Lesson {S['current_lesson_index'] + 1} complete!")
-        if st.button("Next Lesson"):
-            S["current_lesson_index"] += 1
-            S["current_section_index"] = 0
-            st.rerun()
+        # Offer next lesson OR quiz start
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Next Lesson ▶️"):
+                S["current_lesson_index"] += 1
+                S["current_section_index"] = 0
+                st.rerun()
+        with col2:
+            if st.button("Start Final Quiz for This Level 📝"):
+                # Generate quiz if not already present
+                if "quiz_questions" not in level_data or not level_data["quiz_questions"]:
+                    with st.spinner("Generating quiz..."):
+                        quiz_prompt = create_level_quiz_prompt(level_data.get("topic", "General"))
+                        quiz_resp = ask_gpt_conversation(quiz_prompt)
+                        level_data["quiz_questions"] = _learn_extract_json_any(quiz_resp) or []
+                        S["current_question_index"] = 0
+                        S["user_score"] = 0
+                S["quiz_mode"] = True
+                st.rerun()
 
 # ================================================================
 # MAIN UI
@@ -1032,7 +1046,7 @@ mode = st.sidebar.selectbox(
         "Tailored Learning Path",
         "Bible Beta Mode",
         "Pixar Story Animation",
-        "Learn Module",  # added without altering existing entries
+        "Learn Module",  # 🔥 added dynamic module
     ],
 )
 
