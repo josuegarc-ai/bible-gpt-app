@@ -1081,7 +1081,15 @@ Return ONLY a JSON array (no prose), e.g.:
             if lesson_data:
                 lesson_data = _ensure_lesson_depth(
                     lesson_data,
-                    
+
+            lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=TOKENS_BY_TIME[S["time_commitment"]])
+            lesson_data = _learn_extract_json_any(lesson_resp)
+            if lesson_data:
+            lesson_data = _ensure_lesson_depth(lesson_data, S["time_commitment"])
+            level_data["lessons"].append(lesson_data)
+            S["current_section_index"] = 0
+            st.rerun()
+
 # ================================================================
 # MAIN UI
 # ================================================================
