@@ -756,64 +756,64 @@ def _learn_extract_json_any(response_text: str):
     return None
 
 def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str, goal: str) -> str:
-    """Prompt asking the model to return STRICT JSON for one lesson with embedded knowledge checks."""
+    """Robust prompt asking the model to generate a theologically grounded lesson with depth based on time commitment."""
     return f"""
-You are an expert theologian and Bible teacher. Generate a single lesson for a Christian learning app.
+You are an expert theologian and Bible teacher. Generate full lessons that are grounded in the Word of God, for a Christian learning app.
 
-Goal: "{goal}"
-Level Topic: "{level_topic}"
-Lesson Number: {lesson_number}
-Learning Style: "{user_learning_style}"
-Time Commitment: "{time_commitment}"
+- Goal: "{goal}"
+- Level Topic: "{level_topic}"
+- Lesson Number: {lesson_number}
+- Learning Style: "{user_learning_style}"
+- Time Commitment: "{time_commitment}"
 
-Your response MUST be ONLY a JSON object (no prose, no code fences):
+👉 Structure the lesson length and depth according to the time commitment:
+- **15 minutes:** Focus on 1 core passage, short explanations, 2–3 key takeaways, and 2 knowledge check questions.
+- **30 minutes:** Cover 2–3 passages in depth with doctrinal commentary, original language insights (Hebrew/Greek where relevant), historical context, 3–5 teaching sections, and 4–6 knowledge check questions distributed throughout.
+- **45 minutes:** Cover 3–4 passages thoroughly, including exegesis, historical-cultural context, doctrinal development, cross references, and 6–8 knowledge check questions. End with reflection and application.
 
+General structure:
+1. **Passage Selection & Reading** — Provide the passage text or summary with references.
+2. **Biblical Exegesis** — Explain the meaning in context (historical, cultural, linguistic, theological).
+3. **Cross References** — Show how other passages reinforce this truth.
+4. **Teaching Sections** — 3–5 depending on time commitment. Each section must have clear teaching and at least one knowledge check.
+5. **Application & Reflection** — End with practical application and 2–3 bullet-point reflections.
+
+Return ONLY valid JSON (no prose, no markdown). Use the structure:
 {{
-  "lesson_title": "A concise, engaging, biblically sound title",
+  "lesson_title": "A concise, biblically faithful title",
   "lesson_content_sections": [
-    {{
-      "type": "text",
-      "content": "Open with clear, pastoral teaching that is faithful to Scripture."
-    }},
-    {{
-      "type": "knowledge_check",
-      "question_type": "multiple_choice",
-      "question": "Write a sound, unambiguous check question.",
-      "options": ["Option A","Option B","Option C","Option D"],
-      "correct_answer": "Option B",
-      "biblical_reference": "Provide a verse reference, e.g., Romans 5:1"
-    }},
-    {{
-      "type": "text",
-      "content": "Build on the idea with practical application."
-    }},
-    {{
-      "type": "knowledge_check",
-      "question_type": "true_false",
-      "question": "Write a true/false check question.",
-      "correct_answer": "True",
-      "biblical_reference": "Provide a verse reference"
-    }}
+    {{"type": "text", "content": "Biblically grounded teaching section"}},
+    {{"type": "knowledge_check", "question_type": "multiple_choice", "question": "Question text", "options": ["A","B","C","D"], "correct_answer": "B", "biblical_reference": "e.g., Romans 5:1"}},
+    ...
   ],
-  "summary_points": [
-    "One precise takeaway",
-    "Another precise takeaway"
-  ]
+  "summary_points": ["Key takeaway 1", "Key takeaway 2", "Key takeaway 3"]
 }}
 """
 
 def create_level_quiz_prompt(level_topic: str) -> str:
+    """Prompt for generating a full 10-question quiz tied to the level topic."""
     return f"""
-Create a 10-question quiz (strict JSON array) for the level topic: "{level_topic}".
-Mix of question types: multiple_choice, true_false, fill_in_the_blank, matching.
-Each object must include:
-- "question_type"
-- "question"
-- If multiple_choice: "options" (array)
-- "correct_answer"
-- "biblical_reference"
-Return ONLY JSON (no prose, no code fences).
+You are a Bible teacher creating a level quiz for a Christian learning app.
+
+Topic: "{level_topic}"
+
+Create a 10-question quiz to assess the learner's comprehension of the entire level. 
+The questions should be theologically sound, contextually rooted in Scripture, and cover a mix of:
+- Multiple choice (4 options, 1 correct)
+- True/false
+- Fill in the blank
+- Matching
+
+For each question, return a JSON object with:
+- "question_type": "multiple_choice" | "true_false" | "fill_in_the_blank" | "matching"
+- "question": "The actual question text"
+- If multiple_choice: "options": ["A", "B", "C", "D"]
+- "correct_answer": "The correct answer"
+- "biblical_reference": "e.g., John 3:16"
+
+Return ONLY a JSON array of 10 objects. No prose, no code fences, no markdown.
 """
+
 
 def display_knowledge_check_question(S):
     current_lesson_sections = S["levels"][S["current_level"]]["lessons"][S["current_lesson_index"]]["lesson_content_sections"]
