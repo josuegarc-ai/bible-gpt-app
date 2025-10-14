@@ -1,5 +1,5 @@
 # ================================================================
-# ✅ Bible GPT — v2.6 (Learn Module Fixed)
+# ✅ Bible GPT — v2.7 (Cohesive Learning Flow)
 # ================================================================
 
 # ==== Core imports ====
@@ -729,7 +729,7 @@ def ask_gpt_json(prompt: str, max_tokens: int = 3000):
         resp = client.chat.completions.create(
             model=MODEL,
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "You are a helpful assistant that only returns JSON."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=max_tokens,
@@ -739,20 +739,6 @@ def ask_gpt_json(prompt: str, max_tokens: int = 3000):
     except Exception as e:
         st.error(f"GPT JSON call failed: {e}")
         return None
-
-def _ensure_lesson_depth(lesson_data: dict, time_commitment: str) -> dict:
-    if not isinstance(lesson_data, dict):
-        return {}
-    sections = lesson_data.get("lesson_content_sections", [])
-    expected_min_sections = {
-        "15 minutes": 4,
-        "30 minutes": 7,
-        "45 minutes": 10,
-    }
-    min_sections = expected_min_sections.get(time_commitment, 4)
-    if len(sections) < min_sections:
-        lesson_data["lesson_title"] += " (Regenerated for Depth)"
-    return lesson_data
 
 def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
     """More flexible answer matching for knowledge checks and quizzes."""
@@ -767,26 +753,59 @@ def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
     
     return user_ans_str.lower() == correct_ans_str.lower()
 
+# ✅ FIX #2: New helper function to summarize a lesson for context memory
+def summarize_lesson_content(lesson_data: dict) -> str:
+    """Summarizes the textual content of a lesson."""
+    text_content = " ".join([
+        section['content'] for section in lesson_data.get('lesson_content_sections', []) 
+        if section.get('type') == 'text'
+    ])
+    
+    if not text_content:
+        return "No textual content to summarize."
+
+    prompt = f"Summarize the following Bible lesson content into one concise sentence for use as context in the next lesson: {text_content[:2000]}"
+    
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=100,
+            temperature=0.2
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return lesson_data.get("lesson_title", "Summary unavailable.")
+
 # -------------------------
 # PROMPTS
 # -------------------------
-def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str, goal: str) -> str:
+# ✅ FIX #1 & #2: Prompts updated for lesson length and cohesion
+def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str, goal: str, previous_lesson_summary: str = None) -> str:
+    
+    length_instructions = {
+        "15 minutes": "Generate exactly 3 teaching sections, each about 150-200 words long. The lesson must include exactly 2 knowledge check questions.",
+        "30 minutes": "Generate exactly 5 teaching sections, each about 200-250 words long, with deeper commentary. The lesson must include exactly 4 knowledge check questions.",
+        "45 minutes": "Generate exactly 7 teaching sections, each about 250-300 words long, including exegesis and historical context. The lesson must include exactly 6 knowledge check questions."
+    }
+    
+    context_clause = ""
+    if previous_lesson_summary:
+        context_clause = f"This lesson should build upon the previous one, which covered: '{previous_lesson_summary}'. Ensure the new content is a logical continuation."
+
     return f"""
-You are an expert theologian and Bible teacher. Generate a full lesson for a Christian learning app.
+You are an expert theologian and Bible teacher creating a lesson for a Christian learning app.
 - Goal: "{goal}"
 - Level Topic: "{level_topic}"
 - Lesson Number: {lesson_number}
 - Learning Style: "{user_learning_style}"
-- Time Commitment: "{time_commitment}"
 
-👉 Structure the lesson length and depth according to the time commitment:
-- **15 minutes:** 1 core passage, short explanations, 2 key takeaways, and 2 knowledge check questions.
-- **30 minutes:** 2-3 passages, deeper commentary, 3-5 teaching sections, and 4-6 knowledge checks.
-- **45 minutes:** 3-4 passages, exegesis, historical context, and 6-8 knowledge checks.
+👉 **Content Requirements:** {length_instructions.get(time_commitment, length_instructions["15 minutes"])}
+👉 **Context:** {context_clause}
 
-Return ONLY valid JSON (no prose, no markdown). Use the structure:
+Structure the output as ONLY valid JSON (no prose, no markdown).
 {{
-  "lesson_title": "A concise, biblically faithful title",
+  "lesson_title": "A concise, biblically faithful title that logically follows the previous lesson if applicable",
   "lesson_content_sections": [
     {{"type": "text", "content": "Biblically grounded teaching section..."}},
     {{"type": "knowledge_check", "question_type": "multiple_choice", "question": "Question text", "options": ["A","B","C","D"], "correct_answer": "B", "biblical_reference": "e.g., Romans 5:1"}},
@@ -796,11 +815,18 @@ Return ONLY valid JSON (no prose, no markdown). Use the structure:
 }}
 """
 
-def create_level_quiz_prompt(level_topic: str) -> str:
+# ✅ FIX #3: Quiz prompt updated to use context from all lessons in the level
+def create_level_quiz_prompt(level_topic: str, lesson_summaries: list) -> str:
+    summaries_text = "\n".join(f"- {s}" for s in lesson_summaries)
     return f"""
-You are a Bible teacher creating a level quiz.
-Topic: "{level_topic}"
-Create a 10-question quiz (multiple choice, true/false, fill-in-the-blank).
+You are a Bible teacher creating a cumulative level quiz for a Christian learning app.
+- Level Topic: "{level_topic}"
+
+👉 **Instructions:** Create a 10-question quiz to assess the learner's comprehension of the entire level. 
+👉 **Crucially, you MUST base your questions on the key topics covered in these lesson summaries:**
+{summaries_text}
+
+The questions should be theologically sound and cover a mix of multiple choice, true/false, and fill-in-the-blank.
 For each question, return a JSON object with: "question_type", "question", "options" (if mc), "correct_answer", and "biblical_reference".
 Return ONLY a JSON array of 10 objects. No prose or markdown.
 """
@@ -907,7 +933,7 @@ def run_level_quiz(S):
                 st.rerun()
 
 # ================================================================
-# ✅✅✅ MAIN LEARN MODULE FLOW (FULLY CORRECTED) ✅✅✅
+# MAIN LEARN MODULE FLOW (FULLY CORRECTED)
 # ================================================================
 def run_learn_module():
     st.subheader("📚 Learn Module — Personalized Bible Learning")
@@ -917,10 +943,11 @@ def run_learn_module():
 
     # --- 1) Initial Setup: User defines goal and levels are generated ---
     if "levels" not in S:
+        st.info("Define your spiritual growth goal to begin a personalized learning journey.")
         goal = st.text_input("What do you want to learn? (e.g., 'Understanding grace', 'Life of David')")
-        num_levels = st.number_input("How many levels do you want?", min_value=1, max_value=10, value=3)
+        num_levels = st.number_input("How many levels should your journey have?", min_value=1, max_value=10, value=3)
         learning_style = st.selectbox("Preferred learning style:", ["storytelling", "analytical", "practical"])
-        time_commitment = st.selectbox("Daily time commitment:", ["15 minutes", "30 minutes", "45 minutes"])
+        time_commitment = st.selectbox("How much time per lesson?", ["15 minutes", "30 minutes", "45 minutes"])
 
         if st.button("🚀 Generate Your Learning Journey") and goal:
             level_prompt = f"""
@@ -943,7 +970,8 @@ Return ONLY a JSON array, e.g.: [{{"name":"Level 1: Title","topic":"Topic"}}]
 
     # --- 2) Check for Completion ---
     if S["current_level"] >= len(S["levels"]):
-        st.success("🎉 You've completed all levels!")
+        st.success("🎉 You've completed your entire learning journey!")
+        st.balloons()
         return
 
     level_data = S["levels"][S["current_level"]]
@@ -959,20 +987,30 @@ Return ONLY a JSON array, e.g.: [{{"name":"Level 1: Title","topic":"Topic"}}]
 
     # --- 4) Generate Lesson if it doesn't exist ---
     if S["current_lesson_index"] >= len(level_data["lessons"]):
-        with st.spinner("Generating lesson..."):
+        with st.spinner("Generating your next lesson..."):
+            
+            # ✅ FIX #2: Get summary of the previous lesson for context
+            prev_summary = None
+            if S["current_lesson_index"] > 0:
+                prev_lesson = level_data["lessons"][S["current_lesson_index"] - 1]
+                prev_summary = prev_lesson.get("lesson_summary")
+
             lesson_prompt = create_lesson_prompt(
                 level_topic=level_data.get("topic", "General"),
                 lesson_number=S["current_lesson_index"] + 1,
                 user_learning_style=S["user_learning_style"],
                 time_commitment=S["time_commitment"],
                 goal=S["goal"],
+                previous_lesson_summary=prev_summary
             )
             max_toks = TOKENS_BY_TIME.get(S["time_commitment"], 2000)
             lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=max_toks)
             lesson_data = _learn_extract_json_any(lesson_resp) if lesson_resp else None
             
             if lesson_data:
-                lesson_data = _ensure_lesson_depth(lesson_data, S["time_commitment"])
+                # ✅ FIX #2: Generate and store summary for this new lesson
+                lesson_data["lesson_summary"] = summarize_lesson_content(lesson_data)
+                
                 level_data["lessons"].append(lesson_data)
                 S["current_section_index"] = 0
                 st.rerun()
@@ -980,9 +1018,9 @@ Return ONLY a JSON array, e.g.: [{{"name":"Level 1: Title","topic":"Topic"}}]
                 st.error("Failed to generate lesson content. Please try again.")
                 return
 
-    # --- 5) Display Lesson Content (The missing piece) ---
+    # --- 5) Display Lesson Content ---
     current_lesson = level_data["lessons"][S["current_lesson_index"]]
-    st.markdown(f"### Lesson {S['current_lesson_index'] + 1}: {current_lesson.get('lesson_title', 'Untitled Lesson')}")
+    st.markdown(f"### Lesson {S['current_lesson_index'] + 1} of {len(level_data.get('lessons', []))}: {current_lesson.get('lesson_title', 'Untitled Lesson')}")
 
     current_lesson_sections = current_lesson.get("lesson_content_sections", [])
     
@@ -990,32 +1028,50 @@ Return ONLY a JSON array, e.g.: [{{"name":"Level 1: Title","topic":"Topic"}}]
         section = current_lesson_sections[S["current_section_index"]]
         if section.get("type") == "text":
             st.markdown(section.get("content", "Empty content section."))
-            if st.button("Next Section", key=f"next_sec_{S['current_section_index']}"):
+            if st.button("Continue", key=f"next_sec_{S['current_section_index']}"):
                 S["current_section_index"] += 1
                 st.rerun()
         elif section.get("type") == "knowledge_check":
             display_knowledge_check_question(S)
     else:
         # --- 6) Handle End of Lesson ---
-        st.success("Lesson Completed! Review the summary points.")
+        st.success("Lesson Completed!")
+        st.markdown("**Key Takeaways:**")
         for point in current_lesson.get("summary_points", []):
             st.markdown(f"- {point}")
 
-        if st.button("Start Level Quiz"):
-            if "quiz_questions" not in level_data or not level_data["quiz_questions"]:
-                with st.spinner("Generating quiz..."):
-                    quiz_prompt = create_level_quiz_prompt(level_data.get("topic", "General"))
-                    quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2000)
-                    quiz_questions_data = _learn_extract_json_any(quiz_resp)
-                    if quiz_questions_data and isinstance(quiz_questions_data, list):
-                        level_data["quiz_questions"] = quiz_questions_data
-                    else:
-                        st.error("Failed to generate quiz questions.")
-                        return
-            S["quiz_mode"] = True
-            S["current_question_index"] = 0
-            S["user_score"] = 0
-            st.rerun()
+        # ✅ FIX #3: Logic to show "Next Lesson" or "Start Quiz"
+        total_lessons_in_level = len(level_data.get('lessons', [])) # This will need to be dynamic later
+        
+        # This is an approximation. We need a way to know the target number of lessons per level.
+        # For now, let's assume a level has 3 lessons for demonstration.
+        TARGET_LESSONS_PER_LEVEL = 3 
+
+        if S["current_lesson_index"] < TARGET_LESSONS_PER_LEVEL - 1:
+            if st.button("Go to Next Lesson"):
+                S["current_lesson_index"] += 1
+                S["current_section_index"] = 0
+                st.rerun()
+        else: # On the last lesson
+            st.info("You've completed all lessons for this level. Time for the final quiz!")
+            if st.button("Start Level Quiz"):
+                if "quiz_questions" not in level_data or not level_data["quiz_questions"]:
+                    with st.spinner("Generating your level quiz..."):
+                        # ✅ FIX #3: Pass all lesson summaries to the quiz prompt
+                        all_summaries = [l.get("lesson_summary", "") for l in level_data["lessons"]]
+                        quiz_prompt = create_level_quiz_prompt(level_data.get("topic", "General"), all_summaries)
+                        
+                        quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500)
+                        quiz_questions_data = _learn_extract_json_any(quiz_resp)
+                        if quiz_questions_data and isinstance(quiz_questions_data, list):
+                            level_data["quiz_questions"] = quiz_questions_data
+                        else:
+                            st.error("Failed to generate quiz questions.")
+                            return
+                S["quiz_mode"] = True
+                S["current_question_index"] = 0
+                S["user_score"] = 0
+                st.rerun()
 
 # ================================================================
 # MAIN UI
@@ -1026,6 +1082,7 @@ st.title("✅ Bible GPT")
 mode = st.sidebar.selectbox(
     "Choose a mode:",
     [
+        "Learn Module",
         "Bible Lookup",
         "Chat with GPT",
         "Sermon Transcriber & Summarizer",
@@ -1039,11 +1096,12 @@ mode = st.sidebar.selectbox(
         "Tailored Learning Path",
         "Bible Beta Mode",
         "Pixar Story Animation",
-        "Learn Module",
     ],
 )
 
-if mode == "Bible Lookup":
+if mode == "Learn Module":
+    run_learn_module()
+elif mode == "Bible Lookup":
     run_bible_lookup()
 elif mode == "Chat with GPT":
     run_chat_mode()
@@ -1069,7 +1127,5 @@ elif mode == "Bible Beta Mode":
     run_bible_beta()
 elif mode == "Pixar Story Animation":
     run_pixar_story_animation()
-elif mode == "Learn Module":
-    run_learn_module()
 else:
     st.warning("This mode is under construction.")
