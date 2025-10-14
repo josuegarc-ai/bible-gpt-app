@@ -1076,12 +1076,6 @@ Return ONLY a JSON array (no prose), e.g.:
                 goal=S["goal"],
             )
             max_toks = TOKENS_BY_TIME.get(S["time_commitment"], 2000)
-            lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=max_toks)
-            lesson_data = _learn_extract_json_any(lesson_resp)
-            if lesson_data:
-                lesson_data = _ensure_lesson_depth(
-                    lesson_data,
-
             lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=TOKENS_BY_TIME[S["time_commitment"]])
             lesson_data = _learn_extract_json_any(lesson_resp)
             if lesson_data:
