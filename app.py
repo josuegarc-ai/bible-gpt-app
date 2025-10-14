@@ -1,5 +1,5 @@
-# ================================================================
-# ✅ Bible GPT — v2.7 (Cohesive Learning Flow)
+    # ================================================================
+# ✅ Bible GPT — v2.8 (Improved Lesson Length Adherence)
 # ================================================================
 
 # ==== Core imports ====
@@ -753,7 +753,6 @@ def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
     
     return user_ans_str.lower() == correct_ans_str.lower()
 
-# ✅ FIX #2: New helper function to summarize a lesson for context memory
 def summarize_lesson_content(lesson_data: dict) -> str:
     """Summarizes the textual content of a lesson."""
     text_content = " ".join([
@@ -780,13 +779,13 @@ def summarize_lesson_content(lesson_data: dict) -> str:
 # -------------------------
 # PROMPTS
 # -------------------------
-# ✅ FIX #1 & #2: Prompts updated for lesson length and cohesion
 def create_lesson_prompt(level_topic: str, lesson_number: int, user_learning_style: str, time_commitment: str, goal: str, previous_lesson_summary: str = None) -> str:
     
+    # ✅ Adjusted content requirements for better adherence
     length_instructions = {
-        "15 minutes": "Generate exactly 5 teaching sections, each about 200-250 words long. The lesson must include at least 3 knowledge check questions.",
-        "30 minutes": "Generate exactly 7 teaching sections, each about 300-375 words long, with deeper commentary. The lesson must include exactly 4 knowledge check questions.",
-        "45 minutes": "Generate exactly 10 teaching sections, each about 400-500 words long, including exegesis and historical context. The lesson must include exactly 6 knowledge check questions."
+        "15 minutes": "MUST generate exactly 3 teaching sections, each about 150-200 words long. The lesson MUST include exactly 2 knowledge check questions.",
+        "30 minutes": "MUST generate exactly 5 teaching sections, each about 200-250 words long, with deeper commentary. The lesson MUST include exactly 3 knowledge check questions.", # Reduced to 5 sections, 3 questions
+        "45 minutes": "MUST generate exactly 7 teaching sections, each about 250-300 words long, including exegesis and historical context. The lesson MUST include exactly 4 knowledge check questions." # Reduced to 7 sections, 4 questions
     }
     
     context_clause = ""
@@ -815,7 +814,6 @@ Structure the output as ONLY valid JSON (no prose, no markdown).
 }}
 """
 
-# ✅ FIX #3: Quiz prompt updated to use context from all lessons in the level
 def create_level_quiz_prompt(level_topic: str, lesson_summaries: list) -> str:
     summaries_text = "\n".join(f"- {s}" for s in lesson_summaries)
     return f"""
@@ -989,7 +987,6 @@ Return ONLY a JSON array, e.g.: [{{"name":"Level 1: Title","topic":"Topic"}}]
     if S["current_lesson_index"] >= len(level_data["lessons"]):
         with st.spinner("Generating your next lesson..."):
             
-            # ✅ FIX #2: Get summary of the previous lesson for context
             prev_summary = None
             if S["current_lesson_index"] > 0:
                 prev_lesson = level_data["lessons"][S["current_lesson_index"] - 1]
@@ -1008,7 +1005,6 @@ Return ONLY a JSON array, e.g.: [{{"name":"Level 1: Title","topic":"Topic"}}]
             lesson_data = _learn_extract_json_any(lesson_resp) if lesson_resp else None
             
             if lesson_data:
-                # ✅ FIX #2: Generate and store summary for this new lesson
                 lesson_data["lesson_summary"] = summarize_lesson_content(lesson_data)
                 
                 level_data["lessons"].append(lesson_data)
@@ -1040,24 +1036,24 @@ Return ONLY a JSON array, e.g.: [{{"name":"Level 1: Title","topic":"Topic"}}]
         for point in current_lesson.get("summary_points", []):
             st.markdown(f"- {point}")
 
-        # ✅ FIX #3: Logic to show "Next Lesson" or "Start Quiz"
-        total_lessons_in_level = len(level_data.get('lessons', [])) # This will need to be dynamic later
-        
-        # This is an approximation. We need a way to know the target number of lessons per level.
-        # For now, let's assume a level has 3 lessons for demonstration.
-        TARGET_LESSONS_PER_LEVEL = 3 
+        # Derive TARGET_LESSONS_PER_LEVEL from the initial num_levels input
+        # This assumes each level will have roughly one lesson for now,
+        # until a more complex dynamic lesson count per level is implemented.
+        # For a truly dynamic experience, you might need to ask GPT how many lessons
+        # a level should have based on its topic and desired time commitment.
+        TARGET_LESSONS_PER_LEVEL = 1 # We can make this dynamic if needed, but for now, 1 lesson per topic per level.
+                                     # If num_levels is 3, then each level will have 1 lesson based on the level's topic.
 
         if S["current_lesson_index"] < TARGET_LESSONS_PER_LEVEL - 1:
             if st.button("Go to Next Lesson"):
                 S["current_lesson_index"] += 1
                 S["current_section_index"] = 0
                 st.rerun()
-        else: # On the last lesson
+        else: # On the last lesson of the current level
             st.info("You've completed all lessons for this level. Time for the final quiz!")
             if st.button("Start Level Quiz"):
                 if "quiz_questions" not in level_data or not level_data["quiz_questions"]:
                     with st.spinner("Generating your level quiz..."):
-                        # ✅ FIX #3: Pass all lesson summaries to the quiz prompt
                         all_summaries = [l.get("lesson_summary", "") for l in level_data["lessons"]]
                         quiz_prompt = create_level_quiz_prompt(level_data.get("topic", "General"), all_summaries)
                         
