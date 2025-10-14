@@ -507,6 +507,7 @@ def _learn_extract_json_any(response_text: str):
 # ============================
 # LEARN MODULE SUPPORT HELPERS
 # ============================
+# Adjusted max_tokens to be more generous to accommodate requested word counts
 TOKENS_BY_TIME = {"15 minutes": 1800, "30 minutes": 3000, "45 minutes": 4000}
 
 def ask_gpt_json(prompt: str, max_tokens: int = 4000):
@@ -551,6 +552,13 @@ def summarize_lesson_content(lesson_data: dict) -> str:
 # -------------------------
 def create_full_learning_plan_prompt(form_data: dict) -> str:
     """Creates the master prompt to generate the entire curriculum."""
+    pacing_to_lessons_per_level = {
+        "A quick, high-level overview": 1, # Changed from 1-2 to 1 for quick, for simplicity.
+        "A steady, detailed study": 2, # Changed from 2-3 to 2
+        "A deep, comprehensive dive": 3 # Changed from 3-5 to 3
+    }
+    num_lessons_per_level = pacing_to_lessons_per_level.get(form_data['pacing'], 2) # Default to 2 for steady
+
     return f"""
 You are an expert theologian and personalized curriculum designer. A user has provided this profile:
 - Topics of Interest: {form_data['topics']}
@@ -559,26 +567,31 @@ You are an expert theologian and personalized curriculum designer. A user has pr
 - Common Struggles: {", ".join(form_data['struggles'])}
 - Preferred Learning Style: {form_data['learning_style']}
 - Desired Pacing: {form_data['pacing']}
+- Time Commitment per Lesson: {form_data['time_commitment']}
 
 Task: Design a complete Bible study curriculum based on this profile.
 1. Create a personalized title for the plan.
 2. Write a brief, encouraging introduction.
-3. Determine the appropriate number of levels (e.g., a "quick overview" is 2-3 levels; a "steady, detailed study" is 3-5 levels; a "deep, comprehensive dive" is 5-7 levels).
+3. Determine the appropriate number of levels (e.g., "A quick, high-level overview" is 2-3 levels; "A steady, detailed study" is 3-5 levels; "A deep, comprehensive dive" is 5-7 levels).
 4. For each level, create a concise "name" and "topic" that flows logically.
+5. For each level, determine a `num_lessons` based on the user's 'Desired Pacing'.
+   - If 'A quick, high-level overview', generate 1 lesson per level.
+   - If 'A steady, detailed study', generate 2 lessons per level.
+   - If 'A deep, comprehensive dive', generate 3 lessons per level.
 
 Output ONLY a single, valid JSON object like this:
 {{
   "plan_title": "Your Journey Through Grace",
   "introduction": "This plan will help you gain a deeper understanding of grace.",
   "levels": [
-    {{"name": "Level 1: The Foundation", "topic": "Exploring grace in the Old Testament."}},
-    {{"name": "Level 2: Grace Personified in Christ", "topic": "Analyzing key New Testament passages where Jesus demonstrates grace."}},
+    {{"name": "Level 1: The Foundation", "topic": "Exploring grace in the Old Testament.", "num_lessons": {num_lessons_per_level}}},
+    {{"name": "Level 2: Grace Personified in Christ", "topic": "Analyzing key New Testament passages where Jesus demonstrates grace.", "num_lessons": {num_lessons_per_level}}},
     ...
   ]
 }}
 """
 
-def create_lesson_prompt(level_topic: str, lesson_number: int, form_data: dict, previous_lesson_summary: str = None) -> str:
+def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None) -> str:
     length_instructions = {
         "15 minutes": "Generate exactly 3 teaching sections (150-200 words each) and 2 knowledge checks.",
         "30 minutes": "Generate exactly 5 teaching sections (200-250 words each) and 3 knowledge checks.",
@@ -589,19 +602,26 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, form_data: dict, 
 You are an expert theologian creating a Bible lesson based on this user profile:
 - Primary Goal: {form_data['topics']}
 - Learning Style: {form_data['learning_style']}
+- Time Commitment per Lesson: {form_data['time_commitment']}
 
-Your task is to create Lesson {lesson_number} for the level topic: "{level_topic}".
-- **Content Requirements:** {length_instructions.get(form_data['time_commitment'])}
+Your task is to create Lesson {lesson_number} out of {total_lessons_in_level} for the level topic: "{level_topic}".
+- **Content Requirements:** {length_instructions.get(form_data['time_commitment'], 'Generate comprehensive content relevant to the time commitment.')}
 - **Context:** {context_clause}
+- **Tone:** Pastoral, encouraging, and biblically sound.
+- **Each text section should be focused and build upon the previous, guiding the learner through the topic.**
+- **Each knowledge check should directly relate to the content just presented.**
 
 Return ONLY a valid JSON object.
 {{
-  "lesson_title": "A concise, biblically faithful title",
+  "lesson_title": "A concise, biblically faithful title for Lesson {lesson_number}",
   "lesson_content_sections": [
-    {{"type": "text", "content": "..."}},
-    {{"type": "knowledge_check", "question_type": "multiple_choice", "question": "...", "options": [], "correct_answer": "...", "biblical_reference": "..."}}
+    {{"type": "text", "content": "The first teaching section for this lesson (150-300 words)."}},
+    {{"type": "knowledge_check", "question_type": "multiple_choice", "question": "Question 1 related to the first section?", "options": ["Option A", "Option B", "Option C", "Option D"], "correct_answer": "Correct Option", "biblical_reference": "John 3:16"}},
+    {{"type": "text", "content": "The second teaching section for this lesson (150-300 words)."}},
+    {{"type": "knowledge_check", "question_type": "fill_in_the_blank", "question": "God so loved the [BLANK] that he gave his one and only Son.", "correct_answer": "world", "biblical_reference": "John 3:16"}},
+    {{ ... more sections based on time commitment ... }}
   ],
-  "summary_points": ["...", "...", "..."]
+  "summary_points": ["Key point 1 from this lesson", "Key point 2 from this lesson", "Key point 3 from this lesson"]
 }}
 """
 
@@ -610,9 +630,22 @@ def create_level_quiz_prompt(level_topic: str, lesson_summaries: list) -> str:
     return f"""
 You are a Bible teacher creating a cumulative level quiz.
 - Level Topic: "{level_topic}"
-- **Instructions:** Create a 10-question quiz based on the key topics from these lesson summaries:
+- **Instructions:** Create a 10-question quiz based on the key topics from ALL lessons in this level, as summarized below:
 {summaries_text}
-- The questions should be a mix of types. Return ONLY a JSON array of 10 question objects.
+- The questions should be a mix of types (multiple_choice, true_false, fill_in_the_blank).
+- For multiple_choice questions, provide 4 options.
+- For true_false questions, options should be ["True", "False"].
+- For fill_in_the_blank, provide only the correct answer.
+- Ensure each question includes a 'question_type' field.
+- Return ONLY a JSON array of 10 question objects.
+Example question object:
+{{
+    "question": "Who was the first king of Israel?",
+    "question_type": "multiple_choice",
+    "options": ["David", "Saul", "Solomon", "Samuel"],
+    "correct_answer": "Saul",
+    "biblical_reference": "1 Samuel 10:24"
+}}
 """
 
 # -------------------------
@@ -698,6 +731,8 @@ def run_level_quiz(S):
                 S["current_lesson_index"] = 0
                 S["current_section_index"] = 0
                 S["quiz_mode"] = False
+                S["current_question_index"] = 0 # Reset quiz state for next level
+                S["user_score"] = 0 # Reset quiz score for next level
                 st.rerun()
         else:
             st.error("Please review the lessons and try the quiz again.")
@@ -727,7 +762,8 @@ def run_learn_module_setup():
             return
         with st.spinner("Our AI is designing your personalized curriculum..."):
             master_prompt = create_full_learning_plan_prompt(form_data)
-            plan_resp = ask_gpt_json(master_prompt)
+            # Use a sufficiently large max_tokens for the entire plan structure
+            plan_resp = ask_gpt_json(master_prompt, max_tokens=2500)
             plan_data = _learn_extract_json_any(plan_resp) if plan_resp else None
             if plan_data and "levels" in plan_data:
                 S = st.session_state.learn_state
@@ -739,6 +775,7 @@ def run_learn_module_setup():
                 st.rerun()
             else:
                 st.error("Failed to generate a valid learning plan. Please try adjusting your inputs.")
+                if plan_resp: st.text_area("Raw AI Response (for debugging):", plan_resp, height=200)
 
 # ================================================================
 # MAIN LEARN MODULE FLOW
@@ -767,79 +804,109 @@ def run_learn_module():
 
     level_data = S["levels"][S["current_level"]]
     st.markdown(f"--- \n## {level_data.get('name','Current Level')}")
+    st.markdown(f"**Topic:** {level_data.get('topic')}")
 
     if S.get("quiz_mode"):
         run_level_quiz(S)
         return
 
-    if "lessons" not in level_data: level_data["lessons"] = []
+    if "lessons" not in level_data:
+        level_data["lessons"] = []
 
-    # The current model generates one comprehensive lesson per level topic.
-    # We proceed to generate this lesson if it hasn't been generated yet.
-    if S["current_lesson_index"] >= len(level_data["lessons"]):
-        with st.spinner("Generating your next lesson..."):
-            prev_summary = None
-            # Fetch summary from the last lesson of the *previous* level, if applicable
-            if S["current_level"] > 0 and S["current_lesson_index"] == 0:
-                # Ensure the previous level actually has lessons and get the last one's summary
-                prev_level_lessons = S["levels"][S["current_level"]-1].get("lessons", [])
-                if prev_level_lessons:
-                    prev_summary = prev_level_lessons[-1].get("lesson_summary")
-            
-            lesson_prompt = create_lesson_prompt(
-                level_topic=level_data.get("topic"),
-                lesson_number=S["current_lesson_index"] + 1,
-                form_data=S["form_data"], # Pass the entire form_data to the prompt function
-                previous_lesson_summary=prev_summary
-            )
-            lesson_resp = ask_gpt_json(lesson_prompt)
-            lesson_data = _learn_extract_json_any(lesson_resp) if lesson_resp else None
-            
-            if lesson_data:
-                # Generate and store summary for this new lesson
-                lesson_data["lesson_summary"] = summarize_lesson_content(lesson_data)
-                level_data["lessons"].append(lesson_data)
-                S["current_section_index"] = 0
-                st.rerun()
+    # Logic for generating and displaying lessons
+    # Check if all lessons for the current level have been generated
+    if S["current_lesson_index"] < level_data.get("num_lessons", 1): # Default to 1 if num_lessons is missing
+        if S["current_lesson_index"] >= len(level_data["lessons"]):
+            # Generate the next lesson if it doesn't exist
+            with st.spinner(f"Generating Lesson {S['current_lesson_index'] + 1} for this level..."):
+                prev_summary = None
+                # Fetch summary from the last lesson of the *previous* level, if applicable
+                if S["current_level"] > 0 and S["current_lesson_index"] == 0:
+                    prev_level_lessons = S["levels"][S["current_level"]-1].get("lessons", [])
+                    if prev_level_lessons:
+                        prev_summary = prev_level_lessons[-1].get("lesson_summary")
+                elif S["current_lesson_index"] > 0:
+                    # Fetch summary from the previous lesson within the current level
+                    prev_summary = level_data["lessons"][S["current_lesson_index"] - 1].get("lesson_summary")
+
+                lesson_max_tokens = TOKENS_BY_TIME.get(S["form_data"]['time_commitment'], 4000)
+                lesson_prompt = create_lesson_prompt(
+                    level_topic=level_data.get("topic"),
+                    lesson_number=S["current_lesson_index"] + 1,
+                    total_lessons_in_level=level_data.get("num_lessons", 1),
+                    form_data=S["form_data"],
+                    previous_lesson_summary=prev_summary
+                )
+                lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=lesson_max_tokens)
+                lesson_data = _learn_extract_json_any(lesson_resp) if lesson_resp else None
+                
+                if lesson_data and "lesson_content_sections" in lesson_data:
+                    # Generate and store summary for this new lesson
+                    lesson_data["lesson_summary"] = summarize_lesson_content(lesson_data)
+                    level_data["lessons"].append(lesson_data)
+                    S["current_section_index"] = 0 # Reset section index for new lesson
+                    st.rerun()
+                else:
+                    st.error("Failed to generate lesson content. Please try again.")
+                    if lesson_resp: st.text_area("Raw AI Lesson Response (for debugging):", lesson_resp, height=200)
+                    return
+        
+        # Display the current lesson
+        current_lesson = level_data["lessons"][S["current_lesson_index"]]
+        st.markdown(f"### Lesson {S['current_lesson_index'] + 1}: {current_lesson.get('lesson_title', 'Untitled Lesson')}")
+        
+        lesson_sections = current_lesson.get("lesson_content_sections", [])
+        if S["current_section_index"] < len(lesson_sections):
+            section = lesson_sections[S["current_section_index"]]
+            if section.get("type") == "text":
+                st.markdown(section.get("content"))
+                if st.button("Continue Reading"):
+                    S["current_section_index"] += 1
+                    st.rerun()
+            elif section.get("type") == "knowledge_check":
+                display_knowledge_check_question(S)
+        else:
+            # End of current lesson's sections
+            st.success(f"Lesson {S['current_lesson_index'] + 1} Completed!")
+            st.markdown("**Key Takeaways from this Lesson:**")
+            for point in current_lesson.get("summary_points", []): st.markdown(f"- {point}")
+
+            if S["current_lesson_index"] + 1 < level_data.get("num_lessons", 1):
+                # More lessons in this level
+                if st.button("Go to Next Lesson ▶️"):
+                    S["current_lesson_index"] += 1
+                    S["current_section_index"] = 0 # Reset section index for new lesson
+                    st.rerun()
             else:
-                st.error("Failed to generate lesson content. Please try again.")
-                return
-
-    current_lesson = level_data["lessons"][S["current_lesson_index"]]
-    st.markdown(f"### {current_lesson.get('lesson_title', 'Untitled Lesson')}")
-    
-    lesson_sections = current_lesson.get("lesson_content_sections", [])
-    if S["current_section_index"] < len(lesson_sections):
-        section = lesson_sections[S["current_section_index"]]
-        if section.get("type") == "text":
-            st.markdown(section.get("content"))
-            if st.button("Continue"):
-                S["current_section_index"] += 1
-                st.rerun()
-        elif section.get("type") == "knowledge_check":
-            display_knowledge_check_question(S)
+                # All lessons in this level are completed, prepare for quiz
+                st.info("You've completed all lessons for this level. Time for the final quiz!")
+                if st.button("Start Level Quiz"):
+                    if "quiz_questions" not in level_data:
+                        with st.spinner("Generating your level quiz..."):
+                            all_summaries = [l.get("lesson_summary", "") for l in level_data["lessons"]]
+                            quiz_prompt = create_level_quiz_prompt(level_data.get("topic"), all_summaries)
+                            quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500)
+                            quiz_data = _learn_extract_json_any(quiz_resp)
+                            if quiz_data and isinstance(quiz_data, list):
+                                level_data["quiz_questions"] = quiz_data
+                            else:
+                                st.error("Failed to generate quiz questions.");
+                                if quiz_resp: st.text_area("Raw AI Quiz Response (for debugging):", quiz_resp, height=200)
+                                return
+                    S["quiz_mode"] = True
+                    S["current_question_index"] = 0
+                    S["user_score"] = 0
+                    st.rerun()
     else:
-        # End of the lesson, which is also the end of this particular level's content
-        st.success("Level Completed!")
-        st.markdown("**Key Takeaways:**")
-        for point in current_lesson.get("summary_points", []): st.markdown(f"- {point}")
-
-        st.info("You've completed this level. Time for the final quiz!")
-        if st.button("Start Level Quiz"):
-            if "quiz_questions" not in level_data:
-                with st.spinner("Generating your level quiz..."):
-                    all_summaries = [l.get("lesson_summary", "") for l in level_data["lessons"]]
-                    quiz_prompt = create_level_quiz_prompt(level_data.get("topic"), all_summaries)
-                    quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500)
-                    quiz_data = _learn_extract_json_any(quiz_resp)
-                    if quiz_data and isinstance(quiz_data, list):
-                        level_data["quiz_questions"] = quiz_data
-                    else:
-                        st.error("Failed to generate quiz questions."); return
+        # This case should ideally not be reached if the "Start Level Quiz" button is the only path after lessons.
+        # It's a fallback if `num_lessons` is somehow fulfilled without triggering the quiz button.
+        st.info("You've completed all lessons for this level. If you haven't taken the quiz, please do so!")
+        if st.button("Start Level Quiz (if not started)"):
             S["quiz_mode"] = True
             S["current_question_index"] = 0
             S["user_score"] = 0
             st.rerun()
+
 
 # ================================================================
 # MAIN UI
