@@ -592,36 +592,63 @@ Output ONLY a single, valid JSON object like this:
 """
 
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None) -> str:
-    length_instructions = {
-        "15 minutes": "Generate exactly 3 teaching sections (150-200 words each) and 2 knowledge checks.",
-        "30 minutes": "Generate exactly 5 teaching sections (200-250 words each) and 3 knowledge checks.",
-        "45 minutes": "Generate exactly 7 teaching sections (250-300 words each) and 4 knowledge checks."
-    }
+    """Creates a more theologically rich and structured lesson prompt, focused on biblical knowledge and context."""
+    
+    # Define the core structure for a rich, knowledge-focused lesson
+    lesson_structure_flow = """
+    The 'lesson_content_sections' array MUST follow this specific theological structure:
+    1.  **Introduction & Key Scripture:** Start with a 'text' section that provides a compelling introduction to the lesson's topic and clearly states the primary Bible passage(s) for study.
+    2.  **Historical & Cultural Context:** A 'text' section that explains the background of the passage. Who was it written to? What was going on at that time?
+    3.  **Breaking Down the Passage:** A 'text' section that provides a clear, verse-by-verse or thematic explanation of the scripture. This is the core teaching component.
+    4.  **Connecting to the Bigger Story:** A 'text' section that provides a significant cross-reference, connecting the passage's theme to another part of the Bible (e.g., how an Old Testament story points to Jesus, or how a New Testament teaching fulfills a prophecy).
+    5.  **Knowledge Check:** A 'knowledge_check' section with a question that reinforces understanding of the passage's literal meaning, context, or its main theological point.
+    
+    You must intelligently adapt the length and depth of these sections based on the user's time commitment ('{time_commitment}'), but the lesson MUST contain these core components in this order. A 15-minute lesson will have shorter sections, while a 45-minute lesson will have much more detailed ones.
+    """
+
+    time_commitment = form_data.get('time_commitment', '30 minutes')
     context_clause = f"This lesson must build upon the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
+    
     return f"""
-You are an expert theologian creating a Bible lesson based on this user profile:
+You are an expert theologian and curriculum designer creating a biblically rich and engaging lesson for a student with this profile:
 - Primary Goal: {form_data['topics']}
 - Learning Style: {form_data['learning_style']}
-- Time Commitment per Lesson: {form_data['time_commitment']}
+- Time Commitment per Lesson: {time_commitment}
 
 Your task is to create Lesson {lesson_number} out of {total_lessons_in_level} for the level topic: "{level_topic}".
-- **Content Requirements:** {length_instructions.get(form_data['time_commitment'], 'Generate comprehensive content relevant to the time commitment.')}
 - **Context:** {context_clause}
-- **Tone:** Pastoral, encouraging, and biblically sound.
-- **Each text section should be focused and build upon the previous, guiding the learner through the topic.**
-- **Each knowledge check should directly relate to the content just presented.**
+- **Structure Mandate:** {lesson_structure_flow.format(time_commitment=time_commitment)}
 
-Return ONLY a valid JSON object.
+Return ONLY a valid JSON object. The `content` fields for text sections should use Markdown for formatting (e.g., `### Title`, `**bold**`).
 {{
   "lesson_title": "A concise, biblically faithful title for Lesson {lesson_number}",
   "lesson_content_sections": [
-    {{"type": "text", "content": "The first teaching section for this lesson (150-300 words)."}},
-    {{"type": "knowledge_check", "question_type": "multiple_choice", "question": "Question 1 related to the first section?", "options": ["Option A", "Option B", "Option C", "Option D"], "correct_answer": "Correct Option", "biblical_reference": "John 3:16"}},
-    {{"type": "text", "content": "The second teaching section for this lesson (150-300 words)."}},
-    {{"type": "knowledge_check", "question_type": "fill_in_the_blank", "question": "God so loved the [BLANK] that he gave his one and only Son.", "correct_answer": "world", "biblical_reference": "John 3:16"}},
-    {{ ... more sections based on time commitment ... }}
+    {{
+      "type": "text",
+      "content": "### Introduction & Key Scripture\\nStart with a compelling hook... The primary passage for our study today is **[Bible Reference]**."
+    }},
+    {{
+      "type": "text",
+      "content": "### Historical & Cultural Context\\nTo understand this passage, we need to go back in time..."
+    }},
+    {{
+      "type": "text",
+      "content": "### Breaking Down the Passage\\nLet's look closely at what the text says..."
+    }},
+    {{
+      "type": "text",
+      "content": "### Connecting to the Bigger Story\\nThis theme of [Theme] doesn't just appear here. We also see it in..."
+    }},
+    {{
+      "type": "knowledge_check",
+      "question_type": "multiple_choice",
+      "question": "Based on the context and theological connections, what is the main truth of this passage?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct_answer": "Correct Option",
+      "biblical_reference": "[Bible Reference]"
+    }}
   ],
-  "summary_points": ["Key point 1 from this lesson", "Key point 2 from this lesson", "Key point 3 from this lesson"]
+  "summary_points": ["Key theological point 1", "Key contextual insight 2", "Key scriptural connection 3"]
 }}
 """
 
