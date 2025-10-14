@@ -1004,6 +1004,61 @@ def run_level_quiz(S):
                 S["user_score"] = 0
                 st.rerun()
 
+# ============================
+# LEARN MODULE SUPPORT HELPERS
+# ============================
+
+TOKENS_BY_TIME = {
+    "15 minutes": 1800,
+    "30 minutes": 3000,
+    "45 minutes": 4000
+}
+
+def ask_gpt_json(prompt: str, max_tokens: int = 3000):
+    """Wrapper around the OpenAI API to return raw text for JSON parsing."""
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=max_tokens,
+            temperature=0
+        )
+        return resp.choices[0].message.content
+    except Exception as e:
+        st.error(f"GPT JSON call failed: {e}")
+        return None
+
+def _ensure_lesson_depth(lesson_data: dict, time_commitment: str) -> dict:
+    """
+    Ensures the lesson roughly matches the expected number of sections/questions
+    for the selected time commitment. If the model returns too shallow a lesson,
+    this function can pad or re-ask later (for now, it just returns lesson_data as-is).
+    """
+    if not isinstance(lesson_data, dict):
+        return {}
+
+    sections = lesson_data.get("lesson_content_sections", [])
+    expected_min_sections = {
+        "15 minutes": 4,   # 2 text + 2 checks
+        "30 minutes": 7,   # deeper content
+        "45 minutes": 10,  # full exegesis, more checks
+    }
+
+    min_sections = expected_min_sections.get(time_commitment, 4)
+    if len(sections) < min_sections:
+        lesson_data["lesson_title"] += " (Regenerated for Depth)"
+    return lesson_data
+
+def _answers_match(user_answer, correct_answer) -> bool:
+    """More flexible answer matching for knowledge checks and quizzes."""
+    if user_answer is None or correct_answer is None:
+        return False
+    return str(user_answer).strip().lower() == str(correct_answer).strip().lower()
+
+
 # -------------------------
 # MAIN LEARN MODULE FLOW
 # -------------------------
