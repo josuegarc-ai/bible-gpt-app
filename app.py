@@ -783,21 +783,37 @@ def run_level_quiz(S):
 def run_learn_module_setup():
     st.info("Let's create a personalized learning plan based on your unique needs.")
     with st.form("user_profile_form"):
-        form_data = {}
-        form_data['topics'] = st.text_input("**What topics are on your heart to learn about?** (Separate with commas)", "Understanding grace, The life of David")
-        form_data['knowledge_level'] = st.radio("**How would you describe your current Bible knowledge?**", ["Just starting out", "I know the main stories", "I'm comfortable with deeper concepts"], horizontal=True)
-        form_data['objectives'] = st.multiselect("**What do you hope to achieve with this study?**", ["Gain knowledge and understanding", "Find practical life application", "Strengthen my faith", "Prepare to teach others"])
-        form_data['struggles'] = st.multiselect("**What are some of your common challenges?**", ["Understanding historical context", "Connecting it to my daily life", "Staying consistent", "Dealing with difficult passages"])
-        form_data['learning_style'] = st.selectbox("**Preferred learning style:**", ["storytelling", "analytical", "practical"])
-        form_data['pacing'] = st.select_slider("**How would you like to pace your learning?**", options=["A quick, high-level overview", "A steady, detailed study", "A deep, comprehensive dive"])
-        form_data['time_commitment'] = st.selectbox("**How much time can you realistically commit to each lesson?**", ["15 minutes", "30 minutes", "45 minutes"])
+        # Capture each input into its own variable
+        topics_input = st.text_input("**What topics are on your heart to learn about?** (Separate with commas)", "Understanding grace, The life of David")
+        knowledge_level_input = st.radio("**How would you describe your current Bible knowledge?**", ["Just starting out", "I know the main stories", "I'm comfortable with deeper concepts"], horizontal=True)
+        objectives_input = st.multiselect("**What do you hope to achieve with this study?**", ["Gain knowledge and understanding", "Find practical life application", "Strengthen my faith", "Prepare to teach others"])
+        struggles_input = st.multiselect("**What are some of your common challenges?**", ["Understanding historical context", "Connecting it to my daily life", "Staying consistent", "Dealing with difficult passages"])
+        learning_style_input = st.selectbox("**Preferred learning style:**", ["storytelling", "analytical", "practical"])
+        pacing_input = st.select_slider("**How would you like to pace your learning?**", options=["A quick, high-level overview", "A steady, detailed study", "A deep, comprehensive dive"])
+        time_commitment_input = st.selectbox("**How much time can you realistically commit to each lesson?**", ["15 minutes", "30 minutes", "45 minutes"])
+        
         submitted = st.form_submit_button("🚀 Generate My Tailor-Made Plan")
+    
+    # This block now correctly uses the variables from inside the form
     if submitted:
+        # Build the form_data dictionary here, AFTER submission is confirmed
+        form_data = {
+            'topics': topics_input,
+            'knowledge_level': knowledge_level_input,
+            'objectives': objectives_input,
+            'struggles': struggles_input,
+            'learning_style': learning_style_input,
+            'pacing': pacing_input,
+            'time_commitment': time_commitment_input
+        }
+        
         if not form_data['topics'] or not form_data['objectives']:
             st.warning("Please fill out the topics and objectives to generate a plan.")
             return
+            
         with st.spinner("Our AI is designing your personalized curriculum..."):
             master_prompt = create_full_learning_plan_prompt(form_data)
+            # Use a sufficiently large max_tokens for the entire plan structure
             plan_resp = ask_gpt_json(master_prompt, max_tokens=2500)
             plan_data = _learn_extract_json_any(plan_resp) if plan_resp else None
             if plan_data and "levels" in plan_data:
