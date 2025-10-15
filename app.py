@@ -684,7 +684,36 @@ def display_knowledge_check_question(S):
 
     if S.get("kc_answered_incorrectly"):
         st.error(f"Not quite. The correct answer is: **{q.get('correct_answer')}**")
-        st.info(f"See {q.get('biblical_reference', '')} for more context.")
+        
+        # --- NEW PART THAT ADDS THE EXPLANATION ---
+        reference = q.get('biblical_reference', '')
+        if reference:
+            try:
+                # Step 1: Fetch the verse text
+                verse_text = fetch_bible_verse(reference)
+                
+                # Step 2: Create a prompt asking the AI for an explanation
+                explanation_prompt = (
+                    f"A student was asked the question: '{q.get('question')}' "
+                    f"The correct answer is '{q.get('correct_answer')}'. "
+                    f"Based on the Bible verse '{reference}', which says '{verse_text}', "
+                    f"please provide a brief, one-paragraph explanation for why the answer is correct."
+                )
+                
+                # Step 3: Call the AI to get the explanation
+                explanation = ask_gpt_conversation(explanation_prompt)
+
+                # Step 4: Display the verse and the explanation
+                with st.expander(f"📖 See {reference} for context and an explanation"):
+                    st.markdown(f"**Verse Text:**\n\n*'{verse_text}'*")
+                    st.markdown("---")
+                    st.markdown(f"**Explanation:**\n\n{explanation}")
+
+            except Exception as e:
+                # Fallback in case something fails
+                st.info(f"See {reference} for more context. (Could not fetch text or explanation: {e})")
+        # --- END OF NEW PART ---
+
         if st.button("Continue", key=f"continue_{input_key}"):
             del S["kc_answered_incorrectly"]
             S["current_section_index"] += 1
