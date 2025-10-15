@@ -18,6 +18,7 @@ import streamlit as st
 # ==== AI / NLP ====
 import openai
 import whisper
+from thefuzz import fuzz # <-- ADDED FOR FUZZY STRING MATCHING
 
 # ==== Web scraping ====
 from bs4 import BeautifulSoup
@@ -507,7 +508,6 @@ def _learn_extract_json_any(response_text: str):
 # ============================
 # LEARN MODULE SUPPORT HELPERS
 # ============================
-# Adjusted max_tokens to be more generous to accommodate requested word counts
 TOKENS_BY_TIME = {"15 minutes": 1800, "30 minutes": 3000, "45 minutes": 4000}
 
 def ask_gpt_json(prompt: str, max_tokens: int = 4000):
@@ -527,14 +527,22 @@ def ask_gpt_json(prompt: str, max_tokens: int = 4000):
         st.error(f"GPT JSON call failed: {e}")
         return None
 
+# MODIFIED: Issue #1 - Fuzzy Matching for Typos and Case
 def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
-    """Flexible answer matching for quizzes."""
+    """Flexible answer matching for quizzes, including fuzzy matching for text."""
     if user_answer is None or correct_answer is None: return False
+    
     user_ans_str = str(user_answer).strip()
     correct_ans_str = str(correct_answer).strip()
-    if question_type == 'multiple_choice':
-        return user_ans_str.upper().startswith(correct_ans_str.upper())
-    return user_ans_str.lower() == correct_ans_str.lower()
+    
+    if question_type == 'multiple_choice' or question_type == 'true_false':
+        # Exact matching for multiple choice and true/false is usually best
+        return user_ans_str.lower() == correct_ans_str.lower()
+    
+    # For fill-in-the-blank, use fuzzy matching
+    # A ratio of 85 is a good threshold for catching minor typos.
+    similarity_ratio = fuzz.ratio(user_ans_str.lower(), correct_ans_str.lower())
+    return similarity_ratio >= 85
 
 def summarize_lesson_content(lesson_data: dict) -> str:
     """Summarizes lesson content for context memory."""
@@ -553,11 +561,11 @@ def summarize_lesson_content(lesson_data: dict) -> str:
 def create_full_learning_plan_prompt(form_data: dict) -> str:
     """Creates the master prompt to generate the entire curriculum."""
     pacing_to_lessons_per_level = {
-        "A quick, high-level overview": 1, # Changed from 1-2 to 1 for quick, for simplicity.
-        "A steady, detailed study": 2, # Changed from 2-3 to 2
-        "A deep, comprehensive dive": 3 # Changed from 3-5 to 3
+        "A quick, high-level overview": 1,
+        "A steady, detailed study": 2,
+        "A deep, comprehensive dive": 3
     }
-    num_lessons_per_level = pacing_to_lessons_per_level.get(form_data['pacing'], 2) # Default to 2 for steady
+    num_lessons_per_level = pacing_to_lessons_per_level.get(form_data['pacing'], 2)
 
     return f"""
 You are an expert theologian, bible teacher, Christian education pastor and personalized curriculum designer. A user has provided this profile:
@@ -572,12 +580,9 @@ You are an expert theologian, bible teacher, Christian education pastor and pers
 Task: Design a complete Bible study curriculum based on this profile.
 1. Create a personalized title for the plan.
 2. Write a brief, encouraging introduction.
-3. Determine the appropriate number of levels (e.g., "A quick, high-level overview" is 2-3 levels; "A steady, detailed study" is 3-5 levels; "A deep, comprehensive dive" is 5-7 levels).
+3. Determine the appropriate number of levels based on the pacing (e.g., "quick overview" is 2-3 levels; "steady study" is 3-5 levels; "deep dive" is 5-7 levels).
 4. For each level, create a concise "name" and "topic" that flows logically.
-5. For each level, determine a `num_lessons` based on the user's 'Desired Pacing'.
-   - If 'A quick, high-level overview', generate 1 lesson per level.
-   - If 'A steady, detailed study', generate 2 lessons per level.
-   - If 'A deep, comprehensive dive', generate 3 lessons per level.
+5. For each level, set `num_lessons` based on the user's 'Desired Pacing': 1 for 'quick', 2 for 'steady', 3 for 'deep'.
 
 Output ONLY a single, valid JSON object like this:
 {{
@@ -585,12 +590,12 @@ Output ONLY a single, valid JSON object like this:
   "introduction": "This plan will help you gain a deeper understanding of grace.",
   "levels": [
     {{"name": "Level 1: The Foundation", "topic": "Exploring grace in the Old Testament.", "num_lessons": {num_lessons_per_level}}},
-    {{"name": "Level 2: Grace Personified in Christ", "topic": "Analyzing key New Testament passages where Jesus demonstrates grace.", "num_lessons": {num_lessons_per_level}}},
-    ...
+    {{"name": "Level 2: Grace Personified in Christ", "topic": "Analyzing key New Testament passages where Jesus demonstrates grace.", "num_lessons": {num_lessons_per_level}}}
   ]
 }}
 """
 
+# MODIFIED: Issues #3 & #4 - Use knowledge level and enforce scripture references
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None) -> str:
     length_instructions = {
         "15 minutes": "Generate exactly 3 teaching sections (150-200 words each) and 2 knowledge checks.",
@@ -599,27 +604,30 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     }
     context_clause = f"This lesson must build upon the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
     return f"""
-You are an expert theologian creating a Bible lesson based on this user profile:
+You are an expert theologian creating a Bible lesson for a user with this profile:
 - Primary Goal: {form_data['topics']}
 - Learning Style: {form_data['learning_style']}
 - Time Commitment per Lesson: {form_data['time_commitment']}
+- Current Knowledge Level: {form_data['knowledge_level']}
 
 Your task is to create Lesson {lesson_number} out of {total_lessons_in_level} for the level topic: "{level_topic}".
+
+**INSTRUCTIONS:**
+- **Tailor the Depth:** You MUST tailor the depth, vocabulary, and theological complexity of the lesson to a user with a '{form_data['knowledge_level']}' level of Bible knowledge. For "Just starting out," be very clear and foundational. For "comfortable with deeper concepts," you can introduce more complex ideas.
+- **Cite Scripture:** Crucially, you MUST embed specific Bible references (e.g., John 3:16) directly within the text of your explanations to ground the teaching in Scripture.
 - **Content Requirements:** {length_instructions.get(form_data['time_commitment'], 'Generate comprehensive content relevant to the time commitment.')}
 - **Context:** {context_clause}
 - **Tone:** Pastoral, encouraging, and biblically sound.
-- **Each text section should be focused and build upon the previous, guiding the learner through the topic.**
-- **Each knowledge check should directly relate to the content just presented.**
+- **Structure:** Each text section should be focused and build upon the previous one. Each knowledge check should directly relate to the content just presented.
 
 Return ONLY a valid JSON object.
 {{
   "lesson_title": "A concise, biblically faithful title for Lesson {lesson_number}",
   "lesson_content_sections": [
-    {{"type": "text", "content": "The first teaching section for this lesson (150-300 words)."}},
+    {{"type": "text", "content": "The first teaching section for this lesson, with scripture references like (Genesis 1:1)."}},
     {{"type": "knowledge_check", "question_type": "multiple_choice", "question": "Question 1 related to the first section?", "options": ["Option A", "Option B", "Option C", "Option D"], "correct_answer": "Correct Option", "biblical_reference": "John 3:16"}},
-    {{"type": "text", "content": "The second teaching section for this lesson (150-300 words)."}},
-    {{"type": "knowledge_check", "question_type": "fill_in_the_blank", "question": "God so loved the [BLANK] that he gave his one and only Son.", "correct_answer": "world", "biblical_reference": "John 3:16"}},
-    {{ ... more sections based on time commitment ... }}
+    {{"type": "text", "content": "The second teaching section, again citing verses (Romans 8:28)."}},
+    {{"type": "knowledge_check", "question_type": "fill_in_the_blank", "question": "God so loved the [BLANK] that he gave his one and only Son (John 3:16).", "correct_answer": "world", "biblical_reference": "John 3:16"}}
   ],
   "summary_points": ["Key point 1 from this lesson", "Key point 2 from this lesson", "Key point 3 from this lesson"]
 }}
@@ -651,6 +659,7 @@ Example question object:
 # -------------------------
 # KNOWLEDGE CHECK & QUIZ UI
 # -------------------------
+# MODIFIED: Issue #2 - Save incorrect answer and use it in explanation prompt
 def display_knowledge_check_question(S):
     level_data = S["levels"][S["current_level"]]
     current_lesson = level_data["lessons"][S["current_lesson_index"]]
@@ -677,45 +686,43 @@ def display_knowledge_check_question(S):
             st.success("Correct! Moving on.")
             S["current_section_index"] += 1
             if "kc_answered_incorrectly" in S: del S["kc_answered_incorrectly"]
+            if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
             st.rerun()
         else:
             S["kc_answered_incorrectly"] = True
+            S["last_incorrect_answer"] = user_answer # Save the user's wrong answer
             st.rerun()
 
     if S.get("kc_answered_incorrectly"):
         st.error(f"Not quite. The correct answer is: **{q.get('correct_answer')}**")
         
-        # --- NEW PART THAT ADDS THE EXPLANATION ---
         reference = q.get('biblical_reference', '')
         if reference:
             try:
-                # Step 1: Fetch the verse text
                 verse_text = fetch_bible_verse(reference)
                 
-                # Step 2: Create a prompt asking the AI for an explanation
+                incorrect_ans = S.get("last_incorrect_answer", "their answer")
+                
                 explanation_prompt = (
-                    f"A student was asked the question: '{q.get('question')}' "
-                    f"The correct answer is '{q.get('correct_answer')}'. "
+                    f"A student was asked: '{q.get('question')}' "
+                    f"They incorrectly answered '{incorrect_ans}'. The correct answer is '{q.get('correct_answer')}'. "
                     f"Based on the Bible verse '{reference}', which says '{verse_text}', "
-                    f"please provide a brief, one-paragraph explanation for why the answer is correct."
+                    f"please provide a brief, one-paragraph explanation focusing on why their answer '{incorrect_ans}' was incorrect and why '{q.get('correct_answer')}' is the right one."
                 )
                 
-                # Step 3: Call the AI to get the explanation
                 explanation = ask_gpt_conversation(explanation_prompt)
 
-                # Step 4: Display the verse and the explanation
                 with st.expander(f"📖 See {reference} for context and an explanation"):
                     st.markdown(f"**Verse Text:**\n\n*'{verse_text}'*")
                     st.markdown("---")
                     st.markdown(f"**Explanation:**\n\n{explanation}")
 
             except Exception as e:
-                # Fallback in case something fails
                 st.info(f"See {reference} for more context. (Could not fetch text or explanation: {e})")
-        # --- END OF NEW PART ---
 
         if st.button("Continue", key=f"continue_{input_key}"):
             del S["kc_answered_incorrectly"]
+            if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
             S["current_section_index"] += 1
             st.rerun()
 
@@ -760,8 +767,8 @@ def run_level_quiz(S):
                 S["current_lesson_index"] = 0
                 S["current_section_index"] = 0
                 S["quiz_mode"] = False
-                S["current_question_index"] = 0 # Reset quiz state for next level
-                S["user_score"] = 0 # Reset quiz score for next level
+                S["current_question_index"] = 0 
+                S["user_score"] = 0 
                 st.rerun()
         else:
             st.error("Please review the lessons and try the quiz again.")
@@ -791,7 +798,6 @@ def run_learn_module_setup():
             return
         with st.spinner("Our AI is designing your personalized curriculum..."):
             master_prompt = create_full_learning_plan_prompt(form_data)
-            # Use a sufficiently large max_tokens for the entire plan structure
             plan_resp = ask_gpt_json(master_prompt, max_tokens=2500)
             plan_data = _learn_extract_json_any(plan_resp) if plan_resp else None
             if plan_data and "levels" in plan_data:
@@ -814,12 +820,10 @@ def run_learn_module():
     if "learn_state" not in st.session_state: st.session_state.learn_state = {}
     S = st.session_state.learn_state
 
-    # Phase 1: Setup via Questionnaire
     if "plan" not in S:
         run_learn_module_setup()
         return
 
-    # Phase 2: Follow the Generated Plan
     st.title(S["plan"].get("plan_title", "Your Learning Journey"))
     st.write(S["plan"].get("introduction", ""))
 
@@ -842,20 +846,15 @@ def run_learn_module():
     if "lessons" not in level_data:
         level_data["lessons"] = []
 
-    # Logic for generating and displaying lessons
-    # Check if all lessons for the current level have been generated
-    if S["current_lesson_index"] < level_data.get("num_lessons", 1): # Default to 1 if num_lessons is missing
+    if S["current_lesson_index"] < level_data.get("num_lessons", 1):
         if S["current_lesson_index"] >= len(level_data["lessons"]):
-            # Generate the next lesson if it doesn't exist
             with st.spinner(f"Generating Lesson {S['current_lesson_index'] + 1} for this level..."):
                 prev_summary = None
-                # Fetch summary from the last lesson of the *previous* level, if applicable
                 if S["current_level"] > 0 and S["current_lesson_index"] == 0:
                     prev_level_lessons = S["levels"][S["current_level"]-1].get("lessons", [])
                     if prev_level_lessons:
                         prev_summary = prev_level_lessons[-1].get("lesson_summary")
                 elif S["current_lesson_index"] > 0:
-                    # Fetch summary from the previous lesson within the current level
                     prev_summary = level_data["lessons"][S["current_lesson_index"] - 1].get("lesson_summary")
 
                 lesson_max_tokens = TOKENS_BY_TIME.get(S["form_data"]['time_commitment'], 4000)
@@ -870,17 +869,15 @@ def run_learn_module():
                 lesson_data = _learn_extract_json_any(lesson_resp) if lesson_resp else None
                 
                 if lesson_data and "lesson_content_sections" in lesson_data:
-                    # Generate and store summary for this new lesson
                     lesson_data["lesson_summary"] = summarize_lesson_content(lesson_data)
                     level_data["lessons"].append(lesson_data)
-                    S["current_section_index"] = 0 # Reset section index for new lesson
+                    S["current_section_index"] = 0
                     st.rerun()
                 else:
                     st.error("Failed to generate lesson content. Please try again.")
                     if lesson_resp: st.text_area("Raw AI Lesson Response (for debugging):", lesson_resp, height=200)
                     return
         
-        # Display the current lesson
         current_lesson = level_data["lessons"][S["current_lesson_index"]]
         st.markdown(f"### Lesson {S['current_lesson_index'] + 1}: {current_lesson.get('lesson_title', 'Untitled Lesson')}")
         
@@ -895,19 +892,16 @@ def run_learn_module():
             elif section.get("type") == "knowledge_check":
                 display_knowledge_check_question(S)
         else:
-            # End of current lesson's sections
             st.success(f"Lesson {S['current_lesson_index'] + 1} Completed!")
             st.markdown("**Key Takeaways from this Lesson:**")
             for point in current_lesson.get("summary_points", []): st.markdown(f"- {point}")
 
             if S["current_lesson_index"] + 1 < level_data.get("num_lessons", 1):
-                # More lessons in this level
                 if st.button("Go to Next Lesson ▶️"):
                     S["current_lesson_index"] += 1
-                    S["current_section_index"] = 0 # Reset section index for new lesson
+                    S["current_section_index"] = 0
                     st.rerun()
             else:
-                # All lessons in this level are completed, prepare for quiz
                 st.info("You've completed all lessons for this level. Time for the final quiz!")
                 if st.button("Start Level Quiz"):
                     if "quiz_questions" not in level_data:
@@ -927,15 +921,12 @@ def run_learn_module():
                     S["user_score"] = 0
                     st.rerun()
     else:
-        # This case should ideally not be reached if the "Start Level Quiz" button is the only path after lessons.
-        # It's a fallback if `num_lessons` is somehow fulfilled without triggering the quiz button.
         st.info("You've completed all lessons for this level. If you haven't taken the quiz, please do so!")
         if st.button("Start Level Quiz (if not started)"):
             S["quiz_mode"] = True
             S["current_question_index"] = 0
             S["user_score"] = 0
             st.rerun()
-
 
 # ================================================================
 # MAIN UI
@@ -950,7 +941,6 @@ mode = st.sidebar.selectbox("Choose a mode:", [
     "Pixar Story Animation",
 ])
 
-# A dictionary to map modes to functions
 mode_functions = {
     "Learn Module": run_learn_module,
     "Bible Lookup": run_bible_lookup,
@@ -968,11 +958,7 @@ mode_functions = {
     "Pixar Story Animation": run_pixar_story_animation,
 }
 
-# Run the selected mode's function
 if mode in mode_functions:
-    # Special handling for "Practice Chat" as its internal state is complex
-    # and "Tailored Learning Path" which is now essentially replaced by "Learn Module"
-    # but kept for consistency if user still wants it.
     if mode == "Practice Chat":
         run_practice_chat()
     elif mode == "Tailored Learning Path":
