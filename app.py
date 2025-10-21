@@ -18,7 +18,7 @@ import streamlit as st
 # ==== AI / NLP ====
 import openai
 import whisper
-from thefuzz import fuzz # <-- ADDED FOR FUZZY STRING MATCHING
+from thefuzz import fuzz # <-- REQUIRED FOR FUZZY STRING MATCHING
 
 # ==== Web scraping ====
 from bs4 import BeautifulSoup
@@ -49,21 +49,21 @@ VALID_TRANSLATIONS = ["web", "kjv", "asv", "bbe", "oeb-us"]
 client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
 MODEL = "gpt-4o"
 
-# Diagnostic Quiz Questions - UPDATED
+# Diagnostic Quiz Questions (with "I don't know")
 DIAGNOSTIC_QUESTIONS = [
     {
         "question": "Who led the Israelites out of Egypt?",
-        "options": ["Abraham", "Moses", "David", "Noah", "I don't know"], # Added option
+        "options": ["Abraham", "Moses", "David", "Noah", "I don't know"],
         "correct": "Moses"
     },
     {
         "question": "Which disciple denied Jesus three times before the rooster crowed?",
-        "options": ["Judas", "John", "Peter", "Thomas", "I don't know"], # Added option
+        "options": ["Judas", "John", "Peter", "Thomas", "I don't know"],
         "correct": "Peter"
     },
     {
         "question": "What theological term refers to the study of 'last things' or end times?",
-        "options": ["Soteriology", "Eschatology", "Christology", "Pneumatology", "I don't know"], # Added option
+        "options": ["Soteriology", "Eschatology", "Christology", "Pneumatology", "I don't know"],
         "correct": "Eschatology"
     }
 ]
@@ -107,9 +107,18 @@ def ask_gpt_conversation(prompt: str) -> str:
 def extract_json_from_response(response_text: str):
     """Legacy JSON extractor for simple objects."""
     try:
-        json_text = re.search(r"\{.*\}", response_text, re.DOTALL).group(0)
+        # Prioritize JSON within markdown code blocks
+        match = re.search(r"```json\s*(\{.*?\})\s*```", response_text, re.DOTALL)
+        if match:
+            json_text = match.group(1)
+        else:
+             # Fallback to finding the first curly brace object
+            json_text_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+            if not json_text_match: return None
+            json_text = json_text_match.group(0)
         return json.loads(json_text)
-    except Exception:
+    except Exception as e:
+        st.error(f"Error extracting JSON: {e}") # Added error logging
         return None
 
 # ================================================================
@@ -138,15 +147,16 @@ def search_sermons_online(passage: str):
                     if start > -1 and end > start:
                         json_text = txt[start:end]
                         yt_data = json.loads(json_text)
-                        contents = yt_data["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"]
+                        # Added checks for key existence
+                        contents = yt_data.get("contents",{}).get("twoColumnSearchResultsRenderer",{}).get("primaryContents",{}).get("sectionListRenderer",{}).get("contents",[{}])[0].get("itemSectionRenderer",{}).get("contents",[])
                         for item in contents:
                             if "videoRenderer" in item:
                                 video_id = item["videoRenderer"]["videoId"]
                                 video_url = f"https://www.youtube.com/watch?v={video_id}"
                                 results.append({"pastor": pastor, "url": video_url})
                                 found = True
-                                break
-                        break
+                                break # Found first result for this pastor
+                        if found: break # Move to next pastor
             if not found:
                 results.append({"pastor": pastor, "url": "❌ No result"})
         except Exception as e:
@@ -166,7 +176,7 @@ def run_bible_lookup():
                 verse_text = fetch_bible_verse(passage, translation)
                 st.success(f"**{passage.strip()} ({translation.upper()})**\n\n{verse_text}")
                 st.markdown("---")
-                
+
                 summary = ask_gpt_conversation(f"Summarize and explain this Bible verse clearly: '{verse_text}' ({passage}). Include a daily life takeaway.")
                 st.markdown("**💡 AI Summary & Takeaway:**")
                 st.info(summary)
@@ -198,12 +208,15 @@ def run_chat_mode():
             )
             st.markdown("**🙏 Final Encouragement:**")
             st.write(reflection)
+            # Clear chat history after reflection? Optional.
+            # st.session_state.chat_history = []
             return
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         messages = [{"role": "system", "content": "You are a loving, biblically grounded mentor."}] + st.session_state.chat_history
         r = client.chat.completions.create(model=MODEL, messages=messages, temperature=0.4)
         reply = r.choices[0].message.content.strip()
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
+    # Display chat history
     for msg in st.session_state.chat_history:
         who = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
         st.markdown(f"**{who}:** {msg['content']}")
@@ -223,15 +236,16 @@ def run_pixar_story_animation():
         story_prompt = f"Turn the Bible story from {reference} into a Pixar-studio style film story for kids ages 4–10. Tone: {tone}. Theme: {theme or 'faith'}. Break it into exactly 5 cinematic scenes with 1–2 sentences each. Each scene should be visually imaginative but true to the biblical setting. Output as a numbered list."
         response = ask_gpt_conversation(story_prompt)
         st.markdown("### 📚 Pixar-Style Bible Story Scenes")
-        scenes = re.findall(r"\d+\.\s+(.*)", response) or [s.strip() for s in response.split("\n") if s.strip()]
+        # Improved parsing for numbered lists or simple newlines
+        scenes = re.findall(r"^\d+\.\s*(.*)", response, re.MULTILINE) or [s.strip() for s in response.split("\n") if s.strip() and not s.strip().isdigit()]
         if not scenes:
             st.error("❌ Could not parse story scenes. Try different input.")
             return
-        for idx, scene in enumerate(scenes[:5], 1):
+        for idx, scene in enumerate(scenes[:5], 1): # Limit to 5 scenes
             st.markdown(f"#### 🎬 Scene {idx}\n*{scene}*")
 
 # ================================================================
-# PRACTICE CHAT (Quiz)
+# PRACTICE CHAT (Quiz) - UPDATED FOR FUZZY MATCHING AND EXPLANATION
 # ================================================================
 def run_practice_chat():
     st.subheader("🤠 Practice Chat")
@@ -258,48 +272,84 @@ def run_practice_chat():
         if st.button("Start Practice") and (random_practice or book):
             S["book"] = book; S["style"] = style; S["level"] = level
             num_questions = random.randint(7, 10)
-            while len(S["questions"]) < num_questions:
-                chosen_style = style if style != "mixed" else random.choice(["multiple choice", "fill in the blank", "true or false"])
-                topic = book if book else "the Bible"
-                q_prompt = (
-                    f"Generate a {chosen_style} Bible question from {topic} suitable for a {level} learner. "
-                    f"Format as JSON with 'question','correct','choices'. "
-                    f"{'Choices for true/false should be [\"True\", \"False\"].' if chosen_style == 'true or false' else 'Include 1 correct and 3 incorrect options.'}"
-                )
-                data = extract_json_from_response(ask_gpt_conversation(q_prompt))
-                if not data: continue
-                norm = data["question"].strip().lower()
-                if norm in S["used_questions"]: continue
-                S["used_questions"].add(norm)
-                phrase_key = " ".join(sorted(norm.split()));
-                if phrase_key in S["used_phrases"]: continue
-                S["used_phrases"].add(phrase_key)
+            with st.spinner("Generating practice questions..."): # Added spinner
+                while len(S["questions"]) < num_questions:
+                    chosen_style = style if style != "mixed" else random.choice(["multiple choice", "fill in the blank", "true or false"])
+                    topic = book if book else "the Bible"
+                    q_prompt = (
+                        f"Generate a {chosen_style} Bible question from {topic} suitable for a {level} learner. "
+                        f"Format as JSON with 'question', 'correct', 'choices' (list of strings), and 'question_type' ('multiple_choice', 'fill_in_the_blank', or 'true_false'). " # Added question_type
+                        f"{'Choices for true/false should be [\"True\", \"False\"].' if chosen_style == 'true or false' else 'For multiple choice, include 1 correct and 3 incorrect options.'}"
+                    )
+                    data = extract_json_from_response(ask_gpt_conversation(q_prompt)) # Using more robust extractor
+                    if not data or 'question' not in data or 'correct' not in data: continue # Basic validation
+                    
+                    # Add question_type if missing (shouldn't happen with updated prompt)
+                    if 'question_type' not in data: data['question_type'] = chosen_style
 
-                if chosen_style == "true or false": data["choices"] = ["True", "False"]
-                else:
-                    uniq = list(dict.fromkeys(data["choices"]));
-                    if data["correct"] not in uniq: uniq.append(data["correct"])
-                    random.shuffle(uniq); data["choices"] = uniq
-                S["questions"].append(data)
-            st.rerun()
+                    norm = data["question"].strip().lower()
+                    if norm in S["used_questions"]: continue
+                    S["used_questions"].add(norm)
+                    
+                    # Deduplicate options and ensure correct is present for MC/FITB
+                    if data['question_type'] != 'true_false':
+                         if 'choices' not in data: data['choices'] = []
+                         # Ensure choices is a list
+                         if not isinstance(data['choices'], list): data['choices'] = []
+                         # Deduplicate while preserving order (important for potential distractors)
+                         seen = set()
+                         uniq = [x for x in data['choices'] if not (x in seen or seen.add(x))]
+                         # Add correct answer if not already in choices
+                         if data['correct'] not in seen:
+                             uniq.append(data['correct'])
+                         random.shuffle(uniq)
+                         data['choices'] = uniq
+                    else:
+                        data['choices'] = ["True", "False"] # Standardize TF choices
+
+                    S["questions"].append(data)
+            if not S["questions"]: # Handle case where generation failed
+                 st.error("Failed to generate questions. Please try again.")
+            else:
+                 st.rerun()
+
     elif S["current"] < len(S["questions"]):
         q = S["questions"][S["current"]]
         st.markdown(f"**Q{S['current'] + 1}: {q['question']}**")
-        ans = st.radio("Choose:", q["choices"], key=f"q{S['current']}_choice")
+        
+        q_type = q.get("question_type", "multiple_choice") # Default if missing
+        ans = None
+        if q_type == 'multiple_choice':
+             ans = st.radio("Choose:", q.get("choices", []), key=f"q{S['current']}_choice", index=None)
+        elif q_type == 'true_false':
+             ans = st.radio("Choose:", ["True", "False"], key=f"q{S['current']}_choice", index=None)
+        elif q_type == 'fill_in_the_blank':
+             ans = st.text_input("Fill in the blank:", key=f"q{S['current']}_choice")
+
         if not S.get("awaiting_next", False):
             if st.button("Submit Answer"):
-                # Use the updated _answers_match function for Practice Chat as well
-                if _answers_match(ans, q["correct"], q.get("question_type", "multiple choice")): # Assuming default if type missing
-                    S["score"] += 1; st.success("✅ Correct!"); S["current"] += 1; st.rerun()
-                else:
-                    st.error(f"❌ Incorrect. Correct answer: {q['correct']}");
-                    explain = ask_gpt_conversation(
-                        f"You're a theological Bible teacher. A student answered '{ans}' to the question '{q['question']}'. The correct answer is '{q['correct']}'. Explain why their answer was incorrect and why '{q['correct']}' is right, using Scripture-based reasoning."
-                    )
-                    st.markdown("**📜 Teaching Moment:**"); st.write(explain); S["awaiting_next"] = True
+                 if ans is None and (q_type == 'multiple_choice' or q_type == 'true_false'):
+                      st.warning("Please select an answer.")
+                 elif ans is not None:
+                    if _answers_match(ans, q["correct"], q_type): # Using fuzzy match function
+                        S["score"] += 1; st.success("✅ Correct!"); S["current"] += 1; st.rerun()
+                    else:
+                        st.error(f"❌ Incorrect. Correct answer: **{q['correct']}**"); # Made correct answer bold
+                        # Updated explanation prompt to include the incorrect answer
+                        explain_prompt = (
+                            f"You're a theological Bible teacher. A student answered '{ans}' to the question: '{q['question']}'. "
+                            f"The correct answer is '{q['correct']}'. Explain briefly why their answer '{ans}' was incorrect and why '{q['correct']}' is the right one, using Scripture-based reasoning if possible."
+                        )
+                        explanation = ask_gpt_conversation(explain_prompt)
+                        st.markdown("**📜 Teaching Moment:**"); st.write(explanation); S["awaiting_next"] = True
+                        st.rerun() # Rerun to show teaching moment and Next button
+        
+        # Display Next button only after an incorrect answer's explanation is shown
         if S.get("awaiting_next"):
             if st.button("Next Question", key=f"next_{S['current']}"):
-                del S["awaiting_next"]; S["current"] += 1; st.rerun()
+                S["awaiting_next"] = False # Reset flag
+                S["current"] += 1
+                st.rerun()
     else:
         st.markdown(f"**🌞 Final Score: {S['score']}/{len(S['questions'])}**")
         if st.button("Restart Practice"): S["restart_flag"] = True; st.rerun()
@@ -312,18 +362,26 @@ def run_faith_journal():
     entry = st.text_area("Write your thoughts, prayers, or reflections:")
     if st.button("Save Entry") and entry:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"journal_{ts}.txt"
-        with open(filename, "w", encoding="utf-8") as f: f.write(entry)
-        st.success(f"Saved as {filename}.")
-        if st.checkbox("Get spiritual insight from this entry"):
-            insight = ask_gpt_conversation(f"Analyze this faith journal and offer spiritual insight and encouragement: {entry}")
-            st.markdown("**💡 Insight:**"); st.write(insight)
+        # Ensure directory exists
+        os.makedirs("faith_journal", exist_ok=True)
+        filename = os.path.join("faith_journal", f"journal_{ts}.txt")
+        try:
+            with open(filename, "w", encoding="utf-8") as f: f.write(entry)
+            st.success(f"Saved as `{filename}`.")
+            # Added option for AI insight after saving
+            if st.checkbox("Get spiritual insight from this entry?"):
+                 with st.spinner("Analyzing your entry..."):
+                      insight = ask_gpt_conversation(f"Analyze this faith journal entry and offer spiritual insight and encouragement based on biblical principles: {entry}")
+                      st.markdown("**💡 Insight:**"); st.write(insight)
+        except Exception as e:
+            st.error(f"Failed to save entry: {e}")
 
 # ================================================================
-# TAILORED LEARNING PATH (This seems redundant with the new Learn Module, but keeping as per prior code)
+# TAILORED LEARNING PATH (Kept for compatibility, but Learn Module is preferred)
 # ================================================================
 def run_learning_path_mode():
-    st.subheader("📚 Tailored Learning Path")
+    st.subheader("📚 Tailored Learning Path (Legacy)")
+    st.warning("Consider using the 'Learn Module' for a more interactive experience.")
     user_type = st.selectbox("User type:", ["child", "adult"])
     goal = st.text_input("Learning goal:")
     level = st.selectbox("Bible knowledge level:", ["beginner", "intermediate", "advanced"])
@@ -331,111 +389,206 @@ def run_learning_path_mode():
         "Preferred learning styles:",
         ["storytelling", "questions", "memory games", "reflection", "devotional"],
     )
-    if st.button("Generate Path") and goal and styles:
+    if st.button("Generate Legacy Path") and goal and styles:
         style_str = ", ".join(styles)
-        prompt = (f"Design a creative Bible learning path for a {user_type} with goal '{goal}', level '{level}', "
-                  f"using these learning styles: {style_str}.")
+        prompt = (f"Design a creative Bible learning path outline for a {user_type} with goal '{goal}', level '{level}', "
+                  f"using these learning styles: {style_str}. Provide a list of suggested topics or activities.")
         result = ask_gpt_conversation(prompt)
-        st.text_area("📘 Learning Path", result, height=500)
+        st.text_area("📘 Learning Path Outline", result, height=500)
 
 # ================================================================
 # BIBLE BETA
 # ================================================================
 def run_bible_beta():
     st.subheader("📘 Bible Beta Mode")
-    st.info("🧪 Experimental: Read and Listen to Bible page by page.")
+    st.info("🧪 Experimental: Read Bible chapters.")
     book = st.text_input("Book (e.g., John):")
-    chapter = st.number_input("Chapter:", min_value=1, step=1)
-    if st.button("Display Page") and book:
-        verse = f"{book} {chapter}:1"
+    # Changed to text input for flexibility, e.g., "John 3"
+    passage_ref = st.text_input("Chapter or Passage (e.g., 3 or 3:1-16):", "1") 
+    translation_beta = st.selectbox("Translation:", VALID_TRANSLATIONS, key="beta_trans")
+
+    if st.button("Display Passage") and book and passage_ref:
+        full_ref = f"{book} {passage_ref}"
         try:
-            text = fetch_bible_verse(verse)
-            st.text_area("📖 Bible Text:", value=text, height=200)
-            if st.checkbox("✨ Highlight and Summarize"):
-                highlight = st.text_area("Paste the section to summarize:")
-                if highlight:
-                    summary = ask_gpt_conversation(f"Summarize and reflect on this Bible passage: {highlight}")
-                    st.markdown("**💬 Summary:**"); st.markdown(summary)
+            with st.spinner(f"Fetching {full_ref}..."):
+                 text = fetch_bible_verse(full_ref, translation_beta)
+                 st.text_area(f"📖 {full_ref} ({translation_beta.upper()})", value=text, height=400)
+            
+            # Optional summarization integrated below text area
+            if st.checkbox("✨ Summarize this passage?"):
+                with st.spinner("Generating summary..."):
+                     summary = ask_gpt_conversation(f"Summarize and explain the key points of this Bible passage: {text} ({full_ref})")
+                     st.markdown("**💬 Summary & Key Points:**"); st.markdown(summary)
+
         except Exception as e:
-            st.error(str(e))
+            st.error(f"Error fetching passage: {e}")
 
 # ================================================================
 # SERMON TRANSCRIBER & SUMMARIZER (YouTube or file upload)
 # ================================================================
 def _convert_to_wav_if_needed(src_path: str) -> str:
-    """If Whisper has trouble with container, convert to 16k mono WAV using ffmpeg (no ffprobe)."""
+    """If Whisper has trouble with container, convert to 16k mono WAV using ffmpeg."""
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
         wav_path = tmp_file.name
     cmd = [_FFMPEG_BIN, "-y", "-i", src_path, "-ar", "16000", "-ac", "1", wav_path]
     try:
-        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        # Added timeout and capture stderr
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=120) 
     except subprocess.CalledProcessError as e:
-        raise Exception(f"ffmpeg failed with exit code {e.returncode}: {e.stderr}")
+        raise Exception(f"ffmpeg conversion failed with exit code {e.returncode}: {e.stderr}")
+    except subprocess.TimeoutExpired:
+         raise Exception("ffmpeg conversion timed out after 2 minutes.")
     return wav_path
 
 def download_youtube_audio(url: str) -> tuple[str, str, str]:
     """Download audio *without* postprocessing (so yt_dlp won't call ffprobe)."""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as temp_file:
+    # Use a specific file extension preferred by yt-dlp format selection
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as temp_file: 
         output_path = temp_file.name
+    
     ydl_opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio/best", "outtmpl": output_path,
+        # Prefer m4a, fallback to best audio
+        "format": "bestaudio[ext=m4a]/bestaudio/best", 
+        "outtmpl": output_path, # Use the temp file path directly
         "ffmpeg_location": os.environ.get("FFMPEG_LOCATION", _FFMPEG_DIR),
-        "quiet": True, "retries": 3, "noprogress": True,
-        "http_headers": {
+        "quiet": True, 
+        "retries": 3, 
+        "noprogress": True,
+        "http_headers": { # Standard browser headers
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9", "Referer": "https://www.youtube.com/",
+            "Accept-Language": "en-US,en;q=0.9", 
+            "Referer": "https://www.youtube.com/",
         },
-        **({"cookiefile": "cookies.txt"} if os.path.exists("cookies.txt") else {}),
+        # Use cookies if available
+        **({"cookiefile": "cookies.txt"} if os.path.exists("cookies.txt") else {}), 
+        # Set socket timeout
+        "socket_timeout": 30,
     }
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        # Use context manager for yt_dlp
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl: 
             info = ydl.extract_info(url, download=True)
-            title = info.get("title", "Untitled Sermon"); uploader = info.get("uploader", "Unknown")
+            title = info.get("title", "Untitled Sermon")
+            uploader = info.get("uploader", "Unknown")
+            
+        # Check if file exists and is not empty AFTER download attempt
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-            raise Exception("Audio download failed, resulting in an empty file.")
+            raise Exception("Audio download failed or resulted in an empty file.")
+            
         return output_path, uploader, title
+    except yt_dlp.utils.DownloadError as e: # Catch specific download errors
+         raise Exception(f"❌ YouTube download error: {e}")
     except Exception as e:
         raise Exception(f"❌ Failed during YouTube audio processing: {e}")
 
 def run_sermon_transcriber():
     st.subheader("🎧 Sermon Transcriber & Summarizer")
-    st.info("Upload a sermon audio or paste a YouTube link. Max length: 15 minutes (for testing).")
-    yt_link = st.text_input("📺 YouTube Link (≤ 15 mins):")
-    audio_file = st.file_uploader("🎙️ Or upload sermon audio (MP3/WAV/M4A)", type=["mp3", "wav", "m4a"])
+    st.info("Upload sermon audio or paste a YouTube link (max ~15-20 mins recommended due to processing limits).")
+    yt_link = st.text_input("📺 YouTube Link:")
+    audio_file = st.file_uploader("🎙️ Or upload audio (MP3/WAV/M4A/MP4):", type=["mp3", "wav", "m4a", "mp4"])
+
     if st.button("⏺️ Transcribe & Summarize") and (yt_link or audio_file):
-        with st.spinner("Transcribing... please wait."):
-            try:
-                preacher = "Unknown"; title = "Untitled Sermon"; audio_path = None
+        audio_path = None
+        preacher = "Unknown"; title = "Untitled Sermon"
+        cleanup_path = None # Path to delete later
+
+        try:
+            with st.spinner("Processing audio..."):
                 if yt_link:
+                    # Validate URL format roughly
+                    if not yt_link.startswith(("http://", "https://")):
+                         raise ValueError("Invalid YouTube URL provided.")
+                    # Get duration without full download first
                     with yt_dlp.YoutubeDL({"quiet": True, "noprogress": True}) as ydl:
                         info = ydl.extract_info(yt_link, download=False)
-                        duration = int(info.get("duration", 0) or 0)
-                        if duration > 900: raise Exception("❌ Sermon too long. Please limit to 15 minutes.")
+                        duration = info.get("duration")
+                        # Add a reasonable limit, e.g., 20 mins (1200 seconds)
+                        if duration and duration > 1200: 
+                            st.warning(f"⚠️ Warning: Video is longer than 20 minutes ({duration}s). Transcription might be slow or fail.")
                         preacher = info.get("uploader", "Unknown") or "Unknown"
                         title = info.get("title", "Untitled Sermon") or "Untitled Sermon"
+                    # Download the audio
                     audio_path, _, _ = download_youtube_audio(yt_link)
+                    cleanup_path = audio_path # Mark for deletion
+
                 elif audio_file:
-                    suffix = os.path.splitext(audio_file.name)[1].lower() or ".wav"
+                    # Save uploaded file to a temporary path
+                    suffix = os.path.splitext(audio_file.name)[1].lower() or ".tmp"
                     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
-                        temp_audio.write(audio_file.getvalue()); audio_path = temp_audio.name
-                model = whisper.load_model("base")
-                try: transcription = model.transcribe(audio_path)
-                except Exception: transcription = model.transcribe(_convert_to_wav_if_needed(audio_path))
-                transcript_text = transcription.get("text", "").strip()
-                if not transcript_text: raise Exception("Transcription produced empty text.")
-                st.success("✅ Transcription complete."); st.markdown("### 📝 Transcript")
-                st.text_area("Transcript", transcript_text, height=300)
-                short = transcript_text[:1800].replace("\n", " ").replace("\r", " ")
-                prompt = f"""You are a sermon summarizer. From the transcript below, summarize the following:
-- **Sermon Title** - **Preacher Name** - **Bible Verses Referenced** - **Main Takeaways** - **Reflection Questions** - **Call to Action (if any)**
-Preacher: {preacher}\nTitle: {title}\nTranscript:\n{short}"""
-                summary = ask_gpt_conversation(prompt); st.markdown("### 🧠 Sermon Summary"); st.markdown(summary)
-                os.makedirs("sermon_journal", exist_ok=True); ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                with open(f"sermon_journal/transcript_{ts}.txt", "w", encoding="utf-8") as f: f.write(transcript_text)
-                with open(f"sermon_journal/summary_{ts}.txt", "w", encoding="utf-8") as f: f.write(summary)
-                st.success("Saved transcript and summary to `sermon_journal/` folder.")
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
+                        temp_audio.write(audio_file.getvalue())
+                        audio_path = temp_audio.name
+                        cleanup_path = audio_path # Mark for deletion
+                    title = os.path.splitext(audio_file.name)[0] # Use filename as title
+
+                if not audio_path:
+                    st.warning("Please provide a YouTube link or upload an audio file.")
+                    return
+
+            with st.spinner("Transcribing audio... (This may take a few minutes)"):
+                # Load the base model (faster, less accurate)
+                # Consider 'small' or 'medium' for better accuracy if performance allows
+                model = whisper.load_model("base") 
+                transcription = None
+                try: 
+                    transcription = model.transcribe(audio_path, fp16=False) # fp16=False for CPU
+                except Exception as e_transcribe:
+                    st.warning(f"Initial transcription failed ({e_transcribe}), trying conversion to WAV...")
+                    try:
+                        wav_path = _convert_to_wav_if_needed(audio_path)
+                        cleanup_path = wav_path # Now delete the wav file instead
+                        transcription = model.transcribe(wav_path, fp16=False)
+                    except Exception as e_convert:
+                         raise Exception(f"Transcription failed even after conversion: {e_convert}")
+
+                if not transcription or not transcription.get("text"):
+                     raise Exception("Transcription failed or produced empty text.")
+
+                transcript_text = transcription["text"].strip()
+                st.success("✅ Transcription complete.")
+                st.markdown("### 📝 Transcript")
+                st.text_area("Full Transcript", transcript_text, height=300)
+
+            with st.spinner("Generating summary..."):
+                # Limit summary input to avoid excessive token usage
+                summary_input_limit = 4000 
+                short_transcript = transcript_text[:summary_input_limit] 
+                
+                summary_prompt = f"""You are a sermon summarizer. From the transcript below, provide a concise summary including:
+- **Main Topic/Theme:** (Identify the core subject)
+- **Key Bible Verses Referenced:** (List primary scriptures mentioned)
+- **Main Takeaways:** (Bullet points of key messages or lessons)
+- **Potential Reflection Questions:** (2-3 questions for the listener to consider)
+
+Preacher: {preacher}
+Title: {title}
+Transcript Snippet (first ~{summary_input_limit} characters):
+{short_transcript}"""
+
+                summary = ask_gpt_conversation(summary_prompt)
+                st.markdown("### 🧠 Sermon Summary")
+                st.markdown(summary)
+
+                # Save results
+                os.makedirs("sermon_journal", exist_ok=True)
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                base_filename = re.sub(r'[\\/*?:"<>|]', "", title)[:50] # Sanitize title for filename
+                
+                transcript_filename = os.path.join("sermon_journal", f"transcript_{base_filename}_{ts}.txt")
+                summary_filename = os.path.join("sermon_journal", f"summary_{base_filename}_{ts}.txt")
+                
+                with open(transcript_filename, "w", encoding="utf-8") as f: f.write(transcript_text)
+                with open(summary_filename, "w", encoding="utf-8") as f: f.write(summary)
+                st.success(f"Saved transcript and summary to `{transcript_filename}` and `{summary_filename}`.")
+
+        except Exception as e:
+            st.error(f"❌ An error occurred: {e}")
+        finally:
+             # Clean up temporary audio file
+            if cleanup_path and os.path.exists(cleanup_path):
+                try:
+                    os.remove(cleanup_path)
+                except Exception as e_clean:
+                     st.warning(f"Could not delete temporary file {cleanup_path}: {e_clean}")
 
 # ================================================================
 # SIMPLE STUDY PLAN
@@ -444,89 +597,182 @@ def run_study_plan():
     st.subheader("📅 Personalized Bible Study Plan")
     goal = st.text_input("Study goal (e.g., 'Grow in faith', 'Understand forgiveness'):")
     duration = st.slider("How many days do you want your plan to last?", 7, 60, 14)
-    focus = st.text_input("Focus area (optional):")
-    level = st.selectbox("Knowledge level:", ["Beginner", "Intermediate", "Advanced"])
+    focus = st.text_input("Focus area (e.g., 'Parables', 'Life of Paul', leave blank for general):")
+    level_plan = st.selectbox("Your Bible knowledge level:", ["Beginner", "Intermediate", "Advanced"], key="plan_level")
     include_reflections = st.checkbox("Include daily reflection questions?", True)
+
     if st.button("Generate Study Plan") and goal:
         with st.spinner("✍️ Creating your personalized study plan..."):
             prompt = f"""You are a mature Bible mentor creating a detailed, Scripture-based daily study plan.
-**Parameters:**\n- Goal: {goal}\n- Duration: {duration} days\n- Focus area: {focus or 'General spiritual growth'}\n- Knowledge level: {level}
-**Instructions:**\nDesign a day-by-day Bible study plan.
-For each day:\n- Give a short **title or theme**\n- Suggest **1–2 Bible passages to read**\n- Write a **summary** (3–5 sentences) explaining the meaning and relevance
-- Include a **cross-reference verse**\n- Provide a **practical life application**
-{"- Add a reflection question for journaling." if include_reflections else ""}
-End with a brief closing paragraph encouraging the reader to stay consistent.
-The tone should be pastoral, warm, and theologically sound."""
+**Parameters:**
+- Goal: {goal}
+- Duration: {duration} days
+- Focus area: {focus if focus else 'Based on Goal'}
+- Knowledge level: {level_plan}
+
+**Instructions:**
+Design a day-by-day Bible study plan. For each day:
+- **Day #:**
+- **Theme/Title:** A concise theme for the day.
+- **Reading:** Suggest 1–2 specific Bible passages (e.g., John 3:1-16).
+- **Summary:** Explain the passage's meaning and relevance in 3-5 sentences, tailored to the '{level_plan}' level.
+- **Connection:** Include 1 cross-reference verse and briefly explain its connection.
+- **Application:** Provide a practical life application point or takeaway.
+{'- **Reflection:** Add 1 thoughtful reflection question for journaling.' if include_reflections else ''}
+
+Format clearly for each day. End with a brief closing paragraph encouraging consistency. Tone should be pastoral, warm, and theologically sound. Ensure passages logically progress towards the goal."""
             try:
-                plan = ask_gpt_conversation(prompt); st.markdown("### 📘 Your Study Plan"); st.text_area("", plan, height=600)
-                os.makedirs("study_plans", exist_ok=True); timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                file_path = f"study_plans/study_plan_{timestamp}.txt"
+                plan = ask_gpt_conversation(prompt)
+                st.markdown("### 📘 Your Study Plan")
+                st.text_area("Generated Plan", plan, height=600) # Added label
+                
+                # Save the plan
+                os.makedirs("study_plans", exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                # Create a safe filename from the goal
+                safe_goal = re.sub(r'[\\/*?:"<>|]', "", goal)[:30]
+                file_path = os.path.join("study_plans", f"study_plan_{safe_goal}_{timestamp}.txt")
+                
                 with open(file_path, "w", encoding="utf-8") as f: f.write(plan)
                 st.success(f"✅ Study plan saved to `{file_path}`.")
-            except Exception as e: st.error(f"❌ Error generating study plan: {e}")
+            except Exception as e: 
+                st.error(f"❌ Error generating study plan: {e}")
 
 # ================================================================
 # VERSE OF THE DAY, PRAYER STARTER, FAST DEVOTIONAL, SMALL GROUP
 # ================================================================
 def run_verse_of_the_day():
     st.subheader("🌅 Verse of the Day")
-    books = ["Genesis", "Exodus", "Psalms", "Proverbs", "Isaiah", "Matthew", "Mark", "Luke", "John", "Acts", "Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians", "Philippians", "Colossians", "Hebrews", "James", "1 Peter", "1 John", "Revelation"]
+    # Expanded list of commonly quoted books
+    books = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", 
+             "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel", 
+             "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", 
+             "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs", 
+             "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah", 
+             "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos", 
+             "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", 
+             "Haggai", "Zechariah", "Malachi", 
+             "Matthew", "Mark", "Luke", "John", "Acts", "Romans", 
+             "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians", 
+             "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians", 
+             "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews", 
+             "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John", 
+             "Jude", "Revelation"]
     try:
-        book = random.choice(books); chapter = random.randint(1, 4); verse = random.randint(1, 20)
-        ref = f"{book} {chapter}:{verse}"; text = fetch_bible_verse(ref, "web"); st.success(f"{ref} — {text}")
-        reflection = ask_gpt_conversation(f"Offer a warm, practical reflection on this verse with 1 actionable takeaway: {text} ({ref})")
-        st.markdown("**💬 Reflection:**"); st.write(reflection)
-    except Exception as e: st.error(str(e))
+         # Generate a reference - consider API/library for valid chapter/verse counts later
+        book = random.choice(books)
+        # Simplified chapter/verse generation for now
+        chapter = random.randint(1, 5) # Assume at least 5 chapters
+        verse = random.randint(1, 10) # Assume at least 10 verses
+        ref = f"{book} {chapter}:{verse}"
+
+        with st.spinner("Fetching Verse of the Day..."):
+             text = fetch_bible_verse(ref, "web") # Default to WEB translation
+             st.success(f"**{ref} (WEB)**\n\n> {text}") # Use blockquote
+
+             reflection_prompt = f"Offer a brief (2-3 sentences), warm, and practical reflection on this Bible verse, focusing on one simple takeaway: '{text}' ({ref})"
+             reflection = ask_gpt_conversation(reflection_prompt)
+             st.markdown("**💬 Reflection & Takeaway:**")
+             st.write(reflection)
+
+    except Exception as e: 
+        # Handle cases where the random verse might be invalid
+        st.error(f"Could not fetch Verse of the Day ({ref}): {e}") 
 
 def run_prayer_starter():
     st.subheader("🙏 Prayer Starter")
-    theme = st.text_input("Theme (e.g., gratitude, anxiety, guidance):")
-    if st.button("Generate Prayer") and theme:
-        prayer = ask_gpt_conversation(f"Write a short, theologically faithful prayer starter on {theme}. Address God reverently; avoid clichés.")
-        st.text_area("Prayer", prayer, height=300)
+    theme = st.text_input("What's on your heart? (e.g., gratitude, anxiety, guidance, forgiveness):")
+    if st.button("Generate Prayer Starter") and theme:
+        with st.spinner("Crafting a prayer..."):
+             prayer = ask_gpt_conversation(f"Write a short (3-5 sentences), theologically faithful prayer starter focused on '{theme}'. Address God reverently (e.g., 'Heavenly Father', 'Lord Jesus') and base it on biblical truths. Avoid clichés.")
+             st.text_area("Your Prayer Starter:", prayer, height=200)
 
 def run_fast_devotional():
     st.subheader("⚡ Fast Devotional")
-    topic = st.text_input("Topic (e.g., hope, perseverance):")
-    if st.button("Generate Devotional") and topic:
-        devo = ask_gpt_conversation(f"Compose a 150–200 word devotional on {topic} with one primary verse, 2 cross-refs, and 1 challenge for today.")
-        st.text_area("Devotional", devo, height=350)
+    topic = st.text_input("Devotional Topic (e.g., hope, perseverance, love, faith):")
+    if st.button("Generate Fast Devotional") and topic:
+         with st.spinner("Writing devotional..."):
+              devo = ask_gpt_conversation(f"Compose a short devotional (approx. 150-200 words) on the topic of '{topic}'. Include one primary Bible verse, 1-2 related cross-references, a brief explanation connecting them to the topic, and one practical challenge or encouragement for today.")
+              st.text_area(f"Devotional on {topic}:", devo, height=350)
 
 def run_small_group_generator():
-    st.subheader("👥 Small Group Generator")
-    passage = st.text_input("Passage for discussion (e.g., James 1:2-8):")
-    if st.button("Create Guide") and passage:
-        try: text = fetch_bible_verse(passage, "web")
-        except Exception: text = passage
-        guide = ask_gpt_conversation(f"Create a small-group discussion guide for this passage:\n{text}\n- 5 thoughtful questions (obs/interpretation/application)\n- One short opening and closing prompt\n- A key truth to remember")
-        st.text_area("Group Guide", guide, height=500)
+    st.subheader("👥 Small Group Guide Generator")
+    passage = st.text_input("Bible Passage for Discussion (e.g., James 1:2-8):")
+    group_size = st.slider("Approximate Group Size:", 2, 15, 5) # Optional context
+    
+    if st.button("Create Discussion Guide") and passage:
+        with st.spinner("Generating guide..."):
+            try: 
+                # Fetch text to provide context to the AI
+                text = fetch_bible_verse(passage, "web") 
+                context_text = f"The passage is {passage}:\n\n> {text}\n\n"
+            except Exception: 
+                st.warning(f"Could not fetch text for {passage}, generating questions based on reference only.")
+                context_text = f"The passage is {passage}.\n\n"
+
+            guide_prompt = f"""Create a concise small group discussion guide for a group of about {group_size} people based on the following passage:
+{context_text}
+**Include:**
+- **Opener:** One brief icebreaker question related to the theme.
+- **Discussion Questions:** 3-4 thoughtful questions exploring Observation (What does it say?), Interpretation (What does it mean?), and Application (How does it apply to our lives?).
+- **Key Truth:** One central takeaway message from the passage.
+- **Closing:** A short closing prayer prompt or challenge."""
+            guide = ask_gpt_conversation(guide_prompt)
+            st.text_area(f"Discussion Guide for {passage}:", guide, height=500)
 
 # ================================================================
 # LEARN MODULE (NEW, PERSONALIZED WORKFLOW)
 # ================================================================
 def _learn_extract_json_any(response_text: str):
     """Robustly extracts JSON object or array from a string."""
+    if not response_text: return None # Handle empty input
+    # Prioritize fenced code blocks
     match = re.search(r"```json\s*([\s\S]*?)\s*```", response_text)
     if match:
-        response_text = match.group(1)
-    
+        json_str = match.group(1)
+    else:
+        # Fallback: Find first '{' or '[' and try to parse from there
+        start_index = -1
+        first_brace = response_text.find('{')
+        first_bracket = response_text.find('[')
+        
+        if first_brace != -1 and (first_bracket == -1 or first_brace < first_bracket):
+            start_index = first_brace
+            end_char = '}'
+        elif first_bracket != -1:
+            start_index = first_bracket
+            end_char = ']'
+            
+        if start_index != -1:
+            # Try to find matching closing bracket/brace - basic nesting support
+            open_count = 0
+            end_index = -1
+            for i, char in enumerate(response_text[start_index:]):
+                 if char == response_text[start_index]:
+                      open_count += 1
+                 elif char == end_char:
+                      open_count -= 1
+                 if open_count == 0:
+                      end_index = start_index + i + 1
+                      break
+            if end_index != -1:
+                 json_str = response_text[start_index:end_index]
+            else: # Fallback if matching bracket not found
+                 json_str = response_text[start_index:] 
+        else:
+             st.error("No JSON object or array found in AI response.")
+             return None
+
     try:
-        return json.loads(response_text)
-    except json.JSONDecodeError:
-        match = re.search(r'\{[\s\S]*\}|\[[\s\S]*\]', response_text)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except json.JSONDecodeError:
-                st.error("Failed to decode JSON from AI response.")
-                return None
-        st.error("No valid JSON found in AI response.")
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        st.error(f"Failed to decode JSON from AI response: {e}\nRaw content was: {json_str[:500]}...") # Show snippet
         return None
 
 # ============================
 # LEARN MODULE SUPPORT HELPERS
 # ============================
-TOKENS_BY_TIME = {"15 minutes": 1800, "30 minutes": 3000, "45 minutes": 4000}
+TOKENS_BY_TIME = {"15 minutes": 1800, "30 minutes": 3000, "45 minutes": 4000} # Rough estimates
 
 def ask_gpt_json(prompt: str, max_tokens: int = 4000):
     """Makes a call to the OpenAI API expecting a JSON response."""
@@ -534,16 +780,31 @@ def ask_gpt_json(prompt: str, max_tokens: int = 4000):
         resp = client.chat.completions.create(
             model=MODEL,
             messages=[
-                {"role": "system", "content": "You are a helpful curriculum designer that only returns valid JSON."},
+                {"role": "system", "content": "You are a helpful curriculum designer. Respond ONLY with valid JSON that adheres to the requested structure."}, # Emphasize JSON only
                 {"role": "user", "content": prompt}
             ],
             max_tokens=max_tokens,
-            temperature=0.2
+            temperature=0.2, # Lower temperature for more deterministic JSON output
+            response_format={"type": "json_object"} # Use JSON mode if available
         )
         return resp.choices[0].message.content
-    except Exception as e:
-        st.error(f"GPT JSON call failed: {e}")
-        return None
+    except Exception as e: # Catch potential API errors (like invalid request due to JSON mode)
+        try: # Fallback without JSON mode
+            st.warning(f"JSON mode failed ({e}), attempting standard request...")
+            resp = client.chat.completions.create(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": "You are a helpful curriculum designer. Respond ONLY with valid JSON wrapped in ```json ``` tags."}, # Instruct wrapping
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=max_tokens,
+                temperature=0.2
+            )
+            return resp.choices[0].message.content
+        except Exception as e2:
+             st.error(f"GPT JSON call failed completely: {e2}")
+             return None
+
 
 def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
     """Flexible answer matching for quizzes, including fuzzy matching for text."""
@@ -552,22 +813,29 @@ def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
     user_ans_str = str(user_answer).strip()
     correct_ans_str = str(correct_answer).strip()
     
+    # Exact match needed for multiple choice and true/false
     if question_type == 'multiple_choice' or question_type == 'true_false':
         return user_ans_str.lower() == correct_ans_str.lower()
     
+    # Use fuzzy matching for fill-in-the-blank (tolerant of typos)
+    # fuzz.ratio calculates similarity from 0 to 100
     similarity_ratio = fuzz.ratio(user_ans_str.lower(), correct_ans_str.lower())
-    return similarity_ratio >= 85
+    # Adjust threshold as needed - 85 allows for minor errors
+    return similarity_ratio >= 85 
 
 def summarize_lesson_content(lesson_data: dict) -> str:
     """Summarizes lesson content for context memory."""
-    text_content = " ".join([sec['content'] for sec in lesson_data.get('lesson_content_sections', []) if sec.get('type') == 'text'])
-    if not text_content: return "No textual content."
-    prompt = f"Summarize the following Bible lesson into one concise sentence: {text_content[:2000]}"
+    text_content = " ".join([sec.get('content', '') for sec in lesson_data.get('lesson_content_sections', []) if sec.get('type') == 'text'])
+    if not text_content: return "No textual content available for summary."
+    # Limit length passed to summarizer
+    prompt = f"Summarize the key topic of the following Bible lesson text in one concise sentence (less than 20 words): {text_content[:2000]}"
     try:
-        resp = client.chat.completions.create(model=MODEL, messages=[{"role": "user", "content": prompt}], max_tokens=150)
+        # Use a faster/cheaper model potentially? For now, stick with primary.
+        resp = client.chat.completions.create(model=MODEL, messages=[{"role": "user", "content": prompt}], max_tokens=60, temperature=0.1) 
         return resp.choices[0].message.content.strip()
-    except Exception:
-        return lesson_data.get("lesson_title", "Summary unavailable.")
+    except Exception as e:
+        st.warning(f"Could not generate lesson summary: {e}")
+        return lesson_data.get("lesson_title", "Summary unavailable.") # Fallback
 
 # -------------------------
 # PROMPTS
@@ -579,100 +847,82 @@ def create_full_learning_plan_prompt(form_data: dict) -> str:
         "A steady, detailed study": 2,
         "A deep, comprehensive dive": 3
     }
-    num_lessons_per_level = pacing_to_lessons_per_level.get(form_data['pacing'], 2)
+    num_lessons_per_level = pacing_to_lessons_per_level.get(form_data['pacing'], 2) # Default to steady
 
     return f"""
-You are an expert theologian, bible teacher, Christian education pastor and personalized curriculum designer. A user has provided this profile:
+You are an expert theologian and personalized curriculum designer creating a Bible study plan.
+User Profile:
 - Topics of Interest: {form_data['topics']}
-- Current Knowledge: {form_data['knowledge_level']}
+- Current Knowledge: {form_data['knowledge_level']} (Derived from diagnostic)
 - Learning Goal: {", ".join(form_data['objectives'])}
 - Common Struggles: {", ".join(form_data['struggles'])}
 - Preferred Learning Style: {form_data['learning_style']}
 - Desired Pacing: {form_data['pacing']}
 - Time Commitment per Lesson: {form_data['time_commitment']}
 
-Task: Design a complete Bible study curriculum based on this profile.
-1. Create a personalized title for the plan.
-2. Write a brief, encouraging introduction.
-3. Determine the appropriate number of levels based on the pacing (e.g., "quick overview" is 2-3 levels; "steady study" is 3-5 levels; "deep dive" is 5-7 levels).
-4. For each level, create a concise "name" and "topic" that flows logically.
-5. For each level, set `num_lessons` based on the user's 'Desired Pacing': 1 for 'quick', 2 for 'steady', 3 for 'deep'.
+Task: Design a complete Bible study curriculum plan based on this profile.
+1. Create a personalized `plan_title`.
+2. Write a brief, encouraging `introduction`.
+3. Determine the appropriate number of levels based on the pacing (`quick`: 2-3 levels, `steady`: 3-5 levels, `deep`: 5-7 levels).
+4. For each level, create a concise `name` and `topic` that flows logically towards the user's goals.
+5. For each level, set `num_lessons` based on the user's 'Desired Pacing' (1 for 'quick', 2 for 'steady', 3 for 'deep').
 
-Output ONLY a single, valid JSON object like this:
-{{
-  "plan_title": "Your Journey Through Grace",
-  "introduction": "This plan will help you gain a deeper understanding of grace.",
-  "levels": [
-    {{"name": "Level 1: The Foundation", "topic": "Exploring grace in the Old Testament.", "num_lessons": {num_lessons_per_level}}},
-    {{"name": "Level 2: Grace Personified in Christ", "topic": "Analyzing key New Testament passages where Jesus demonstrates grace.", "num_lessons": {num_lessons_per_level}}}
-  ]
-}}
+Output ONLY a single, valid JSON object with keys "plan_title", "introduction", and "levels" (a list of objects, each with "name", "topic", and "num_lessons").
+Example level object: {{"name": "Level 1: Title", "topic": "Brief topic description", "num_lessons": {num_lessons_per_level}}}
 """
 
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None) -> str:
+    """Generates prompt for creating a single lesson, tailored to user level."""
     length_instructions = {
-        "15 minutes": "Generate exactly 3 teaching sections (150-200 words each) and 2 knowledge checks.",
-        "30 minutes": "Generate exactly 5 teaching sections (200-250 words each) and 3 knowledge checks.",
-        "45 minutes": "Generate exactly 7 teaching sections (250-300 words each) and 4 knowledge checks."
+        "15 minutes": "Generate exactly 3 short teaching sections (approx. 150 words each) and 1-2 knowledge checks.",
+        "30 minutes": "Generate exactly 5 medium teaching sections (approx. 200 words each) and 2-3 knowledge checks.",
+        "45 minutes": "Generate exactly 7 detailed teaching sections (approx. 250 words each) and 3-4 knowledge checks."
     }
-    context_clause = f"This lesson must build upon the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
-    return f"""
-You are an expert theologian creating a Bible lesson for a user with this profile:
-- Primary Goal: {form_data['topics']}
-- Learning Style: {form_data['learning_style']}
-- Time Commitment per Lesson: {form_data['time_commitment']}
-- Current Knowledge Level: {form_data['knowledge_level']}
+    context_clause = f" This lesson should logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
 
-Your task is to create Lesson {lesson_number} out of {total_lessons_in_level} for the level topic: "{level_topic}".
+    return f"""
+You are an expert theologian creating Lesson {lesson_number}/{total_lessons_in_level} on "{level_topic}".
+User Profile:
+- Knowledge Level: {form_data['knowledge_level']}
+- Learning Style: {form_data['learning_style']}
+- Time Commitment: {form_data['time_commitment']}
 
 **INSTRUCTIONS:**
-- **Tailor the Depth:** You MUST tailor the depth, vocabulary, and theological complexity of the lesson to a user with a '{form_data['knowledge_level']}' level of Bible knowledge. For "Just starting out," be very clear and foundational. For "comfortable with deeper concepts," you can introduce more complex ideas.
-- **Cite Scripture:** Crucially, you MUST embed specific Bible references (e.g., John 3:16) directly within the text of your explanations to ground the teaching in Scripture.
-- **Content Requirements:** {length_instructions.get(form_data['time_commitment'], 'Generate comprehensive content relevant to the time commitment.')}
-- **Context:** {context_clause}
-- **Tone:** Pastoral, encouraging, and biblically sound.
-- **Structure:** Each text section should be focused and build upon the previous one. Each knowledge check should directly relate to the content just presented.
+1.  **Tailor Depth & Vocabulary:** Adjust content complexity for the '{form_data['knowledge_level']}' user. Use simpler language and core concepts for 'Just starting out'; introduce richer theology for 'comfortable with deeper concepts'.
+2.  **Cite Scripture:** Embed specific Bible references (e.g., Genesis 1:1) within the `content` of text sections.
+3.  **Content & Structure:** Fulfill the requirements: {length_instructions.get(form_data['time_commitment'], 'Generate content fitting the time.')} Build sections logically.{context_clause}
+4.  **Knowledge Checks:** Ensure checks directly relate to the preceding text section and include `question`, `question_type`, `options`/`correct_answer`, and `biblical_reference`.
+5.  **Tone:** Maintain a pastoral, encouraging, and biblically sound tone.
 
-Return ONLY a valid JSON object.
-{{
-  "lesson_title": "A concise, biblically faithful title for Lesson {lesson_number}",
-  "lesson_content_sections": [
-    {{"type": "text", "content": "The first teaching section for this lesson, with scripture references like (Genesis 1:1)."}},
-    {{"type": "knowledge_check", "question_type": "multiple_choice", "question": "Question 1 related to the first section?", "options": ["Option A", "Option B", "Option C", "Option D"], "correct_answer": "Correct Option", "biblical_reference": "John 3:16"}},
-    {{"type": "text", "content": "The second teaching section, again citing verses (Romans 8:28)."}},
-    {{"type": "knowledge_check", "question_type": "fill_in_the_blank", "question": "God so loved the [BLANK] that he gave his one and only Son (John 3:16).", "correct_answer": "world", "biblical_reference": "John 3:16"}}
-  ],
-  "summary_points": ["Key point 1 from this lesson", "Key point 2 from this lesson", "Key point 3 from this lesson"]
-}}
+Output ONLY a valid JSON object with keys "lesson_title", "lesson_content_sections" (list of objects with "type" ['text' or 'knowledge_check'] and relevant fields), and "summary_points" (list of 3 key takeaways).
+Example text section: {{"type": "text", "content": "Start here (Reference 1:1)... then consider this (Reference 1:2)."}}
+Example check: {{"type": "knowledge_check", "question_type": "multiple_choice", "question": "Q?", "options": ["A","B","C","D"], "correct_answer": "A", "biblical_reference": "Ref 1:1"}}
 """
 
 def create_level_quiz_prompt(level_topic: str, lesson_summaries: list) -> str:
-    summaries_text = "\n".join(f"- {s}" for s in lesson_summaries)
+    """Generates prompt for creating the end-of-level quiz."""
+    summaries_text = "\n".join(f"- {s}" for i, s in enumerate(lesson_summaries) if s) # Filter empty summaries
     return f"""
-You are a Bible teacher creating a cumulative level quiz.
-- Level Topic: "{level_topic}"
-- **Instructions:** Create a 10-question quiz based on the key topics from ALL lessons in this level, as summarized below:
+You are a Bible teacher creating a 10-question cumulative quiz for the level titled "{level_topic}".
+The lessons covered these key points:
 {summaries_text}
-- The questions should be a mix of types (multiple_choice, true_false, fill_in_the_blank).
-- For multiple_choice questions, provide 4 options.
-- For true_false questions, options should be ["True", "False"].
-- For fill_in_the_blank, provide only the correct answer.
-- Ensure each question includes a 'question_type' field.
-- Return ONLY a JSON array of 10 question objects.
-Example question object:
-{{
-    "question": "Who was the first king of Israel?",
-    "question_type": "multiple_choice",
-    "options": ["David", "Saul", "Solomon", "Samuel"],
-    "correct_answer": "Saul",
-    "biblical_reference": "1 Samuel 10:24"
-}}
+
+**Instructions:** Create a quiz based *only* on the topics mentioned in the lesson summaries above.
+- Generate exactly 10 questions.
+- Mix question types: 'multiple_choice', 'true_false', 'fill_in_the_blank'.
+- Each question object MUST include: 'question' (string), 'question_type' (string), 'correct_answer' (string).
+- For 'multiple_choice', also include 'options' (list of 4 strings).
+- For 'true_false', `correct_answer` should be "True" or "False", and you can optionally include `options` as ["True", "False"].
+- Include a relevant 'biblical_reference' (string) for each question if applicable.
+
+Output ONLY a valid JSON array containing the 10 question objects.
 """
 
 # -------------------------
 # KNOWLEDGE CHECK & QUIZ UI
 # -------------------------
 def display_knowledge_check_question(S):
+    """Displays knowledge check, handles submission, and shows explanation on incorrect."""
     level_data = S["levels"][S["current_level"]]
     current_lesson = level_data["lessons"][S["current_lesson_index"]]
     q = current_lesson["lesson_content_sections"][S["current_section_index"]]
@@ -685,120 +935,200 @@ def display_knowledge_check_question(S):
     input_key = f"kc_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"
     q_type = q.get('question_type')
 
+    # Display input widget based on question type
     if q_type == 'multiple_choice':
-        user_answer = st.radio("Select your answer:", q.get('options', []), key=input_key)
+        user_answer = st.radio("Select your answer:", q.get('options', []), key=input_key, index=None)
     elif q_type == 'true_false':
-        user_answer = st.radio("True or False?", ['True', 'False'], key=input_key)
+        user_answer = st.radio("True or False?", ['True', 'False'], key=input_key, index=None)
     elif q_type == 'fill_in_the_blank':
         user_answer = st.text_input("Fill in the blank:", key=input_key)
+    else:
+        st.error(f"Unknown question type: {q_type}")
+        return # Avoid proceeding if type is wrong
 
+    # Handle submission
     if st.button("Submit Answer", key=f"submit_{input_key}"):
+        # Basic validation for radio buttons
+        if user_answer is None and q_type in ['multiple_choice', 'true_false']:
+             st.warning("Please select an answer.")
+             # Keep kc_answered_incorrectly state if it was already set
+             if S.get("kc_answered_incorrectly"): st.rerun() 
+             return # Don't proceed without an answer
+
         is_correct = _answers_match(user_answer, q.get('correct_answer'), q_type)
         if is_correct:
             st.success("Correct! Moving on.")
             S["current_section_index"] += 1
+            # Clear flags if they were set from a previous attempt
             if "kc_answered_incorrectly" in S: del S["kc_answered_incorrectly"]
             if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
             st.rerun()
         else:
             S["kc_answered_incorrectly"] = True
-            S["last_incorrect_answer"] = user_answer 
-            st.rerun()
+            S["last_incorrect_answer"] = user_answer # Store the incorrect answer
+            st.rerun() # Rerun to display the explanation section
 
+    # Display explanation if answered incorrectly on the previous run
     if S.get("kc_answered_incorrectly"):
         st.error(f"Not quite. The correct answer is: **{q.get('correct_answer')}**")
         
         reference = q.get('biblical_reference', '')
         if reference:
             try:
-                verse_text = fetch_bible_verse(reference)
-                
-                incorrect_ans = S.get("last_incorrect_answer", "their answer")
-                
-                explanation_prompt = (
-                    f"A student was asked: '{q.get('question')}' "
-                    f"They incorrectly answered '{incorrect_ans}'. The correct answer is '{q.get('correct_answer')}'. "
-                    f"Based on the Bible verse '{reference}', which says '{verse_text}', "
-                    f"please provide a brief, one-paragraph explanation focusing on why their answer '{incorrect_ans}' was incorrect and why '{q.get('correct_answer')}' is the right one."
-                )
-                
-                explanation = ask_gpt_conversation(explanation_prompt)
+                # Use a spinner while fetching verse and explanation
+                with st.spinner("Loading context and explanation..."):
+                    verse_text = fetch_bible_verse(reference)
+                    incorrect_ans = S.get("last_incorrect_answer", "their answer") # Get the stored wrong answer
+                    
+                    explanation_prompt = (
+                        f"A student was asked: '{q.get('question')}' "
+                        f"They incorrectly answered: '{incorrect_ans}'. The correct answer is: '{q.get('correct_answer')}'. "
+                        f"Based on the Bible verse '{reference}' which says: '{verse_text}', "
+                        f"please provide a brief, one-paragraph explanation focusing on why their answer '{incorrect_ans}' was incorrect and why '{q.get('correct_answer')}' is the right one according to the verse."
+                    )
+                    
+                    explanation = ask_gpt_conversation(explanation_prompt)
 
-                with st.expander(f"📖 See {reference} for context and an explanation"):
-                    st.markdown(f"**Verse Text:**\n\n*'{verse_text}'*")
+                # Display verse and explanation in an expander
+                with st.expander(f"📖 See {reference} for context and explanation"):
+                    st.markdown(f"**Verse Text:**\n\n> *{verse_text}*") # Use blockquote for verse
                     st.markdown("---")
                     st.markdown(f"**Explanation:**\n\n{explanation}")
 
             except Exception as e:
-                st.info(f"See {reference} for more context. (Could not fetch text or explanation: {e})")
+                # Fallback message if fetching fails
+                st.info(f"See {reference} for context. (Could not load additional details: {e})")
+        else:
+             st.info("No specific Bible reference was provided for this question.") # Handle missing reference
 
-        if st.button("Continue", key=f"continue_{input_key}"):
-            del S["kc_answered_incorrectly"]
+        # Continue button appears only after showing the error/explanation
+        if st.button("Continue Lesson", key=f"continue_{input_key}"):
+            # Clear flags before moving on
+            if "kc_answered_incorrectly" in S: del S["kc_answered_incorrectly"]
             if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
             S["current_section_index"] += 1
             st.rerun()
 
+# --- run_level_quiz remains unchanged from your last correct version ---
 def run_level_quiz(S):
     level_data = S["levels"][S["current_level"]]
     quiz_questions = level_data.get("quiz_questions", [])
     q_index = S.get("current_question_index", 0)
 
     st.markdown("### 📝 Final Level Quiz")
-    if not quiz_questions: st.warning("Quiz questions not available."); return
+    if not quiz_questions: 
+        st.warning("Quiz questions not generated yet or generation failed.")
+        # Optionally add a button to retry generation?
+        return
 
-    st.progress((q_index) / len(quiz_questions))
-    st.markdown(f"**Score: {S.get('user_score', 0)}/{len(quiz_questions)}**")
+    # Ensure quiz_questions is a list
+    if not isinstance(quiz_questions, list):
+         st.error("Quiz data is not in the expected format (list). Please restart the level.")
+         return
 
-    if q_index < len(quiz_questions):
+    total_questions = len(quiz_questions)
+    if total_questions == 0:
+         st.warning("No quiz questions found for this level.")
+         return
+         
+    st.progress(q_index / total_questions) # Use q_index for progress
+    st.markdown(f"**Score: {S.get('user_score', 0)}/{total_questions}**")
+
+    if q_index < total_questions:
         q = quiz_questions[q_index]
+        # Basic check for question format
+        if not isinstance(q, dict) or 'question' not in q or 'correct_answer' not in q:
+             st.error(f"Error: Invalid question format at index {q_index}. Skipping question.")
+             S["current_question_index"] = q_index + 1
+             st.rerun()
+             return
+
         st.markdown(f"**Question {q_index + 1}:** {q.get('question', '')}")
         user_answer = None
         q_key = f"quiz_{S['current_level']}_{q_index}"
         q_type = q.get('question_type')
+
+        # Display input widget
         if q_type == 'multiple_choice':
-            user_answer = st.radio("Answer:", q.get('options', []), key=q_key)
+            options = q.get('options', [])
+            if not options: st.error("Error: Multiple choice question has no options."); return
+            user_answer = st.radio("Answer:", options, key=q_key, index=None)
         elif q_type == 'true_false':
-            user_answer = st.radio("Answer:", ["True", "False"], key=q_key)
+            user_answer = st.radio("Answer:", ["True", "False"], key=q_key, index=None)
         elif q_type == 'fill_in_the_blank':
             user_answer = st.text_input("Answer:", key=q_key)
+        else:
+             st.error(f"Unknown quiz question type: {q_type}"); return
+
+        # Handle submission
         if st.button("Submit Quiz Answer", key=f"submit_{q_key}"):
+            if user_answer is None and q_type in ['multiple_choice', 'true_false']:
+                 st.warning("Please select an answer.")
+                 return
+                 
             if _answers_match(user_answer, q.get('correct_answer'), q_type):
                 st.success("Correct!")
                 S["user_score"] = S.get("user_score", 0) + 1
             else:
-                st.error(f"Incorrect. The correct answer was: {q.get('correct_answer')}")
+                st.error(f"Incorrect. The correct answer was: **{q.get('correct_answer')}**")
+                # Optional: Add explanation fetching here too, similar to knowledge check?
+                # For now, just moves on.
             S["current_question_index"] = q_index + 1
             st.rerun()
     else:
-        st.success(f"### Quiz Completed! Final Score: {S.get('user_score', 0)}/{len(quiz_questions)}")
-        if S.get('user_score', 0) >= len(quiz_questions) * 0.7:
+        # Quiz completed
+        score = S.get('user_score', 0)
+        passing_score = total_questions * 0.7 
+        st.success(f"### Quiz Completed! Final Score: {score}/{total_questions}")
+        
+        if score >= passing_score:
             st.balloons()
             st.markdown(f"Congratulations! You passed {level_data.get('name','this level')}!")
-            if st.button("Go to Next Level ▶️"):
-                S["current_level"] += 1
-                S["current_lesson_index"] = 0
-                S["current_section_index"] = 0
-                S["quiz_mode"] = False
-                S["current_question_index"] = 0 
-                S["user_score"] = 0 
-                st.rerun()
+            # Check if there's a next level before showing the button
+            if S["current_level"] + 1 < len(S["levels"]):
+                if st.button("Go to Next Level ▶️"):
+                    S["current_level"] += 1
+                    S["current_lesson_index"] = 0
+                    S["current_section_index"] = 0
+                    S["quiz_mode"] = False
+                    S["current_question_index"] = 0 
+                    S["user_score"] = 0 
+                    # Optionally clear quiz questions for the completed level to save state?
+                    # if "quiz_questions" in S["levels"][S["current_level"]-1]:
+                    #     del S["levels"][S["current_level"]-1]["quiz_questions"]
+                    st.rerun()
+            else:
+                 # This was the last level
+                 st.info("You've completed all levels in this plan!")
+                 if st.button("Start a New Journey"):
+                      st.session_state.learn_state = {} # Reset everything
+                      st.rerun()
+
         else:
-            st.error("Please review the lessons and try the quiz again.")
+            st.error("You didn't reach the passing score. Please review the lessons and try the quiz again.")
+            if st.button("Review Lessons"):
+                 # Reset state to go back to the first lesson of the current level
+                 S["quiz_mode"] = False
+                 S["current_lesson_index"] = 0
+                 S["current_section_index"] = 0
+                 S["current_question_index"] = 0 
+                 S["user_score"] = 0
+                 # Keep generated quiz questions so user doesn't wait again
+                 st.rerun()
             if st.button("Retake Quiz"):
                 S["current_question_index"] = 0
                 S["user_score"] = 0
                 st.rerun()
 
 # ================================================================
-# DIAGNOSTIC QUIZ FUNCTION (NEW)
+# DIAGNOSTIC QUIZ FUNCTION
 # ================================================================
 def run_diagnostic_quiz():
     st.subheader("Quick Bible Knowledge Check")
     st.info("Let's figure out the best starting point for you with a few quick questions.")
 
-    S_learn = st.session_state.learn_state # Shortcut for learn_state
+    S_learn = st.session_state.learn_state 
 
-    # Initialize quiz state if it doesn't exist
     if 'diag_q_index' not in S_learn:
         S_learn['diag_q_index'] = 0
         S_learn['diag_score'] = 0
@@ -810,77 +1140,79 @@ def run_diagnostic_quiz():
         st.markdown(f"**Question {q_index + 1} of {len(DIAGNOSTIC_QUESTIONS)}:**")
         st.markdown(f"*{q_data['question']}*")
         
+        # Add "I don't know" if not present (defensive coding)
+        options = q_data['options']
+        if "I don't know" not in options: options.append("I don't know")
+        
         user_answer = st.radio(
             "Select your answer:",
-            q_data['options'],
+            options, # Use the potentially modified options list
             key=f"diag_q_{q_index}",
-            index=None # No default selection
+            index=None 
         )
 
         if st.button("Submit Answer", key=f"diag_submit_{q_index}"):
             if user_answer:
                 if user_answer == q_data['correct']:
                     S_learn['diag_score'] += 1
-                    st.success("Correct!")
-                else:
-                    # Treat "I don't know" the same as any other wrong answer display-wise
-                    st.error(f"Not quite. The correct answer was: {q_data['correct']}")
+                    # Don't show "Correct!" during diagnostic to speed it up? Optional.
+                    # st.success("Correct!") 
+                # No specific feedback needed for incorrect answers during diagnostic
+                # else:
+                #     st.error(f"Not quite. The correct answer was: {q_data['correct']}")
                 
                 S_learn['diag_q_index'] += 1
-                st.rerun() # Move to the next question or finish
+                st.rerun() 
             else:
                 st.warning("Please select an answer.")
     else:
-        # Quiz finished, determine level
         score = S_learn['diag_score']
         total = len(DIAGNOSTIC_QUESTIONS)
         knowledge_level = ""
-        if score <= 1: # 0 or 1 correct
+        # Define levels based on score ranges
+        if score / total <= 0.4: # Covers 0 or 1 out of 3
             knowledge_level = "Just starting out"
-        elif score == 2: # 2 correct
+        elif score / total <= 0.7: # Covers 2 out of 3
             knowledge_level = "I know the main stories"
-        else: # 3 correct
+        else: # Covers 3 out of 3
             knowledge_level = "I'm comfortable with deeper concepts"
 
-        st.success(f"Quiz complete! Score: {score}/{total}")
-        st.info(f"Based on your answers, we'll tailor the plan for the **'{knowledge_level}'** level.")
+        st.success(f"Knowledge check complete! Score: {score}/{total}")
+        st.info(f"Based on your answers, we'll tailor the plan using the **'{knowledge_level}'** level as a starting point.")
         
-        # Store the derived level and mark diagnostic as complete
         S_learn['derived_knowledge_level'] = knowledge_level
         S_learn['diagnostic_complete'] = True
         
-        if st.button("Continue to Plan Setup"):
-             st.rerun() # Proceed to the main form
+        # Automatically proceed by rerunning, removing the need for the button
+        st.rerun() 
+        # if st.button("Continue to Plan Setup"):
+        #      st.rerun() # Proceed to the main form
 
 # ================================================================
-# LEARNING PLAN SETUP (QUESTIONNAIRE) - MODIFIED
+# LEARNING PLAN SETUP (QUESTIONNAIRE)
 # ================================================================
 def run_learn_module_setup():
     st.info("Now, let's create a personalized learning plan based on your unique needs.")
-    # Retrieve the derived knowledge level
     derived_knowledge_level = st.session_state.learn_state.get('derived_knowledge_level', "Not determined")
-    st.markdown(f"**Detected Knowledge Level:** {derived_knowledge_level}") # Show the user the level
+    st.markdown(f"**Assessed Knowledge Level:** {derived_knowledge_level}") 
 
     with st.form("user_profile_form"):
-        # Capture each input into its own variable
         topics_input = st.text_input("**What topics are on your heart to learn about?** (Separate with commas)", "Understanding grace, The life of David")
-        # knowledge_level_input = st.radio(...) # <-- Radio button removed
-        objectives_input = st.multiselect("**What do you hope to achieve with this study?**", ["Gain knowledge and understanding", "Find practical life application", "Strengthen my faith", "Prepare to teach others"])
+        objectives_input = st.multiselect("**What do you hope to achieve with this study?**", ["Gain knowledge and understanding", "Find practical life application", "Strengthen my faith", "Prepare to teach others"], default=["Gain knowledge and understanding"]) # Added a default
         struggles_input = st.multiselect("**What are some of your common challenges?**", ["Understanding historical context", "Connecting it to my daily life", "Staying consistent", "Dealing with difficult passages"])
-        learning_style_input = st.selectbox("**Preferred learning style:**", ["storytelling", "analytical", "practical"])
-        pacing_input = st.select_slider("**How would you like to pace your learning?**", options=["A quick, high-level overview", "A steady, detailed study", "A deep, comprehensive dive"])
-        time_commitment_input = st.selectbox("**How much time can you realistically commit to each lesson?**", ["15 minutes", "30 minutes", "45 minutes"])
+        learning_style_input = st.selectbox("**Preferred learning style:**", ["Analytical", "Storytelling", "Practical", "Reflective"]) # Added Reflective
+        pacing_input = st.select_slider("**How would you like to pace your learning?**", options=["A quick, high-level overview", "A steady, detailed study", "A deep, comprehensive dive"], value="A steady, detailed study") # Added default
+        time_commitment_input = st.selectbox("**How much time can you realistically commit to each lesson?**", ["15 minutes", "30 minutes", "45 minutes"], index=1) # Default to 30 mins
         
         submitted = st.form_submit_button("🚀 Generate My Tailor-Made Plan")
     
     if submitted:
-        # Build the form_data dictionary here, AFTER submission is confirmed
         form_data = {
             'topics': topics_input,
-            'knowledge_level': derived_knowledge_level, # <-- USE THE DERIVED LEVEL
+            'knowledge_level': derived_knowledge_level, 
             'objectives': objectives_input,
             'struggles': struggles_input,
-            'learning_style': learning_style_input,
+            'learning_style': learning_style_input.lower(), # Ensure lowercase for consistency
             'pacing': pacing_input,
             'time_commitment': time_commitment_input
         }
@@ -888,7 +1220,6 @@ def run_learn_module_setup():
         if not form_data['topics'] or not form_data['objectives']:
             st.warning("Please fill out the topics and objectives to generate a plan.")
             return
-        # Ensure knowledge level was set
         if form_data['knowledge_level'] == "Not determined":
              st.error("Knowledge level could not be determined. Please restart.")
              return
@@ -897,146 +1228,200 @@ def run_learn_module_setup():
             master_prompt = create_full_learning_plan_prompt(form_data)
             plan_resp = ask_gpt_json(master_prompt, max_tokens=2500)
             plan_data = _learn_extract_json_any(plan_resp) if plan_resp else None
-            if plan_data and "levels" in plan_data:
+            
+            if plan_data and isinstance(plan_data, dict) and "levels" in plan_data and isinstance(plan_data["levels"], list):
                 S = st.session_state.learn_state
                 S.update({
                     "plan": plan_data, "levels": plan_data["levels"], "form_data": form_data,
                     "current_level": 0, "current_lesson_index": 0, "current_section_index": 0,
                     "quiz_mode": False, "current_question_index": 0, "user_score": 0,
                 })
-                # Clear diagnostic state after successful plan generation
-                if 'diag_q_index' in S: del S['diag_q_index']
-                if 'diag_score' in S: del S['diag_score']
-                # Keep 'diagnostic_complete' and 'derived_knowledge_level' for reference
+                # Keep diagnostic_complete and derived_knowledge_level
                 st.rerun()
             else:
-                st.error("Failed to generate a valid learning plan. Please try adjusting your inputs.")
+                st.error("Failed to generate a valid learning plan from AI response. Please try adjusting your inputs or try again later.")
                 if plan_resp: st.text_area("Raw AI Response (for debugging):", plan_resp, height=200)
 
 # ================================================================
-# MAIN LEARN MODULE FLOW - MODIFIED
+# MAIN LEARN MODULE FLOW
 # ================================================================
 def run_learn_module():
     st.subheader("📚 Learn Module — Personalized Bible Learning")
     if "learn_state" not in st.session_state: st.session_state.learn_state = {}
     S = st.session_state.learn_state
 
-    # --- CHECK FOR DIAGNOSTIC QUIZ ---
+    # --- Run Diagnostic Quiz if not completed ---
     if not S.get("diagnostic_complete", False):
-        run_diagnostic_quiz() # Run the quiz first
-        return # Stop further execution until quiz is done
-    # --- END OF CHECK ---
-
-    # Phase 1: Setup via Questionnaire (Now runs AFTER diagnostic)
+        run_diagnostic_quiz() 
+        return 
+    
+    # --- Run Plan Setup if plan not generated ---
     if "plan" not in S:
         run_learn_module_setup()
         return
 
-    # Phase 2: Follow the Generated Plan 
+    # --- Execute Learning Plan ---
     st.title(S["plan"].get("plan_title", "Your Learning Journey"))
     st.write(S["plan"].get("introduction", ""))
 
+    # Check for plan completion
     if S["current_level"] >= len(S["levels"]):
         st.success("🎉 You've completed your entire learning journey!")
         st.balloons()
         if st.button("Start a New Journey"):
-            # Reset learn_state completely, including diagnostic flags
-            st.session_state.learn_state = {} 
+            st.session_state.learn_state = {} # Reset state completely
             st.rerun()
         return
 
     level_data = S["levels"][S["current_level"]]
     st.markdown(f"--- \n## {level_data.get('name','Current Level')}")
-    st.markdown(f"**Topic:** {level_data.get('topic')}")
+    st.markdown(f"**Topic:** {level_data.get('topic', 'N/A')}")
+    
+    # Display level progress (e.g., Lesson 1 of 2)
+    num_lessons = level_data.get("num_lessons", 1)
+    st.caption(f"Level {S['current_level'] + 1} of {len(S['levels'])} | Lesson {S['current_lesson_index'] + 1} of {num_lessons}")
 
+
+    # --- Run Quiz Mode ---
     if S.get("quiz_mode"):
         run_level_quiz(S)
         return
 
-    if "lessons" not in level_data:
-        level_data["lessons"] = []
+    # --- Lesson Generation and Display ---
+    if "lessons" not in level_data: level_data["lessons"] = []
 
-    if S["current_lesson_index"] < level_data.get("num_lessons", 1):
+    # Check if more lessons are needed for the level
+    if S["current_lesson_index"] < num_lessons:
+        # Generate lesson if it doesn't exist yet
         if S["current_lesson_index"] >= len(level_data["lessons"]):
-            with st.spinner(f"Generating Lesson {S['current_lesson_index'] + 1} for this level..."):
+            with st.spinner(f"Generating Lesson {S['current_lesson_index'] + 1}..."):
                 prev_summary = None
-                if S["current_level"] > 0 and S["current_lesson_index"] == 0:
+                # Get summary from previous lesson in this level
+                if S["current_lesson_index"] > 0:
+                     prev_summary = level_data["lessons"][S["current_lesson_index"] - 1].get("lesson_summary")
+                # Or get summary from last lesson of previous level if first lesson
+                elif S["current_level"] > 0:
                     prev_level_lessons = S["levels"][S["current_level"]-1].get("lessons", [])
                     if prev_level_lessons:
                         prev_summary = prev_level_lessons[-1].get("lesson_summary")
-                elif S["current_lesson_index"] > 0:
-                    prev_summary = level_data["lessons"][S["current_lesson_index"] - 1].get("lesson_summary")
 
                 lesson_max_tokens = TOKENS_BY_TIME.get(S["form_data"]['time_commitment'], 4000)
                 lesson_prompt = create_lesson_prompt(
                     level_topic=level_data.get("topic"),
                     lesson_number=S["current_lesson_index"] + 1,
-                    total_lessons_in_level=level_data.get("num_lessons", 1),
+                    total_lessons_in_level=num_lessons,
                     form_data=S["form_data"],
                     previous_lesson_summary=prev_summary
                 )
                 lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=lesson_max_tokens)
                 lesson_data = _learn_extract_json_any(lesson_resp) if lesson_resp else None
                 
-                if lesson_data and "lesson_content_sections" in lesson_data:
+                # Validate lesson data structure
+                if lesson_data and isinstance(lesson_data, dict) and "lesson_content_sections" in lesson_data and isinstance(lesson_data["lesson_content_sections"], list):
                     lesson_data["lesson_summary"] = summarize_lesson_content(lesson_data)
                     level_data["lessons"].append(lesson_data)
-                    S["current_section_index"] = 0
-                    st.rerun()
+                    S["current_section_index"] = 0 # Start at the beginning of the new lesson
+                    st.rerun() # Rerun to display the newly generated lesson
                 else:
-                    st.error("Failed to generate lesson content. Please try again.")
+                    st.error("Failed to generate valid lesson content. The AI response might be malformed. Please try again.")
                     if lesson_resp: st.text_area("Raw AI Lesson Response (for debugging):", lesson_resp, height=200)
-                    return
+                    # Add a button to retry generation?
+                    if st.button("Retry Lesson Generation"):
+                         st.rerun() # Simple retry
+                    return # Stop execution if lesson failed
         
+        # --- Display Current Lesson Section ---
         current_lesson = level_data["lessons"][S["current_lesson_index"]]
         st.markdown(f"### Lesson {S['current_lesson_index'] + 1}: {current_lesson.get('lesson_title', 'Untitled Lesson')}")
         
         lesson_sections = current_lesson.get("lesson_content_sections", [])
+        if not lesson_sections: # Handle empty lesson case
+             st.warning("This lesson appears to be empty.")
+             # Automatically move to next lesson or quiz? For now, show button.
+             if st.button("Proceed Anyway"):
+                  S["current_section_index"] = 999 # Force completion check below
+                  st.rerun()
+             return
+
+        # Check if current section index is valid
         if S["current_section_index"] < len(lesson_sections):
             section = lesson_sections[S["current_section_index"]]
-            if section.get("type") == "text":
-                st.markdown(section.get("content"))
-                if st.button("Continue Reading"):
+            section_type = section.get("type")
+
+            if section_type == "text":
+                st.markdown(section.get("content", "*No content for this section.*"))
+                if st.button("Continue Reading", key=f"cont_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"):
                     S["current_section_index"] += 1
                     st.rerun()
-            elif section.get("type") == "knowledge_check":
-                display_knowledge_check_question(S)
-        else:
+            elif section_type == "knowledge_check":
+                display_knowledge_check_question(S) # This function handles its own state and rerun
+            else:
+                 st.warning(f"Unknown section type '{section_type}'. Skipping.")
+                 S["current_section_index"] += 1
+                 st.rerun()
+        
+        # --- End of Lesson Reached ---
+        else: 
             st.success(f"Lesson {S['current_lesson_index'] + 1} Completed!")
             st.markdown("**Key Takeaways from this Lesson:**")
-            for point in current_lesson.get("summary_points", []): st.markdown(f"- {point}")
+            summary_points = current_lesson.get("summary_points", [])
+            if summary_points:
+                for point in summary_points: st.markdown(f"- {point}")
+            else:
+                 st.write("*No summary points provided.*")
 
-            if S["current_lesson_index"] + 1 < level_data.get("num_lessons", 1):
+            # Check if there are more lessons in this level
+            if S["current_lesson_index"] + 1 < num_lessons:
                 if st.button("Go to Next Lesson ▶️"):
                     S["current_lesson_index"] += 1
-                    S["current_section_index"] = 0
+                    S["current_section_index"] = 0 # Reset for new lesson
                     st.rerun()
+            # Last lesson of the level completed, move to quiz
             else:
                 st.info("You've completed all lessons for this level. Time for the final quiz!")
                 if st.button("Start Level Quiz"):
+                    # Generate quiz questions if they don't exist
                     if "quiz_questions" not in level_data:
                         with st.spinner("Generating your level quiz..."):
                             all_summaries = [l.get("lesson_summary", "") for l in level_data["lessons"]]
                             quiz_prompt = create_level_quiz_prompt(level_data.get("topic"), all_summaries)
-                            quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500)
+                            quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500) 
                             quiz_data = _learn_extract_json_any(quiz_resp)
+                            # Validate quiz data structure
                             if quiz_data and isinstance(quiz_data, list):
                                 level_data["quiz_questions"] = quiz_data
                             else:
-                                st.error("Failed to generate quiz questions.");
+                                st.error("Failed to generate valid quiz questions. Please try starting the quiz again.")
                                 if quiz_resp: st.text_area("Raw AI Quiz Response (for debugging):", quiz_resp, height=200)
-                                return
-                    S["quiz_mode"] = True
-                    S["current_question_index"] = 0
-                    S["user_score"] = 0
-                    st.rerun()
-    else:
-        st.info("You've completed all lessons for this level. If you haven't taken the quiz, please do so!")
-        if st.button("Start Level Quiz (if not started)"):
-            S["quiz_mode"] = True
-            S["current_question_index"] = 0
-            S["user_score"] = 0
-            st.rerun()
+                                return # Stop if generation failed
+                    
+                    # Check again if questions were generated successfully before switching modes
+                    if "quiz_questions" in level_data and level_data["quiz_questions"]:
+                        S["quiz_mode"] = True
+                        S["current_question_index"] = 0
+                        S["user_score"] = 0
+                        st.rerun()
+                    else:
+                         st.error("Quiz questions are still missing. Cannot start quiz.")
+
+    # Fallback/Error case: Lesson index is beyond expected number but not in quiz mode
+    # This might happen if num_lessons logic changes or state gets corrupted
+    elif not S.get("quiz_mode"):
+        st.warning("It looks like you've finished the lessons for this level.")
+        if st.button("Proceed to Level Quiz"):
+             # Attempt to generate quiz if needed
+             if "quiz_questions" not in level_data:
+                  # ... (Quiz generation logic as above) ...
+                  pass # Placeholder for quiz gen logic if needed here
+             # Switch to quiz mode
+             if "quiz_questions" in level_data and level_data["quiz_questions"]:
+                  S["quiz_mode"] = True
+                  S["current_question_index"] = 0
+                  S["user_score"] = 0
+                  st.rerun()
+             else:
+                  st.error("Could not prepare quiz questions.")
+
 
 # ================================================================
 # MAIN UI
@@ -1044,13 +1429,17 @@ def run_learn_module():
 st.set_page_config(page_title="Bible GPT", layout="wide")
 st.title("✅ Bible GPT")
 
+# Sidebar Navigation
 mode = st.sidebar.selectbox("Choose a mode:", [
     "Learn Module", "Bible Lookup", "Chat with GPT", "Sermon Transcriber & Summarizer",
     "Practice Chat", "Verse of the Day", "Study Plan", "Faith Journal", "Prayer Starter",
-    "Fast Devotional", "Small Group Generator", "Tailored Learning Path", "Bible Beta Mode",
+    "Fast Devotional", "Small Group Generator", 
+    # "Tailored Learning Path", # Consider removing legacy option?
+    "Bible Beta Mode",
     "Pixar Story Animation",
 ])
 
+# Mode Routing Dictionary
 mode_functions = {
     "Learn Module": run_learn_module,
     "Bible Lookup": run_bible_lookup,
@@ -1063,17 +1452,19 @@ mode_functions = {
     "Prayer Starter": run_prayer_starter,
     "Fast Devotional": run_fast_devotional,
     "Small Group Generator": run_small_group_generator,
-    "Tailored Learning Path": run_learning_path_mode,
+    # "Tailored Learning Path": run_learning_path_mode, # Keep if needed
     "Bible Beta Mode": run_bible_beta,
     "Pixar Story Animation": run_pixar_story_animation,
 }
 
+# Execute Selected Mode
 if mode in mode_functions:
-    if mode == "Practice Chat":
-        run_practice_chat()
-    elif mode == "Tailored Learning Path":
-        run_learning_path_mode()
-    else:
+    try:
         mode_functions[mode]()
+    except Exception as e:
+         st.error(f"An unexpected error occurred in {mode}: {e}")
+         # Optionally add more detailed error logging here
+         # import traceback
+         # st.code(traceback.format_exc()) 
 else:
-    st.warning("Selected mode not found.")
+    st.warning("Selected mode not found or mapped.")
