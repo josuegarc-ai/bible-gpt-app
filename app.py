@@ -49,6 +49,25 @@ VALID_TRANSLATIONS = ["web", "kjv", "asv", "bbe", "oeb-us"]
 client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
 MODEL = "gpt-4o"
 
+# Diagnostic Quiz Questions - UPDATED
+DIAGNOSTIC_QUESTIONS = [
+    {
+        "question": "Who led the Israelites out of Egypt?",
+        "options": ["Abraham", "Moses", "David", "Noah", "I don't know"], # Added option
+        "correct": "Moses"
+    },
+    {
+        "question": "Which disciple denied Jesus three times before the rooster crowed?",
+        "options": ["Judas", "John", "Peter", "Thomas", "I don't know"], # Added option
+        "correct": "Peter"
+    },
+    {
+        "question": "What theological term refers to the study of 'last things' or end times?",
+        "options": ["Soteriology", "Eschatology", "Christology", "Pneumatology", "I don't know"], # Added option
+        "correct": "Eschatology"
+    }
+]
+
 # ================================================================
 # UTILITIES
 # ================================================================
@@ -269,13 +288,13 @@ def run_practice_chat():
         ans = st.radio("Choose:", q["choices"], key=f"q{S['current']}_choice")
         if not S.get("awaiting_next", False):
             if st.button("Submit Answer"):
-                if ans.lower() == q["correct"].lower():
+                # Use the updated _answers_match function for Practice Chat as well
+                if _answers_match(ans, q["correct"], q.get("question_type", "multiple choice")): # Assuming default if type missing
                     S["score"] += 1; st.success("✅ Correct!"); S["current"] += 1; st.rerun()
                 else:
                     st.error(f"❌ Incorrect. Correct answer: {q['correct']}");
                     explain = ask_gpt_conversation(
-                        f"You're a theological Bible teacher. Explain why '{q['correct']}' is correct for: '{q['question']}', "
-                        "and briefly clarify why the other options are incorrect, using Scripture-based reasoning."
+                        f"You're a theological Bible teacher. A student answered '{ans}' to the question '{q['question']}'. The correct answer is '{q['correct']}'. Explain why their answer was incorrect and why '{q['correct']}' is right, using Scripture-based reasoning."
                     )
                     st.markdown("**📜 Teaching Moment:**"); st.write(explain); S["awaiting_next"] = True
         if S.get("awaiting_next"):
@@ -494,7 +513,6 @@ def _learn_extract_json_any(response_text: str):
     try:
         return json.loads(response_text)
     except json.JSONDecodeError:
-        # Fallback for responses without backticks
         match = re.search(r'\{[\s\S]*\}|\[[\s\S]*\]', response_text)
         if match:
             try:
@@ -527,7 +545,6 @@ def ask_gpt_json(prompt: str, max_tokens: int = 4000):
         st.error(f"GPT JSON call failed: {e}")
         return None
 
-# MODIFIED: Issue #1 - Fuzzy Matching for Typos and Case
 def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
     """Flexible answer matching for quizzes, including fuzzy matching for text."""
     if user_answer is None or correct_answer is None: return False
@@ -536,11 +553,8 @@ def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
     correct_ans_str = str(correct_answer).strip()
     
     if question_type == 'multiple_choice' or question_type == 'true_false':
-        # Exact matching for multiple choice and true/false is usually best
         return user_ans_str.lower() == correct_ans_str.lower()
     
-    # For fill-in-the-blank, use fuzzy matching
-    # A ratio of 85 is a good threshold for catching minor typos.
     similarity_ratio = fuzz.ratio(user_ans_str.lower(), correct_ans_str.lower())
     return similarity_ratio >= 85
 
@@ -595,7 +609,6 @@ Output ONLY a single, valid JSON object like this:
 }}
 """
 
-# MODIFIED: Issues #3 & #4 - Use knowledge level and enforce scripture references
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None) -> str:
     length_instructions = {
         "15 minutes": "Generate exactly 3 teaching sections (150-200 words each) and 2 knowledge checks.",
@@ -659,7 +672,6 @@ Example question object:
 # -------------------------
 # KNOWLEDGE CHECK & QUIZ UI
 # -------------------------
-# MODIFIED: Issue #2 - Save incorrect answer and use it in explanation prompt
 def display_knowledge_check_question(S):
     level_data = S["levels"][S["current_level"]]
     current_lesson = level_data["lessons"][S["current_lesson_index"]]
@@ -690,7 +702,7 @@ def display_knowledge_check_question(S):
             st.rerun()
         else:
             S["kc_answered_incorrectly"] = True
-            S["last_incorrect_answer"] = user_answer # Save the user's wrong answer
+            S["last_incorrect_answer"] = user_answer 
             st.rerun()
 
     if S.get("kc_answered_incorrectly"):
@@ -778,14 +790,81 @@ def run_level_quiz(S):
                 st.rerun()
 
 # ================================================================
-# LEARNING PLAN SETUP (QUESTIONNAIRE)
+# DIAGNOSTIC QUIZ FUNCTION (NEW)
+# ================================================================
+def run_diagnostic_quiz():
+    st.subheader("Quick Bible Knowledge Check")
+    st.info("Let's figure out the best starting point for you with a few quick questions.")
+
+    S_learn = st.session_state.learn_state # Shortcut for learn_state
+
+    # Initialize quiz state if it doesn't exist
+    if 'diag_q_index' not in S_learn:
+        S_learn['diag_q_index'] = 0
+        S_learn['diag_score'] = 0
+
+    q_index = S_learn['diag_q_index']
+
+    if q_index < len(DIAGNOSTIC_QUESTIONS):
+        q_data = DIAGNOSTIC_QUESTIONS[q_index]
+        st.markdown(f"**Question {q_index + 1} of {len(DIAGNOSTIC_QUESTIONS)}:**")
+        st.markdown(f"*{q_data['question']}*")
+        
+        user_answer = st.radio(
+            "Select your answer:",
+            q_data['options'],
+            key=f"diag_q_{q_index}",
+            index=None # No default selection
+        )
+
+        if st.button("Submit Answer", key=f"diag_submit_{q_index}"):
+            if user_answer:
+                if user_answer == q_data['correct']:
+                    S_learn['diag_score'] += 1
+                    st.success("Correct!")
+                else:
+                    # Treat "I don't know" the same as any other wrong answer display-wise
+                    st.error(f"Not quite. The correct answer was: {q_data['correct']}")
+                
+                S_learn['diag_q_index'] += 1
+                st.rerun() # Move to the next question or finish
+            else:
+                st.warning("Please select an answer.")
+    else:
+        # Quiz finished, determine level
+        score = S_learn['diag_score']
+        total = len(DIAGNOSTIC_QUESTIONS)
+        knowledge_level = ""
+        if score <= 1: # 0 or 1 correct
+            knowledge_level = "Just starting out"
+        elif score == 2: # 2 correct
+            knowledge_level = "I know the main stories"
+        else: # 3 correct
+            knowledge_level = "I'm comfortable with deeper concepts"
+
+        st.success(f"Quiz complete! Score: {score}/{total}")
+        st.info(f"Based on your answers, we'll tailor the plan for the **'{knowledge_level}'** level.")
+        
+        # Store the derived level and mark diagnostic as complete
+        S_learn['derived_knowledge_level'] = knowledge_level
+        S_learn['diagnostic_complete'] = True
+        
+        if st.button("Continue to Plan Setup"):
+             st.rerun() # Proceed to the main form
+
+# ================================================================
+# LEARNING PLAN SETUP (QUESTIONNAIRE) - MODIFIED
 # ================================================================
 def run_learn_module_setup():
-    st.info("Let's create a personalized learning plan based on your unique needs.")
+    st.info("Now, let's create a personalized learning plan based on your unique needs.")
+    # Retrieve the derived knowledge level
+    derived_knowledge_level = st.session_state.learn_state.get('derived_knowledge_level', "Not determined")
+    st.markdown(f"**Detected Knowledge Level:** {derived_knowledge_level}") # Show the user the level
+
     with st.form("user_profile_form"):
         # Capture each input into its own variable
         topics_input = st.text_input("**What topics are on your heart to learn about?** (Separate with commas)", "Understanding grace, The life of David")
-        knowledge_level_input = st.radio("**How would you describe your current Bible knowledge?**", ["Just starting out", "I know the main stories", "I'm comfortable with deeper concepts"], horizontal=True)
+        # knowledge_level_input = st.radio(...) # <-- Radio button removed
         objectives_input = st.multiselect("**What do you hope to achieve with this study?**", ["Gain knowledge and understanding", "Find practical life application", "Strengthen my faith", "Prepare to teach others"])
         struggles_input = st.multiselect("**What are some of your common challenges?**", ["Understanding historical context", "Connecting it to my daily life", "Staying consistent", "Dealing with difficult passages"])
         learning_style_input = st.selectbox("**Preferred learning style:**", ["storytelling", "analytical", "practical"])
@@ -794,12 +873,11 @@ def run_learn_module_setup():
         
         submitted = st.form_submit_button("🚀 Generate My Tailor-Made Plan")
     
-    # This block now correctly uses the variables from inside the form
     if submitted:
         # Build the form_data dictionary here, AFTER submission is confirmed
         form_data = {
             'topics': topics_input,
-            'knowledge_level': knowledge_level_input,
+            'knowledge_level': derived_knowledge_level, # <-- USE THE DERIVED LEVEL
             'objectives': objectives_input,
             'struggles': struggles_input,
             'learning_style': learning_style_input,
@@ -810,10 +888,13 @@ def run_learn_module_setup():
         if not form_data['topics'] or not form_data['objectives']:
             st.warning("Please fill out the topics and objectives to generate a plan.")
             return
+        # Ensure knowledge level was set
+        if form_data['knowledge_level'] == "Not determined":
+             st.error("Knowledge level could not be determined. Please restart.")
+             return
             
         with st.spinner("Our AI is designing your personalized curriculum..."):
             master_prompt = create_full_learning_plan_prompt(form_data)
-            # Use a sufficiently large max_tokens for the entire plan structure
             plan_resp = ask_gpt_json(master_prompt, max_tokens=2500)
             plan_data = _learn_extract_json_any(plan_resp) if plan_resp else None
             if plan_data and "levels" in plan_data:
@@ -823,23 +904,35 @@ def run_learn_module_setup():
                     "current_level": 0, "current_lesson_index": 0, "current_section_index": 0,
                     "quiz_mode": False, "current_question_index": 0, "user_score": 0,
                 })
+                # Clear diagnostic state after successful plan generation
+                if 'diag_q_index' in S: del S['diag_q_index']
+                if 'diag_score' in S: del S['diag_score']
+                # Keep 'diagnostic_complete' and 'derived_knowledge_level' for reference
                 st.rerun()
             else:
                 st.error("Failed to generate a valid learning plan. Please try adjusting your inputs.")
                 if plan_resp: st.text_area("Raw AI Response (for debugging):", plan_resp, height=200)
 
 # ================================================================
-# MAIN LEARN MODULE FLOW
+# MAIN LEARN MODULE FLOW - MODIFIED
 # ================================================================
 def run_learn_module():
     st.subheader("📚 Learn Module — Personalized Bible Learning")
     if "learn_state" not in st.session_state: st.session_state.learn_state = {}
     S = st.session_state.learn_state
 
+    # --- CHECK FOR DIAGNOSTIC QUIZ ---
+    if not S.get("diagnostic_complete", False):
+        run_diagnostic_quiz() # Run the quiz first
+        return # Stop further execution until quiz is done
+    # --- END OF CHECK ---
+
+    # Phase 1: Setup via Questionnaire (Now runs AFTER diagnostic)
     if "plan" not in S:
         run_learn_module_setup()
         return
 
+    # Phase 2: Follow the Generated Plan 
     st.title(S["plan"].get("plan_title", "Your Learning Journey"))
     st.write(S["plan"].get("introduction", ""))
 
@@ -847,7 +940,8 @@ def run_learn_module():
         st.success("🎉 You've completed your entire learning journey!")
         st.balloons()
         if st.button("Start a New Journey"):
-            del st.session_state.learn_state
+            # Reset learn_state completely, including diagnostic flags
+            st.session_state.learn_state = {} 
             st.rerun()
         return
 
