@@ -874,9 +874,9 @@ Example level object: {{"name": "Level 1: Title", "topic": "Brief topic descript
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None) -> str:
     """Generates prompt for creating a single lesson, tailored to user level."""
     length_instructions = {
-        "15 minutes": "Generate exactly 3 short teaching sections (approx. 150 words each) and 1-2 knowledge checks.",
-        "30 minutes": "Generate exactly 5 medium teaching sections (approx. 200 words each) and 2-3 knowledge checks.",
-        "45 minutes": "Generate exactly 7 detailed teaching sections (approx. 250 words each) and 3-4 knowledge checks."
+        "15 minutes": "Generate exactly 3 short teaching sections (approx. 250 words each) and 2-3 knowledge checks.",
+        "30 minutes": "Generate exactly 5 medium teaching sections (approx. 300 to 375 words each) and 3-4 knowledge checks.",
+        "45 minutes": "Generate exactly 7 detailed teaching sections (approx. 400 to 450 words each) and 5-7 knowledge checks."
     }
     context_clause = f" This lesson should logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
 
