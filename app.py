@@ -68,6 +68,11 @@ DIAGNOSTIC_QUESTIONS = [
     }
 ]
 
+# ================================================================
+# CHAT CONFIG (FINAL GENERALIZED CONVICTION PROMPT)
+# ================================================================
+CHAT_HISTORY_FILE = "user_chat_history.json"
+
 GENERAL_SYSTEM_PROMPT = """
 You are Bible GPT, a mentor who speaks with the love and authority of **absolute biblical truth**.
 Your primary goal is to guide the user toward righteousness and holiness by clearly stating what the Bible teaches.
