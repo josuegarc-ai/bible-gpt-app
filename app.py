@@ -69,28 +69,25 @@ DIAGNOSTIC_QUESTIONS = [
 ]
 
 # ================================================================
-# CHAT CONFIG
+# CHAT CONFIG (NEW CONVICTION-FOCUSED PROMPTS)
 # ================================================================
 CHAT_HISTORY_FILE = "user_chat_history.json"
 
 GENERAL_SYSTEM_PROMPT = """
-You are Bible GPT, a loving, biblically grounded mentor and teacher.
-Your role is to be compassionate, clear, and practical.
-- Explain Scripture clearly, like a kind teacher, avoiding overly complex jargon.
-- Apply biblical truths to modern, everyday life with spiritual insight and wisdom.
-- If you don't know an answer, say so. Do not speculate.
-- If the user shares a personal struggle, respond with empathy and encouragement first, before providing guidance.
-- Your tone is always warm, encouraging, and pastoral.
+You are Bible GPT, a mentor who speaks with love but is grounded in **absolute biblical truth**.
+Your primary goal is to guide the user toward righteousness and holiness.
+- **Tone:** Be conversational, loving, and pastoral, but also **firm and clear**. Your answers must be concise and to the point. Avoid long, academic lists.
+- **Conviction:** You are not a neutral counselor. When asked about practices with pagan or occult origins (like Halloween), you must **advise strong caution and separation**, referencing scriptures like Ephesians 5:11 ("Have nothing to do with the fruitless deeds of darkness") or 2 Corinthians 6:14 ("What fellowship can light have with darkness?"). Do not present these as simple "personal choices," but as matters of spiritual holiness.
+- **Truth:** Your answers must always align with a high view of scripture.
 """
 
 THEOLOGICAL_SYSTEM_PROMPT = """
 You are the "Theological Scholar" mode of Bible GPT.
-Your role is to provide deep, analytical, and comprehensive theological answers.
-- Assume the user is an advanced student (e.g., seminary level).
-- When asked a question, cite specific theological concepts (e.g., Christology, Soteriology, Eschatology, Harmartiology) where relevant.
-- Refer to and explain the significance of original biblical languages (Hebrew/Greek) if it adds meaning (e.g., "The word 'agape' here implies...").
-- Discuss different historical and denominational interpretations (e.g., Calvinist, Arminian, Catholic, Orthodox) objectively and fairly if a question touches on a disputed doctrine.
-- Maintain a scholarly, objective, yet respectful tone.
+Your goal is not just academic knowledge, but **deep spiritual conviction**.
+- **Tone:** You are an expert theologian who speaks with authority and clarity. Be concise.
+- **Depth:** Provide deep, analytical, and comprehensive theological answers.
+- **Conviction:** Connect deep theology to the user's life and the state of the world today. Your answers should be sharp, insightful, and unwavering in biblical truth.
+- **Tools:** You have a web search tool. Use it *any time* the user asks for connections between prophecy, scripture, and **current events** or **major world news**. You MUST provide specific examples when asked.
 """
 
 # ================================================================
@@ -194,7 +191,27 @@ def get_chat_messages(history: list, max_turns: int = 20) -> list:
         {"role": "system", "content": f"[Prior Conversation Summary]: {summary}"},
         *messages_to_keep
     ]
-    
+
+def web_search(query: str) -> str:
+    """Performs a web search using DuckDuckGo."""
+    st.caption(f"🔎 Searching the web for: '{query}'") # Show the user it's searching
+    try:
+        with DDGS() as ddgs:
+            # We will format the results as a clean string for the AI
+            results = [r for r in ddgs.text(query, max_results=5)]
+            if not results:
+                return "No relevant web results found."
+            
+            # Format this for the AI to read
+            formatted_results = "\n".join([
+                f"- Snippet: {r['body']}\n  Source: {r['href']}" 
+                for r in results
+            ])
+            return f"Here are the web search results:\n{formatted_results}"
+            
+    except Exception as e:
+        return f"Search failed. Error: {str(e)}"
+        
 # ================================================================
 # SERMON SEARCH (YouTube result links via HTML scrape)
 # ================================================================
@@ -267,30 +284,20 @@ def run_bible_lookup():
                 st.error(str(e))
 
 # ================================================================
-# CHAT MODE
-# ================================================================
-# ================================================================
-# CHAT MODE (NEW, STATEFUL VERSION)
-# ================================================================
-# ================================================================
-# CHAT MODE (NEW, STATEFUL VERSION - NO EXIT REFLECTION)
+# CHAT MODE (FINAL VERSION - STATEFUL, CONVICTING, & WEB-ENABLED)
 # ================================================================
 def run_chat_mode():
     st.subheader("💬 Chat with GPT")
     
-    # --- 1. UI for Mode Toggle ---
     is_theological_mode = st.toggle(
         "Enable Deep Theological Chat", 
         value=False,
-        help="Toggle on for in-depth, scholarly answers. Toggle off for pastoral, practical guidance."
+        help="Toggle on for in-depth, scholarly answers with web search for current events."
     )
 
-    # --- 2. Load Persistent History ---
-    # This now loads from the JSON file *once* when the session starts.
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = load_chat_history()
 
-    # --- 3. Display Chat History ---
     st.markdown("---")
     chat_container = st.container(height=400, border=False)
     with chat_container:
@@ -298,56 +305,108 @@ def run_chat_mode():
              st.caption("Your conversation will appear here. Your chat history is saved automatically.")
         
         for msg in st.session_state.chat_history:
-            who = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
-            st.markdown(f"**{who}:** {msg['content']}")
-
+            # Don't show the tool call/result messages to the user, only human/ai
+            if msg["role"] in ["user", "assistant"]:
+                who = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
+                st.markdown(f"**{who}:** {msg['content']}")
     st.markdown("---")
     
-    # --- 4. User Input ---
     user_input = st.text_input("Ask a question or share a thought:")
     
     if st.button("Send", type="primary") and user_input:
         
-        # --- Handle Exit Command (SIMPLIFIED) ---
         if user_input.lower().strip() in ["exit", "quit", "end", "stop"]:
             st.info("Conversation ended. Your history is saved.")
-            # We simply stop the function here.
             return
 
-        # Add user message to state
         st.session_state.chat_history.append({"role": "user", "content": user_input})
-        
-        # --- 5. Prepare and Call API ---
+        st.rerun() # Re-run to show the user's message immediately
+
+    # --- This block handles processing the chat after the user message is added ---
+    # Check if the last message was from the user, meaning AI needs to respond
+    if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
         with st.spinner("Thinking..."):
-            # A. Select the correct system prompt
+            
+            # 1. Select prompt and tools
             system_prompt = THEOLOGICAL_SYSTEM_PROMPT if is_theological_mode else GENERAL_SYSTEM_PROMPT
             
-            # B. Get the managed (summarized) message list
+            # Only give the web search tool to the "Theological" mode
+            tools = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "web_search",
+                        "description": "Searches the internet for current events, news, or topics. Use this to connect prophecy or biblical topics to the modern world.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"query": {"type": "string", "description": "The search query"}},
+                            "required": ["query"],
+                        },
+                    },
+                }
+            ] if is_theological_mode else None
+
+            # 2. Get managed message history
             messages_for_api = get_chat_messages(st.session_state.chat_history)
-            
-            # C. Combine for the API call
-            messages = [{"role": "system", "content": system_prompt}] + messages_for_api
+            final_messages = [{"role": "system", "content": system_prompt}] + messages_for_api
             
             try:
-                r = client.chat.completions.create(
-                    model=MODEL, 
-                    messages=messages, 
-                    temperature=0.4 if is_theological_mode else 0.5 
+                # 3. Call the AI
+                response = client.chat.completions.create(
+                    model=MODEL,
+                    messages=final_messages,
+                    temperature=0.3, # Lower temp for more direct, factual answers
+                    tools=tools
                 )
-                reply = r.choices[0].message.content.strip()
-                
-                # D. Add response and save to file
-                st.session_state.chat_history.append({"role": "assistant", "content": reply})
+                response_message = response.choices[0].message
+
+                # 4. Check if AI wants to use a tool (web search)
+                if response_message.tool_calls:
+                    st.session_state.chat_history.append(response_message) # Save the AI's tool request
+                    
+                    # --- This is the new Tool-Calling Loop ---
+                    for tool_call in response_message.tool_calls:
+                        function_name = tool_call.function.name
+                        if function_name == "web_search":
+                            # Get the query from the AI
+                            function_args = json.loads(tool_call.function.arguments)
+                            query = function_args.get("query")
+                            
+                            # Call our Python web_search function
+                            function_response = web_search(query=query)
+                            
+                            # Send the search results back to the AI
+                            st.session_state.chat_history.append(
+                                {
+                                    "tool_call_id": tool_call.id,
+                                    "role": "tool",
+                                    "name": function_name,
+                                    "content": function_response,
+                                }
+                            )
+                    
+                    # 5. Call AI *AGAIN* with the search results
+                    # This lets the AI form a final answer
+                    second_response = client.chat.completions.create(
+                        model=MODEL,
+                        messages=st.session_state.chat_history, # Send the *full* history including tool results
+                    )
+                    final_reply = second_response.choices[0].message.content.strip()
+                    st.session_state.chat_history.append({"role": "assistant", "content": final_reply})
+
+                else:
+                    # 6. No tool was needed, just a direct answer
+                    final_reply = response_message.content.strip()
+                    st.session_state.chat_history.append({"role": "assistant", "content": final_reply})
+
+                # 7. Save and refresh
                 save_chat_history(st.session_state.chat_history)
-                
-                # E. Rerun to show the new message immediately
                 st.rerun()
 
             except Exception as e:
                 st.error(f"Error communicating with AI: {e}")
-                st.session_state.chat_history.pop()
+                st.session_state.chat_history.pop() # Remove the user's message if it failed
                 save_chat_history(st.session_state.chat_history)
-
 # ================================================================
 # PIXAR STORY ANIMATION
 # ================================================================
