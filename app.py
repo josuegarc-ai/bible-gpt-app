@@ -69,6 +69,31 @@ DIAGNOSTIC_QUESTIONS = [
 ]
 
 # ================================================================
+# CHAT CONFIG
+# ================================================================
+CHAT_HISTORY_FILE = "user_chat_history.json"
+
+GENERAL_SYSTEM_PROMPT = """
+You are Bible GPT, a loving, biblically grounded mentor and teacher.
+Your role is to be compassionate, clear, and practical.
+- Explain Scripture clearly, like a kind teacher, avoiding overly complex jargon.
+- Apply biblical truths to modern, everyday life with spiritual insight and wisdom.
+- If you don't know an answer, say so. Do not speculate.
+- If the user shares a personal struggle, respond with empathy and encouragement first, before providing guidance.
+- Your tone is always warm, encouraging, and pastoral.
+"""
+
+THEOLOGICAL_SYSTEM_PROMPT = """
+You are the "Theological Scholar" mode of Bible GPT.
+Your role is to provide deep, analytical, and comprehensive theological answers.
+- Assume the user is an advanced student (e.g., seminary level).
+- When asked a question, cite specific theological concepts (e.g., Christology, Soteriology, Eschatology, Harmartiology) where relevant.
+- Refer to and explain the significance of original biblical languages (Hebrew/Greek) if it adds meaning (e.g., "The word 'agape' here implies...").
+- Discuss different historical and denominational interpretations (e.g., Calvinist, Arminian, Catholic, Orthodox) objectively and fairly if a question touches on a disputed doctrine.
+- Maintain a scholarly, objective, yet respectful tone.
+"""
+
+# ================================================================
 # UTILITIES
 # ================================================================
 def fetch_bible_verse(passage: str, translation: str = "web") -> str:
@@ -121,6 +146,55 @@ def extract_json_from_response(response_text: str):
         st.error(f"Error extracting JSON: {e}") # Added error logging
         return None
 
+# ================================================================
+# CHAT UTILITIES
+# ================================================================
+
+def load_chat_history() -> list:
+    """Loads chat history from a local JSON file."""
+    if os.path.exists(CHAT_HISTORY_FILE):
+        try:
+            with open(CHAT_HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return [] # Return empty if file is corrupt
+    return []
+
+def save_chat_history(history: list):
+    """Saves chat history to a local JSON file."""
+    try:
+        with open(CHAT_HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2)
+    except Exception as e:
+        st.error(f"Failed to save chat history: {e}")
+        
+def get_chat_messages(history: list, max_turns: int = 20) -> list:
+    """Manages chat history to prevent token overflow by summarizing old messages."""
+    if len(history) <= max_turns:
+        return history # Return full history if it's short
+
+    # History is too long, summarize the oldest part
+    # Keep the most recent 10 messages (5 turns)
+    messages_to_keep = history[-10:]
+    messages_to_summarize = history[:-10]
+    
+    # Create a text blob of the old chat
+    old_chat_text = "\n".join([f"{m['role']}: {m['content']}" for m in messages_to_summarize])
+    
+    # Use your existing function to summarize
+    try:
+        summary_prompt = f"Concisely summarize the key points of this conversation in one paragraph: {old_chat_text}"
+        summary = ask_gpt_conversation(summary_prompt) # This is your existing function
+    except Exception as e:
+        st.warning(f"Could not summarize history: {e}")
+        summary = "Summary of prior conversation is unavailable."
+
+    # Return a new history object
+    return [
+        {"role": "system", "content": f"[Prior Conversation Summary]: {summary}"},
+        *messages_to_keep
+    ]
+    
 # ================================================================
 # SERMON SEARCH (YouTube result links via HTML scrape)
 # ================================================================
@@ -195,31 +269,84 @@ def run_bible_lookup():
 # ================================================================
 # CHAT MODE
 # ================================================================
+# ================================================================
+# CHAT MODE (NEW, STATEFUL VERSION)
+# ================================================================
+# ================================================================
+# CHAT MODE (NEW, STATEFUL VERSION - NO EXIT REFLECTION)
+# ================================================================
 def run_chat_mode():
     st.subheader("💬 Chat with GPT")
+    
+    # --- 1. UI for Mode Toggle ---
+    is_theological_mode = st.toggle(
+        "Enable Deep Theological Chat", 
+        value=False,
+        help="Toggle on for in-depth, scholarly answers. Toggle off for pastoral, practical guidance."
+    )
+
+    # --- 2. Load Persistent History ---
+    # This now loads from the JSON file *once* when the session starts.
     if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+        st.session_state.chat_history = load_chat_history()
+
+    # --- 3. Display Chat History ---
+    st.markdown("---")
+    chat_container = st.container(height=400, border=False)
+    with chat_container:
+        if not st.session_state.chat_history:
+             st.caption("Your conversation will appear here. Your chat history is saved automatically.")
+        
+        for msg in st.session_state.chat_history:
+            who = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
+            st.markdown(f"**{who}:** {msg['content']}")
+
+    st.markdown("---")
+    
+    # --- 4. User Input ---
     user_input = st.text_input("Ask a question or share a thought:")
-    if st.button("Send") and user_input:
+    
+    if st.button("Send", type="primary") and user_input:
+        
+        # --- Handle Exit Command (SIMPLIFIED) ---
         if user_input.lower().strip() in ["exit", "quit", "end", "stop"]:
-            full_context = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.chat_history])
-            reflection = ask_gpt_conversation(
-                "You are a Christ-centered, pastoral guide. Based on the following conversation, write a short, encouraging reflection and a related prayer for the user to use.\n\n" + full_context
-            )
-            st.markdown("**🙏 Final Encouragement:**")
-            st.write(reflection)
-            # Clear chat history after reflection? Optional.
-            # st.session_state.chat_history = []
+            st.info("Conversation ended. Your history is saved.")
+            # We simply stop the function here.
             return
+
+        # Add user message to state
         st.session_state.chat_history.append({"role": "user", "content": user_input})
-        messages = [{"role": "system", "content": "You are a loving, biblically grounded mentor."}] + st.session_state.chat_history
-        r = client.chat.completions.create(model=MODEL, messages=messages, temperature=0.4)
-        reply = r.choices[0].message.content.strip()
-        st.session_state.chat_history.append({"role": "assistant", "content": reply})
-    # Display chat history
-    for msg in st.session_state.chat_history:
-        who = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
-        st.markdown(f"**{who}:** {msg['content']}")
+        
+        # --- 5. Prepare and Call API ---
+        with st.spinner("Thinking..."):
+            # A. Select the correct system prompt
+            system_prompt = THEOLOGICAL_SYSTEM_PROMPT if is_theological_mode else GENERAL_SYSTEM_PROMPT
+            
+            # B. Get the managed (summarized) message list
+            messages_for_api = get_chat_messages(st.session_state.chat_history)
+            
+            # C. Combine for the API call
+            messages = [{"role": "system", "content": system_prompt}] + messages_for_api
+            
+            try:
+                r = client.chat.completions.create(
+                    model=MODEL, 
+                    messages=messages, 
+                    temperature=0.4 if is_theological_mode else 0.5 
+                )
+                reply = r.choices[0].message.content.strip()
+                
+                # D. Add response and save to file
+                st.session_state.chat_history.append({"role": "assistant", "content": reply})
+                save_chat_history(st.session_state.chat_history)
+                
+                # E. Rerun to show the new message immediately
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Error communicating with AI: {e}")
+                st.session_state.chat_history.pop()
+                save_chat_history(st.session_state.chat_history)
 
 # ================================================================
 # PIXAR STORY ANIMATION
