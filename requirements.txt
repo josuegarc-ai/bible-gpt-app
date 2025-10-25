@@ -1,4 +1,6 @@
-pip install langchain langchain_openai duckduckgo-search
+langchain
+langchain_openai
+duckduckgo-search
 streamlit
 openai>=1.2.3
 requests
