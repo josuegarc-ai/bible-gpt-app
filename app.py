@@ -1,5 +1,5 @@
 # ================================================================
-# ✅ Bible GPT — v2.9 (Personalized Plan Generator - Full & Integrated)
+# ✅ Bible GPT — v3.0 (LangChain Agent Integration)
 # ================================================================
 
 # ==== Core imports ====
@@ -27,6 +27,13 @@ from duckduckgo_search import DDGS
 # ==== Media / YouTube ====
 import yt_dlp
 import imageio_ffmpeg
+
+# ==== New LangChain / Agent Imports ====
+from langchain_openai.chat_models import ChatOpenAI
+from langchain.agents import AgentExecutor, create_openai_tools_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.tools import tool
+from langchain_core.messages import HumanMessage, AIMessage
 
 # ================================================================
 # FFmpeg: supply binary via imageio-ffmpeg (no ffprobe required)
@@ -173,7 +180,7 @@ def extract_json_from_response(response_text: str):
         return None
 
 # ================================================================
-# CHAT UTILITIES
+# CHAT UTILITIES (LANGCHAIN AGENT VERSION)
 # ================================================================
 
 def load_chat_history() -> list:
@@ -193,45 +200,17 @@ def save_chat_history(history: list):
             json.dump(history, f, indent=2)
     except Exception as e:
         st.error(f"Failed to save chat history: {e}")
-        
-def get_chat_messages(history: list, max_turns: int = 20) -> list:
-    """Manages chat history to prevent token overflow by summarizing old messages."""
-    if len(history) <= max_turns:
-        return history # Return full history if it's short
 
-    # History is too long, summarize the oldest part
-    # Keep the most recent 10 messages (5 turns)
-    messages_to_keep = history[-10:]
-    messages_to_summarize = history[:-10]
-    
-    # Create a text blob of the old chat
-    old_chat_text = "\n".join([f"{m['role']}: {m['content']}" for m in messages_to_summarize])
-    
-    # Use your existing function to summarize
-    try:
-        summary_prompt = f"Concisely summarize the key points of this conversation in one paragraph: {old_chat_text}"
-        summary = ask_gpt_conversation(summary_prompt) # This is your existing function
-    except Exception as e:
-        st.warning(f"Could not summarize history: {e}")
-        summary = "Summary of prior conversation is unavailable."
-
-    # Return a new history object
-    return [
-        {"role": "system", "content": f"[Prior Conversation Summary]: {summary}"},
-        *messages_to_keep
-    ]
-
+@tool
 def web_search(query: str) -> str:
-    """Performs a web search using DuckDuckGo."""
+    """Performs a web search using DuckDuckGo. Use this to find current events or news."""
     st.caption(f"🔎 Searching the web for: '{query}'") # Show the user it's searching
     try:
         with DDGS() as ddgs:
-            # We will format the results as a clean string for the AI
             results = [r for r in ddgs.text(query, max_results=5)]
             if not results:
                 return "No relevant web results found."
             
-            # Format this for the AI to read
             formatted_results = "\n".join([
                 f"- Snippet: {r['body']}\n  Source: {r['href']}" 
                 for r in results
@@ -240,7 +219,17 @@ def web_search(query: str) -> str:
             
     except Exception as e:
         return f"Search failed. Error: {str(e)}"
-        
+
+def format_chat_history_for_langchain(history: list) -> list:
+    """Converts our simple chat history list into LangChain's message format."""
+    langchain_history = []
+    for msg in history:
+        if msg["role"] == "user":
+            langchain_history.append(HumanMessage(content=msg["content"]))
+        elif msg["role"] == "assistant":
+            langchain_history.append(AIMessage(content=msg["content"]))
+    return langchain_history
+
 # ================================================================
 # SERMON SEARCH (YouTube result links via HTML scrape)
 # ================================================================
@@ -313,130 +302,6 @@ def run_bible_lookup():
                 st.error(str(e))
 
 # ================================================================
-# CHAT MODE (FINAL VERSION - STATEFUL, CONVICTING, & WEB-ENABLED)
-# ================================================================
-def run_chat_mode():
-    st.subheader("💬 Chat with GPT")
-    
-    is_theological_mode = st.toggle(
-        "Enable Deep Theological Chat", 
-        value=False,
-        help="Toggle on for in-depth, scholarly answers with web search for current events."
-    )
-
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = load_chat_history()
-
-    st.markdown("---")
-    chat_container = st.container(height=400, border=False)
-    with chat_container:
-        if not st.session_state.chat_history:
-             st.caption("Your conversation will appear here. Your chat history is saved automatically.")
-        
-        for msg in st.session_state.chat_history:
-            # Don't show the tool call/result messages to the user, only human/ai
-            if msg["role"] in ["user", "assistant"]:
-                who = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
-                st.markdown(f"**{who}:** {msg['content']}")
-    st.markdown("---")
-    
-    user_input = st.text_input("Ask a question or share a thought:")
-    
-    if st.button("Send", type="primary") and user_input:
-        
-        if user_input.lower().strip() in ["exit", "quit", "end", "stop"]:
-            st.info("Conversation ended. Your history is saved.")
-            return
-
-        st.session_state.chat_history.append({"role": "user", "content": user_input})
-        st.rerun() # Re-run to show the user's message immediately
-
-    # --- This block handles processing the chat after the user message is added ---
-    # Check if the last message was from the user, meaning AI needs to respond
-    if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
-        with st.spinner("Thinking..."):
-            
-            # 1. Select prompt and tools
-            system_prompt = THEOLOGICAL_SYSTEM_PROMPT if is_theological_mode else GENERAL_SYSTEM_PROMPT
-            
-            # Only give the web search tool to the "Theological" mode
-            tools = [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "web_search",
-                        "description": "Searches the internet for current events, news, or topics. Use this to connect prophecy or biblical topics to the modern world.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {"query": {"type": "string", "description": "The search query"}},
-                            "required": ["query"],
-                        },
-                    },
-                }
-            ] if is_theological_mode else None
-
-            # 2. Get managed message history
-            messages_for_api = get_chat_messages(st.session_state.chat_history)
-            final_messages = [{"role": "system", "content": system_prompt}] + messages_for_api
-            
-            try:
-                # 3. Call the AI
-                response = client.chat.completions.create(
-                    model=MODEL,
-                    messages=final_messages,
-                    temperature=0.3, # Lower temp for more direct, factual answers
-                    tools=tools
-                )
-                response_message = response.choices[0].message
-
-                # 4. Check if AI wants to use a tool (web search)
-                if response_message.tool_calls:
-                    st.session_state.chat_history.append(response_message) # Save the AI's tool request
-                    
-                    # --- This is the new Tool-Calling Loop ---
-                    for tool_call in response_message.tool_calls:
-                        function_name = tool_call.function.name
-                        if function_name == "web_search":
-                            # Get the query from the AI
-                            function_args = json.loads(tool_call.function.arguments)
-                            query = function_args.get("query")
-                            
-                            # Call our Python web_search function
-                            function_response = web_search(query=query)
-                            
-                            # Send the search results back to the AI
-                            st.session_state.chat_history.append(
-                                {
-                                    "tool_call_id": tool_call.id,
-                                    "role": "tool",
-                                    "name": function_name,
-                                    "content": function_response,
-                                }
-                            )
-                    
-                    # 5. Call AI *AGAIN* with the search results
-                    # This lets the AI form a final answer
-                    second_response = client.chat.completions.create(
-                        model=MODEL,
-                        messages=st.session_state.chat_history, # Send the *full* history including tool results
-                    )
-                    final_reply = second_response.choices[0].message.content.strip()
-                    st.session_state.chat_history.append({"role": "assistant", "content": final_reply})
-
-                else:
-                    # 6. No tool was needed, just a direct answer
-                    final_reply = response_message.content.strip()
-                    st.session_state.chat_history.append({"role": "assistant", "content": final_reply})
-
-                # 7. Save and refresh
-                save_chat_history(st.session_state.chat_history)
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"Error communicating with AI: {e}")
-                st.session_state.chat_history.pop() # Remove the user's message if it failed
-                save_chat_history(st.session_state.chat_history)
-# ================================================================
 # PIXAR STORY ANIMATION
 # ================================================================
 def run_pixar_story_animation():
@@ -508,25 +373,25 @@ def run_practice_chat():
                     
                     # Deduplicate options and ensure correct is present for MC/FITB
                     if data['question_type'] != 'true_false':
-                         if 'choices' not in data: data['choices'] = []
-                         # Ensure choices is a list
-                         if not isinstance(data['choices'], list): data['choices'] = []
-                         # Deduplicate while preserving order (important for potential distractors)
-                         seen = set()
-                         uniq = [x for x in data['choices'] if not (x in seen or seen.add(x))]
-                         # Add correct answer if not already in choices
-                         if data['correct'] not in seen:
-                             uniq.append(data['correct'])
-                         random.shuffle(uniq)
-                         data['choices'] = uniq
+                        if 'choices' not in data: data['choices'] = []
+                        # Ensure choices is a list
+                        if not isinstance(data['choices'], list): data['choices'] = []
+                        # Deduplicate while preserving order (important for potential distractors)
+                        seen = set()
+                        uniq = [x for x in data['choices'] if not (x in seen or seen.add(x))]
+                        # Add correct answer if not already in choices
+                        if data['correct'] not in seen:
+                            uniq.append(data['correct'])
+                        random.shuffle(uniq)
+                        data['choices'] = uniq
                     else:
                         data['choices'] = ["True", "False"] # Standardize TF choices
 
                     S["questions"].append(data)
             if not S["questions"]: # Handle case where generation failed
-                 st.error("Failed to generate questions. Please try again.")
+                st.error("Failed to generate questions. Please try again.")
             else:
-                 st.rerun()
+                st.rerun()
 
     elif S["current"] < len(S["questions"]):
         q = S["questions"][S["current"]]
@@ -535,17 +400,17 @@ def run_practice_chat():
         q_type = q.get("question_type", "multiple_choice") # Default if missing
         ans = None
         if q_type == 'multiple_choice':
-             ans = st.radio("Choose:", q.get("choices", []), key=f"q{S['current']}_choice", index=None)
+            ans = st.radio("Choose:", q.get("choices", []), key=f"q{S['current']}_choice", index=None)
         elif q_type == 'true_false':
-             ans = st.radio("Choose:", ["True", "False"], key=f"q{S['current']}_choice", index=None)
+            ans = st.radio("Choose:", ["True", "False"], key=f"q{S['current']}_choice", index=None)
         elif q_type == 'fill_in_the_blank':
-             ans = st.text_input("Fill in the blank:", key=f"q{S['current']}_choice")
+            ans = st.text_input("Fill in the blank:", key=f"q{S['current']}_choice")
 
         if not S.get("awaiting_next", False):
             if st.button("Submit Answer"):
-                 if ans is None and (q_type == 'multiple_choice' or q_type == 'true_false'):
-                      st.warning("Please select an answer.")
-                 elif ans is not None:
+                if ans is None and (q_type == 'multiple_choice' or q_type == 'true_false'):
+                    st.warning("Please select an answer.")
+                elif ans is not None:
                     if _answers_match(ans, q["correct"], q_type): # Using fuzzy match function
                         S["score"] += 1; st.success("✅ Correct!"); S["current"] += 1; st.rerun()
                     else:
@@ -585,9 +450,9 @@ def run_faith_journal():
             st.success(f"Saved as `{filename}`.")
             # Added option for AI insight after saving
             if st.checkbox("Get spiritual insight from this entry?"):
-                 with st.spinner("Analyzing your entry..."):
-                      insight = ask_gpt_conversation(f"Analyze this faith journal entry and offer spiritual insight and encouragement based on biblical principles: {entry}")
-                      st.markdown("**💡 Insight:**"); st.write(insight)
+                with st.spinner("Analyzing your entry..."):
+                    insight = ask_gpt_conversation(f"Analyze this faith journal entry and offer spiritual insight and encouragement based on biblical principles: {entry}")
+                    st.markdown("💡 Insight:"); st.write(insight)
         except Exception as e:
             st.error(f"Failed to save entry: {e}")
 
@@ -626,14 +491,14 @@ def run_bible_beta():
         full_ref = f"{book} {passage_ref}"
         try:
             with st.spinner(f"Fetching {full_ref}..."):
-                 text = fetch_bible_verse(full_ref, translation_beta)
-                 st.text_area(f"📖 {full_ref} ({translation_beta.upper()})", value=text, height=400)
+                text = fetch_bible_verse(full_ref, translation_beta)
+                st.text_area(f"📖 {full_ref} ({translation_beta.upper()})", value=text, height=400)
             
             # Optional summarization integrated below text area
             if st.checkbox("✨ Summarize this passage?"):
                 with st.spinner("Generating summary..."):
-                     summary = ask_gpt_conversation(f"Summarize and explain the key points of this Bible passage: {text} ({full_ref})")
-                     st.markdown("**💬 Summary & Key Points:**"); st.markdown(summary)
+                    summary = ask_gpt_conversation(f"Summarize and explain the key points of this Bible passage: {text} ({full_ref})")
+                    st.markdown("**💬 Summary & Key Points:**"); st.markdown(summary)
 
         except Exception as e:
             st.error(f"Error fetching passage: {e}")
@@ -712,7 +577,7 @@ def run_sermon_transcriber():
                 if yt_link:
                     # Validate URL format roughly
                     if not yt_link.startswith(("http://", "https://")):
-                         raise ValueError("Invalid YouTube URL provided.")
+                        raise ValueError("Invalid YouTube URL provided.")
                     # Get duration without full download first
                     with yt_dlp.YoutubeDL({"quiet": True, "noprogress": True}) as ydl:
                         info = ydl.extract_info(yt_link, download=False)
@@ -753,10 +618,10 @@ def run_sermon_transcriber():
                         cleanup_path = wav_path # Now delete the wav file instead
                         transcription = model.transcribe(wav_path, fp16=False)
                     except Exception as e_convert:
-                         raise Exception(f"Transcription failed even after conversion: {e_convert}")
+                        raise Exception(f"Transcription failed even after conversion: {e_convert}")
 
                 if not transcription or not transcription.get("text"):
-                     raise Exception("Transcription failed or produced empty text.")
+                    raise Exception("Transcription failed or produced empty text.")
 
                 transcript_text = transcription["text"].strip()
                 st.success("✅ Transcription complete.")
@@ -874,7 +739,7 @@ def run_verse_of_the_day():
              "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John", 
              "Jude", "Revelation"]
     try:
-         # Generate a reference - consider API/library for valid chapter/verse counts later
+        # Generate a reference - consider API/library for valid chapter/verse counts later
         book = random.choice(books)
         # Simplified chapter/verse generation for now
         chapter = random.randint(1, 5) # Assume at least 5 chapters
@@ -882,13 +747,13 @@ def run_verse_of_the_day():
         ref = f"{book} {chapter}:{verse}"
 
         with st.spinner("Fetching Verse of the Day..."):
-             text = fetch_bible_verse(ref, "web") # Default to WEB translation
-             st.success(f"**{ref} (WEB)**\n\n> {text}") # Use blockquote
+            text = fetch_bible_verse(ref, "web") # Default to WEB translation
+            st.success(f"**{ref} (WEB)**\n\n> {text}") # Use blockquote
 
-             reflection_prompt = f"Offer a brief (2-3 sentences), warm, and practical reflection on this Bible verse, focusing on one simple takeaway: '{text}' ({ref})"
-             reflection = ask_gpt_conversation(reflection_prompt)
-             st.markdown("**💬 Reflection & Takeaway:**")
-             st.write(reflection)
+            reflection_prompt = f"Offer a brief (2-3 sentences), warm, and practical reflection on this Bible verse, focusing on one simple takeaway: '{text}' ({ref})"
+            reflection = ask_gpt_conversation(reflection_prompt)
+            st.markdown("**💬 Reflection & Takeaway:**")
+            st.write(reflection)
 
     except Exception as e: 
         # Handle cases where the random verse might be invalid
@@ -899,16 +764,16 @@ def run_prayer_starter():
     theme = st.text_input("What's on your heart? (e.g., gratitude, anxiety, guidance, forgiveness):")
     if st.button("Generate Prayer Starter") and theme:
         with st.spinner("Crafting a prayer..."):
-             prayer = ask_gpt_conversation(f"Write a short (3-5 sentences), theologically faithful prayer starter focused on '{theme}'. Address God reverently (e.g., 'Heavenly Father', 'Lord Jesus') and base it on biblical truths. Avoid clichés.")
-             st.text_area("Your Prayer Starter:", prayer, height=200)
+            prayer = ask_gpt_conversation(f"Write a short (3-5 sentences), theologically faithful prayer starter focused on '{theme}'. Address God reverently (e.g., 'Heavenly Father', 'Lord Jesus') and base it on biblical truths. Avoid clichés.")
+            st.text_area("Your Prayer Starter:", prayer, height=200)
 
 def run_fast_devotional():
     st.subheader("⚡ Fast Devotional")
     topic = st.text_input("Devotional Topic (e.g., hope, perseverance, love, faith):")
     if st.button("Generate Fast Devotional") and topic:
          with st.spinner("Writing devotional..."):
-              devo = ask_gpt_conversation(f"Compose a short devotional (approx. 150-200 words) on the topic of '{topic}'. Include one primary Bible verse, 1-2 related cross-references, a brief explanation connecting them to the topic, and one practical challenge or encouragement for today.")
-              st.text_area(f"Devotional on {topic}:", devo, height=350)
+             devo = ask_gpt_conversation(f"Compose a short devotional (approx. 150-200 words) on the topic of '{topic}'. Include one primary Bible verse, 1-2 related cross-references, a brief explanation connecting them to the topic, and one practical challenge or encouragement for today.")
+             st.text_area(f"Devotional on {topic}:", devo, height=350)
 
 def run_small_group_generator():
     st.subheader("👥 Small Group Guide Generator")
@@ -963,20 +828,20 @@ def _learn_extract_json_any(response_text: str):
             open_count = 0
             end_index = -1
             for i, char in enumerate(response_text[start_index:]):
-                 if char == response_text[start_index]:
-                      open_count += 1
-                 elif char == end_char:
-                      open_count -= 1
-                 if open_count == 0:
-                      end_index = start_index + i + 1
-                      break
+                if char == response_text[start_index]:
+                    open_count += 1
+                elif char == end_char:
+                    open_count -= 1
+                if open_count == 0:
+                    end_index = start_index + i + 1
+                    break
             if end_index != -1:
-                 json_str = response_text[start_index:end_index]
+                json_str = response_text[start_index:end_index]
             else: # Fallback if matching bracket not found
-                 json_str = response_text[start_index:] 
+                json_str = response_text[start_index:] 
         else:
-             st.error("No JSON object or array found in AI response.")
-             return None
+            st.error("No JSON object or array found in AI response.")
+            return None
 
     try:
         return json.loads(json_str)
@@ -1017,8 +882,8 @@ def ask_gpt_json(prompt: str, max_tokens: int = 4000):
             )
             return resp.choices[0].message.content
         except Exception as e2:
-             st.error(f"GPT JSON call failed completely: {e2}")
-             return None
+            st.error(f"GPT JSON call failed completely: {e2}")
+            return None
 
 
 def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
@@ -1165,10 +1030,10 @@ def display_knowledge_check_question(S):
     if st.button("Submit Answer", key=f"submit_{input_key}"):
         # Basic validation for radio buttons
         if user_answer is None and q_type in ['multiple_choice', 'true_false']:
-             st.warning("Please select an answer.")
-             # Keep kc_answered_incorrectly state if it was already set
-             if S.get("kc_answered_incorrectly"): st.rerun() 
-             return # Don't proceed without an answer
+            st.warning("Please select an answer.")
+            # Keep kc_answered_incorrectly state if it was already set
+            if S.get("kc_answered_incorrectly"): st.rerun() 
+            return # Don't proceed without an answer
 
         is_correct = _answers_match(user_answer, q.get('correct_answer'), q_type)
         if is_correct:
@@ -1214,7 +1079,7 @@ def display_knowledge_check_question(S):
                 # Fallback message if fetching fails
                 st.info(f"See {reference} for context. (Could not load additional details: {e})")
         else:
-             st.info("No specific Bible reference was provided for this question.") # Handle missing reference
+            st.info("No specific Bible reference was provided for this question.") # Handle missing reference
 
         # Continue button appears only after showing the error/explanation
         if st.button("Continue Lesson", key=f"continue_{input_key}"):
@@ -1253,10 +1118,10 @@ def run_level_quiz(S):
         q = quiz_questions[q_index]
         # Basic check for question format
         if not isinstance(q, dict) or 'question' not in q or 'correct_answer' not in q:
-             st.error(f"Error: Invalid question format at index {q_index}. Skipping question.")
-             S["current_question_index"] = q_index + 1
-             st.rerun()
-             return
+            st.error(f"Error: Invalid question format at index {q_index}. Skipping question.")
+            S["current_question_index"] = q_index + 1
+            st.rerun()
+            return
 
         st.markdown(f"**Question {q_index + 1}:** {q.get('question', '')}")
         user_answer = None
@@ -1273,14 +1138,14 @@ def run_level_quiz(S):
         elif q_type == 'fill_in_the_blank':
             user_answer = st.text_input("Answer:", key=q_key)
         else:
-             st.error(f"Unknown quiz question type: {q_type}"); return
+            st.error(f"Unknown quiz question type: {q_type}"); return
 
         # Handle submission
         if st.button("Submit Quiz Answer", key=f"submit_{q_key}"):
             if user_answer is None and q_type in ['multiple_choice', 'true_false']:
-                 st.warning("Please select an answer.")
-                 return
-                 
+                st.warning("Please select an answer.")
+                return
+                
             if _answers_match(user_answer, q.get('correct_answer'), q_type):
                 st.success("Correct!")
                 S["user_score"] = S.get("user_score", 0) + 1
@@ -1313,23 +1178,23 @@ def run_level_quiz(S):
                     #     del S["levels"][S["current_level"]-1]["quiz_questions"]
                     st.rerun()
             else:
-                 # This was the last level
-                 st.info("You've completed all levels in this plan!")
-                 if st.button("Start a New Journey"):
-                      st.session_state.learn_state = {} # Reset everything
-                      st.rerun()
+                # This was the last level
+                st.info("You've completed all levels in this plan!")
+                if st.button("Start a New Journey"):
+                    st.session_state.learn_state = {} # Reset everything
+                    st.rerun()
 
         else:
             st.error("You didn't reach the passing score. Please review the lessons and try the quiz again.")
             if st.button("Review Lessons"):
-                 # Reset state to go back to the first lesson of the current level
-                 S["quiz_mode"] = False
-                 S["current_lesson_index"] = 0
-                 S["current_section_index"] = 0
-                 S["current_question_index"] = 0 
-                 S["user_score"] = 0
-                 # Keep generated quiz questions so user doesn't wait again
-                 st.rerun()
+                # Reset state to go back to the first lesson of the current level
+                S["quiz_mode"] = False
+                S["current_lesson_index"] = 0
+                S["current_section_index"] = 0
+                S["current_question_index"] = 0 
+                S["user_score"] = 0
+                # Keep generated quiz questions so user doesn't wait again
+                st.rerun()
             if st.button("Retake Quiz"):
                 S["current_question_index"] = 0
                 S["user_score"] = 0
@@ -1370,11 +1235,6 @@ def run_diagnostic_quiz():
             if user_answer:
                 if user_answer == q_data['correct']:
                     S_learn['diag_score'] += 1
-                    # Don't show "Correct!" during diagnostic to speed it up? Optional.
-                    # st.success("Correct!") 
-                # No specific feedback needed for incorrect answers during diagnostic
-                # else:
-                #     st.error(f"Not quite. The correct answer was: {q_data['correct']}")
                 
                 S_learn['diag_q_index'] += 1
                 st.rerun() 
@@ -1398,10 +1258,8 @@ def run_diagnostic_quiz():
         S_learn['derived_knowledge_level'] = knowledge_level
         S_learn['diagnostic_complete'] = True
         
-        # Automatically proceed by rerunning, removing the need for the button
+        # Automatically proceed by rerunning
         st.rerun() 
-        # if st.button("Continue to Plan Setup"):
-        #      st.rerun() # Proceed to the main form
 
 # ================================================================
 # LEARNING PLAN SETUP (QUESTIONNAIRE)
@@ -1436,8 +1294,8 @@ def run_learn_module_setup():
             st.warning("Please fill out the topics and objectives to generate a plan.")
             return
         if form_data['knowledge_level'] == "Not determined":
-             st.error("Knowledge level could not be determined. Please restart.")
-             return
+            st.error("Knowledge level could not be determined. Please restart.")
+            return
             
         with st.spinner("Our AI is designing your personalized curriculum..."):
             master_prompt = create_full_learning_plan_prompt(form_data)
@@ -1513,7 +1371,7 @@ def run_learn_module():
                 prev_summary = None
                 # Get summary from previous lesson in this level
                 if S["current_lesson_index"] > 0:
-                     prev_summary = level_data["lessons"][S["current_lesson_index"] - 1].get("lesson_summary")
+                    prev_summary = level_data["lessons"][S["current_lesson_index"] - 1].get("lesson_summary")
                 # Or get summary from last lesson of previous level if first lesson
                 elif S["current_level"] > 0:
                     prev_level_lessons = S["levels"][S["current_level"]-1].get("lessons", [])
@@ -1542,7 +1400,7 @@ def run_learn_module():
                     if lesson_resp: st.text_area("Raw AI Lesson Response (for debugging):", lesson_resp, height=200)
                     # Add a button to retry generation?
                     if st.button("Retry Lesson Generation"):
-                         st.rerun() # Simple retry
+                        st.rerun() # Simple retry
                     return # Stop execution if lesson failed
         
         # --- Display Current Lesson Section ---
@@ -1551,12 +1409,12 @@ def run_learn_module():
         
         lesson_sections = current_lesson.get("lesson_content_sections", [])
         if not lesson_sections: # Handle empty lesson case
-             st.warning("This lesson appears to be empty.")
-             # Automatically move to next lesson or quiz? For now, show button.
-             if st.button("Proceed Anyway"):
-                  S["current_section_index"] = 999 # Force completion check below
-                  st.rerun()
-             return
+            st.warning("This lesson appears to be empty.")
+            # Automatically move to next lesson or quiz? For now, show button.
+            if st.button("Proceed Anyway"):
+                S["current_section_index"] = 999 # Force completion check below
+                st.rerun()
+            return
 
         # Check if current section index is valid
         if S["current_section_index"] < len(lesson_sections):
@@ -1571,9 +1429,9 @@ def run_learn_module():
             elif section_type == "knowledge_check":
                 display_knowledge_check_question(S) # This function handles its own state and rerun
             else:
-                 st.warning(f"Unknown section type '{section_type}'. Skipping.")
-                 S["current_section_index"] += 1
-                 st.rerun()
+                st.warning(f"Unknown section type '{section_type}'. Skipping.")
+                S["current_section_index"] += 1
+                st.rerun()
         
         # --- End of Lesson Reached ---
         else: 
@@ -1583,7 +1441,7 @@ def run_learn_module():
             if summary_points:
                 for point in summary_points: st.markdown(f"- {point}")
             else:
-                 st.write("*No summary points provided.*")
+                st.write("*No summary points provided.*")
 
             # Check if there are more lessons in this level
             if S["current_lesson_index"] + 1 < num_lessons:
@@ -1617,25 +1475,136 @@ def run_learn_module():
                         S["user_score"] = 0
                         st.rerun()
                     else:
-                         st.error("Quiz questions are still missing. Cannot start quiz.")
+                        st.error("Quiz questions are still missing. Cannot start quiz.")
 
     # Fallback/Error case: Lesson index is beyond expected number but not in quiz mode
-    # This might happen if num_lessons logic changes or state gets corrupted
     elif not S.get("quiz_mode"):
         st.warning("It looks like you've finished the lessons for this level.")
         if st.button("Proceed to Level Quiz"):
-             # Attempt to generate quiz if needed
-             if "quiz_questions" not in level_data:
-                  # ... (Quiz generation logic as above) ...
-                  pass # Placeholder for quiz gen logic if needed here
-             # Switch to quiz mode
-             if "quiz_questions" in level_data and level_data["quiz_questions"]:
-                  S["quiz_mode"] = True
-                  S["current_question_index"] = 0
-                  S["user_score"] = 0
-                  st.rerun()
-             else:
-                  st.error("Could not prepare quiz questions.")
+            # Attempt to generate quiz if needed
+            if "quiz_questions" not in level_data:
+                # ... (Quiz generation logic as above) ...
+                pass # Placeholder for quiz gen logic if needed here
+            # Switch to quiz mode
+            if "quiz_questions" in level_data and level_data["quiz_questions"]:
+                S["quiz_mode"] = True
+                S["current_question_index"] = 0
+                S["user_score"] = 0
+                st.rerun()
+            else:
+                st.error("Could not prepare quiz questions.")
+
+# ================================================================
+# CHAT MODE (LANGCHAIN AGENT VERSION)
+# ================================================================
+def run_chat_mode():
+    st.subheader("💬 Chat with GPT")
+    
+    is_theological_mode = st.toggle(
+        "Enable Deep Theological Chat", 
+        value=False,
+        help="Toggle on for in-depth, scholarly answers with web search for current events."
+    )
+
+    # --- 1. Define the "Brain" ---
+    # We define the AI model we want to use.
+    try:
+        llm = ChatOpenAI(
+            model=MODEL, 
+            temperature=0.3, 
+            api_key=st.secrets["OPENAI_API_KEY"]
+        )
+    except Exception as e:
+        st.error(f"Error initializing AI model: {e}")
+        return
+
+    # --- 2. Define the "Tools" ---
+    # The "Theological" mode gets the web_search tool. The "General" mode gets no tools.
+    tools = [web_search] if is_theological_mode else []
+    
+    # --- 3. Define the "Instructions" (The Prompt) ---
+    # This is where we put our conviction-based prompts.
+    if is_theological_mode:
+        system_instructions = THEOLOGICAL_SYSTEM_PROMPT
+    else:
+        system_instructions = GENERAL_SYSTEM_PROMPT
+
+    # A "MessagesPlaceholder" is just a "blank space" for the chat history to be inserted.
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_instructions),
+        MessagesPlaceholder(variable_name="chat_history"),
+        ("human", "{input}"), # This is where the user's new question goes
+    ])
+
+    # --- 4. Build the "Agent Engine" ---
+    # This connects the Brain, Tools, and Instructions.
+    try:
+        agent = create_openai_tools_agent(llm, tools, prompt)
+        
+        # The AgentExecutor is the "engine" that actually runs everything.
+        agent_executor = AgentExecutor(
+            agent=agent, 
+            tools=tools, 
+            verbose=True, # Prints "thoughts" to your terminal for debugging
+            handle_parsing_errors=True # Good practice
+        )
+    except Exception as e:
+        st.error(f"Error building AI agent: {e}")
+        return
+
+    # --- 5. Load and Display Chat History ---
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = load_chat_history()
+
+    st.markdown("---")
+    chat_container = st.container(height=400, border=False)
+    with chat_container:
+        if not st.session_state.chat_history:
+             st.caption("Your conversation will appear here. Your chat history is saved automatically.")
+        
+        # Display all user and assistant messages
+        for msg in st.session_state.chat_history:
+            if msg["role"] in ["user", "assistant"]:
+                who = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
+                st.markdown(f"**{who}:** {msg['content']}")
+    st.markdown("---")
+
+    # --- 6. Handle User Input ---
+    user_input = st.text_input("Ask a question or share a thought:")
+    
+    if st.button("Send", type="primary") and user_input:
+        
+        if user_input.lower().strip() in ["exit", "quit", "end", "stop"]:
+            st.info("Conversation ended. Your history is saved.")
+            return
+
+        with st.spinner("Thinking..."):
+            try:
+                # Convert our simple history to LangChain's format
+                langchain_history = format_chat_history_for_langchain(st.session_state.chat_history)
+                
+                # --- This is the new part ---
+                # We "run" the agent engine. This is just one line!
+                response = agent_executor.invoke({
+                    "chat_history": langchain_history,
+                    "input": user_input
+                })
+                
+                # The agent's final answer is in the "output" key
+                reply = response["output"]
+
+                # Save history and refresh
+                st.session_state.chat_history.append({"role": "user", "content": user_input})
+                st.session_state.chat_history.append({"role": "assistant", "content": reply})
+                save_chat_history(st.session_state.chat_history)
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
+                # If the agent fails, we don't want to save the user's message
+                # because it would just try and fail again on the next rerun.
+                # So we just show the error and let them try again.
+                pass # Don't pop, just let the error show.
 
 
 # ================================================================
@@ -1677,9 +1646,9 @@ if mode in mode_functions:
     try:
         mode_functions[mode]()
     except Exception as e:
-         st.error(f"An unexpected error occurred in {mode}: {e}")
-         # Optionally add more detailed error logging here
-         # import traceback
-         # st.code(traceback.format_exc()) 
+        st.error(f"An unexpected error occurred in {mode}: {e}")
+        # Optionally add more detailed error logging here
+        import traceback
+        st.code(traceback.format_exc()) 
 else:
     st.warning("Selected mode not found or mapped.")
