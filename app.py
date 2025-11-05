@@ -1099,45 +1099,29 @@ Example level object: {{"name": "Level 1: Title", "topic": "Brief topic descript
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None) -> str:
     """Generates a robust, theologically sound prompt for a single lesson."""
     context_clause = f" This lesson must logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
-
-    # --- Deeper, more specific instructions ---
-    time_commitment = form_data['time_commitment']
+    
     knowledge_level = form_data['knowledge_level']
     learning_style = form_data['learning_style']
 
-    # Define lesson structure based on time
+    # --- Define Section Counts (Simpler Logic) ---
+    time_commitment = form_data['time_commitment']
     if time_commitment == "15 minutes":
-        structure_instructions = """
-        1.  **Introduction (text):** A brief hook and the lesson's main question.
-        2.  **Core Teaching (text):** The main Bible passage and its core meaning.
-        3.  **Knowledge Check (knowledge_check):** One question on the Core Teaching.
-        4.  **Application (text):** One clear, practical takeaway.
-        5.  **Final Check (knowledge_check):** One question on the Application or main theme.
-        """
+        # Total 3 sections: Text, Text, Check
+        structure_desc = "exactly 2 'text' sections and 1 'knowledge_check' section"
+        flow_hint = "[Text 1: Introduction], [Text 2: Core Teaching], [Check 1 (on Text 2)]"
+        total_sections = 3
     elif time_commitment == "30 minutes":
-        structure_instructions = """
-        1.  **Introduction (text):** A hook, the main theme, and the key Bible passage.
-        2.  **Exposition (text):** Explain the context and meaning of the main passage.
-        3.  **Knowledge Check (knowledge_check):** A question on the Exposition.
-        4.  **Biblical Connection (text):** Connect this passage to another part of the Bible (Old or New Testament).
-        5.  **Knowledge Check (knowledge_check):** A question on the Biblical Connection.
-        6.  **Practical Application (text):** A "So what?" section for daily life.
-        7.  **Final Check (knowledge_check):** A reflective or application-based question.
-        """
+        # Total 5 sections: Text, Check, Text, Check, Text
+        structure_desc = "exactly 3 'text' sections and 2 'knowledge_check' sections"
+        flow_hint = "[Text 1: Introduction], [Check 1 (on Text 1)], [Text 2: Main Point], [Check 2 (on Text 2)], [Text 3: Application]"
+        total_sections = 5
     else: # 45 minutes
-        structure_instructions = """
-        1.  **Introduction (text):** A compelling hook, the main theological question, and the primary Scripture for the lesson.
-        2.  **Exposition & Context (text):** A deep dive into the primary passage. What did it mean to its original audience?
-        3.  **Knowledge Check (knowledge_check):** A question on the Exposition.
-        4.  **Theological Synthesis (text):** Connect the passage to a core doctrine (e.g., if the text is John 1, connect to the Trinity or Incarnation).
-        5.  **Knowledge Check (knowledge_check):** A question on the Theological Synthesis.
-        6.  **Broader Biblical Connection (text):** Connect this theme across the entire canon (e.g., how this New Testament idea was foreshadowed in the Old Testament).
-        7.  **Knowledge Check (knowledge_check):** A question on the Broader Connection.
-        8.  **Practical Application (text):** A clear "So what?" section for daily life, addressing potential struggles.
-        9.  **Guided Reflection (text):** A final paragraph with questions or a prayer prompt to help the user internalize the lesson.
-        """
+        # Total 7 sections: Text, Check, Text, Check, Text, Check, Text
+        structure_desc = "exactly 4 'text' sections and 3 'knowledge_check' sections"
+        flow_hint = "[Text 1: Intro], [Check 1], [Text 2: Exposition], [Check 2], [Text 3: Connection], [Check 3], [Text 4: Application]"
+        total_sections = 7
 
-    # --- Deeper instructions for level and style ---
+    # --- Define Level and Style Instructions ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
         level_instructions = "Focus on the core narrative and clear application. Define ALL theological terms (e.g., 'grace', 'justification', 'redemption'). Assume no prior knowledge."
@@ -1148,11 +1132,11 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
 
     style_instructions = ""
     if learning_style == "analytical":
-        style_instructions = "Use bullet points, logical arguments, and defined terms."
+        style_instructions = "Use bullet points, logical arguments, and defined terms in 'text' sections."
     elif learning_style == "storytelling":
-        style_instructions = "Use narrative, parables, and historical stories to illustrate points."
+        style_instructions = "Use narrative, parables, and historical stories to illustrate points in 'text' sections."
     elif learning_style == "practical":
-        style_instructions = "Focus heavily on the 'Practical Application' section with concrete, actionable steps."
+        style_instructions = "Focus heavily on the 'text' sections that deal with application. Make them concrete and actionable."
     elif learning_style == "reflective":
         style_instructions = "Embed 1-2 additional short, italicized reflection questions *within* the 'text' sections to make the user pause and think."
 
@@ -1165,15 +1149,19 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 - Learning Style: {learning_style}
 
 **CRITICAL INSTRUCTIONS:**
-1.  **Biblical Density:** Every `text` section MUST be rooted in Scripture, citing specific passages (e.g., John 3:16).
-2.  **Theological Soundness:** All content must be biblically orthodox and theologically robust.
-3.  **Knowledge Level Tailoring:** {level_instructions}
-4.  **Learning Style Tailoring:** {style_instructions}
-5.  **Lesson Structure:** Generate the lesson sections *exactly* in this order:
-{structure_instructions}
-6.  **Knowledge Checks:** Ensure each `knowledge_check` directly relates to the preceding `text` section. Each check *must* include `question`, `question_type`, `correct_answer`, and a `biblical_reference`. For `multiple_choice`, include an `options` list of 4 strings. For `true_false`, the `correct_answer` is "True" or "False".
+1.  **Content & Structure:** Generate **{structure_desc}**, for a total of {total_sections} sections.
+2.  **Flow:** You MUST intersperse them. A 'knowledge_check' must always follow a 'text' section. A good flow is: {flow_hint}.
+3.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense, and cite specific Bible passages (e.g., John 3:16).
+4.  **Level Tailoring:** {level_instructions}
+5.  **Style Tailoring:** {style_instructions}
+6.  **Knowledge Checks:** Each `knowledge_check` must directly test the content of the `text` section *immediately preceding it*. It MUST include `question`, `question_type`, `correct_answer`, and a `biblical_reference`.
+7.  **JSON Format:** Output ONLY a valid JSON object with keys "lesson_title", "lesson_content_sections" (a list of all {total_sections} objects), and "summary_points" (a list of 3-4 key takeaways).
 
-Output ONLY a valid JSON object with keys "lesson_title", "lesson_content_sections" (a list of objects following the structure above), and "summary_points" (a list of 3-4 key takeaways from the lesson).
+**Example 'text' section object:**
+{{"type": "text", "content": "The introduction to the lesson goes here (Genesis 1:1)..."}}
+
+**Example 'knowledge_check' object:**
+{{"type": "knowledge_check", "question_type": "multiple_choice", "question": "What is the key theme?", "options": ["A","B","C","D"], "correct_answer": "A", "biblical_reference": "Genesis 1:1"}}
 """
 
 def create_level_quiz_prompt(level_topic: str, lesson_summaries: list, level_name: str) -> str:
