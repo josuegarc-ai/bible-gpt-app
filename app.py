@@ -1191,14 +1191,15 @@ The lessons covered these key points:
 
 **Instructions:** Create a quiz based on the *theological concepts, scriptural connections, and applications* implied by these lesson summaries.
 - Generate exactly 10 questions.
-- Questions should test for *deep understanding* of the concepts, not just surface-level facts.
 - Mix question types: 'multiple_choice', 'true_false', 'fill_in_the_blank'.
 - Each question object MUST include: 'question' (string), 'question_type' (string), 'correct_answer' (string).
 - For 'multiple_choice', also include 'options' (list of 4 strings, including the correct one).
 - For 'true_false', `correct_answer` must be "True" or "False".
 - Include a relevant 'biblical_reference' (string) for each question.
 
-Output ONLY a valid JSON array containing the 10 question objects.
+**Output Format:**
+Output ONLY a valid JSON object with a *single key* named "quiz". The value of "quiz" MUST be the JSON *array* containing the 10 question objects.
+Example: {{"quiz": [ {{...question 1...}}, {{...question 2...}} ]}}
 """
 
 # -------------------------
@@ -1729,15 +1730,23 @@ def run_learn_module():
                                     lesson_summaries=all_summaries,
                                     level_name=level_data.get("name")
                                 )
+                               # --- This is the NEW, corrected code block ---
                                 quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500) 
-                                quiz_data = _learn_extract_json_any(quiz_resp)
-                                # Validate quiz data structure
-                                if quiz_data and isinstance(quiz_data, list):
-                                    level_data["quiz_questions"] = quiz_data
+                                quiz_data_object = _learn_extract_json_any(quiz_resp)
+                                
+                                # Validate the new structure (an object containing a "quiz" list)
+                                if (quiz_data_object and 
+                                    isinstance(quiz_data_object, dict) and 
+                                    "quiz" in quiz_data_object and 
+                                    isinstance(quiz_data_object["quiz"], list)):
+                                    
+                                    # Success! Extract the list of questions.
+                                    level_data["quiz_questions"] = quiz_data_object["quiz"]
                                 else:
+                                    # Failure
                                     st.error("Failed to generate valid quiz questions. Please try starting the quiz again.")
                                     if quiz_resp: st.text_area("Raw AI Quiz Response (for debugging):", quiz_resp, height=200)
-                                    return # Stop if generation failed
+                                    return # Stop if generation failed     
                         
                         # Check again if questions were generated successfully before switching modes
                         if "quiz_questions" in level_data and level_data["quiz_questions"]:
