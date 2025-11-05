@@ -508,25 +508,25 @@ def run_practice_chat():
                     
                     # Deduplicate options and ensure correct is present for MC/FITB
                     if data['question_type'] != 'true_false':
-                         if 'choices' not in data: data['choices'] = []
-                         # Ensure choices is a list
-                         if not isinstance(data['choices'], list): data['choices'] = []
-                         # Deduplicate while preserving order (important for potential distractors)
-                         seen = set()
-                         uniq = [x for x in data['choices'] if not (x in seen or seen.add(x))]
-                         # Add correct answer if not already in choices
-                         if data['correct'] not in seen:
-                             uniq.append(data['correct'])
-                         random.shuffle(uniq)
-                         data['choices'] = uniq
+                        if 'choices' not in data: data['choices'] = []
+                        # Ensure choices is a list
+                        if not isinstance(data['choices'], list): data['choices'] = []
+                        # Deduplicate while preserving order (important for potential distractors)
+                        seen = set()
+                        uniq = [x for x in data['choices'] if not (x in seen or seen.add(x))]
+                        # Add correct answer if not already in choices
+                        if data['correct'] not in seen:
+                            uniq.append(data['correct'])
+                        random.shuffle(uniq)
+                        data['choices'] = uniq
                     else:
                         data['choices'] = ["True", "False"] # Standardize TF choices
 
                     S["questions"].append(data)
             if not S["questions"]: # Handle case where generation failed
-                 st.error("Failed to generate questions. Please try again.")
+                st.error("Failed to generate questions. Please try again.")
             else:
-                 st.rerun()
+                st.rerun()
 
     elif S["current"] < len(S["questions"]):
         q = S["questions"][S["current"]]
@@ -543,9 +543,9 @@ def run_practice_chat():
 
         if not S.get("awaiting_next", False):
             if st.button("Submit Answer"):
-                 if ans is None and (q_type == 'multiple_choice' or q_type == 'true_false'):
-                     st.warning("Please select an answer.")
-                 elif ans is not None:
+                if ans is None and (q_type == 'multiple_choice' or q_type == 'true_false'):
+                    st.warning("Please select an answer.")
+                elif ans is not None:
                     if _answers_match(ans, q["correct"], q_type): # Using fuzzy match function
                         S["score"] += 1; st.success("✅ Correct!"); S["current"] += 1; st.rerun()
                     else:
@@ -585,9 +585,9 @@ def run_faith_journal():
             st.success(f"Saved as `{filename}`.")
             # Added option for AI insight after saving
             if st.checkbox("Get spiritual insight from this entry?"):
-                 with st.spinner("Analyzing your entry..."):
-                     insight = ask_gpt_conversation(f"Analyze this faith journal entry and offer spiritual insight and encouragement based on biblical principles: {entry}")
-                     st.markdown("**💡 Insight:**"); st.write(insight)
+                with st.spinner("Analyzing your entry..."):
+                    insight = ask_gpt_conversation(f"Analyze this faith journal entry and offer spiritual insight and encouragement based on biblical principles: {entry}")
+                    st.markdown("**💡 Insight:**"); st.write(insight)
         except Exception as e:
             st.error(f"Failed to save entry: {e}")
 
@@ -626,14 +626,14 @@ def run_bible_beta():
         full_ref = f"{book} {passage_ref}"
         try:
             with st.spinner(f"Fetching {full_ref}..."):
-                 text = fetch_bible_verse(full_ref, translation_beta)
-                 st.text_area(f"📖 {full_ref} ({translation_beta.upper()})", value=text, height=400)
+                text = fetch_bible_verse(full_ref, translation_beta)
+                st.text_area(f"📖 {full_ref} ({translation_beta.upper()})", value=text, height=400)
             
             # Optional summarization integrated below text area
             if st.checkbox("✨ Summarize this passage?"):
                 with st.spinner("Generating summary..."):
-                     summary = ask_gpt_conversation(f"Summarize and explain the key points of this Bible passage: {text} ({full_ref})")
-                     st.markdown("**💬 Summary & Key Points:**"); st.markdown(summary)
+                    summary = ask_gpt_conversation(f"Summarize and explain the key points of this Bible passage: {text} ({full_ref})")
+                    st.markdown("**💬 Summary & Key Points:**"); st.markdown(summary)
 
         except Exception as e:
             st.error(f"Error fetching passage: {e}")
@@ -652,7 +652,7 @@ def _convert_to_wav_if_needed(src_path: str) -> str:
     except subprocess.CalledProcessError as e:
         raise Exception(f"ffmpeg conversion failed with exit code {e.returncode}: {e.stderr}")
     except subprocess.TimeoutExpired:
-         raise Exception("ffmpeg conversion timed out after 2 minutes.")
+        raise Exception("ffmpeg conversion timed out after 2 minutes.")
     return wav_path
 
 def download_youtube_audio(url: str) -> tuple[str, str, str]:
@@ -692,7 +692,7 @@ def download_youtube_audio(url: str) -> tuple[str, str, str]:
             
         return output_path, uploader, title
     except yt_dlp.utils.DownloadError as e: # Catch specific download errors
-         raise Exception(f"❌ YouTube download error: {e}")
+        raise Exception(f"❌ YouTube download error: {e}")
     except Exception as e:
         raise Exception(f"❌ Failed during YouTube audio processing: {e}")
 
@@ -712,7 +712,7 @@ def run_sermon_transcriber():
                 if yt_link:
                     # Validate URL format roughly
                     if not yt_link.startswith(("http://", "https://")):
-                         raise ValueError("Invalid YouTube URL provided.")
+                        raise ValueError("Invalid YouTube URL provided.")
                     # Get duration without full download first
                     with yt_dlp.YoutubeDL({"quiet": True, "noprogress": True}) as ydl:
                         info = ydl.extract_info(yt_link, download=False)
@@ -753,10 +753,10 @@ def run_sermon_transcriber():
                         cleanup_path = wav_path # Now delete the wav file instead
                         transcription = model.transcribe(wav_path, fp16=False)
                     except Exception as e_convert:
-                         raise Exception(f"Transcription failed even after conversion: {e_convert}")
+                        raise Exception(f"Transcription failed even after conversion: {e_convert}")
 
                 if not transcription or not transcription.get("text"):
-                     raise Exception("Transcription failed or produced empty text.")
+                    raise Exception("Transcription failed or produced empty text.")
 
                 transcript_text = transcription["text"].strip()
                 st.success("✅ Transcription complete.")
@@ -874,7 +874,7 @@ def run_verse_of_the_day():
              "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John", 
              "Jude", "Revelation"]
     try:
-         # Generate a reference - consider API/library for valid chapter/verse counts later
+        # Generate a reference - consider API/library for valid chapter/verse counts later
         book = random.choice(books)
         # Simplified chapter/verse generation for now
         chapter = random.randint(1, 5) # Assume at least 5 chapters
@@ -882,13 +882,13 @@ def run_verse_of_the_day():
         ref = f"{book} {chapter}:{verse}"
 
         with st.spinner("Fetching Verse of the Day..."):
-             text = fetch_bible_verse(ref, "web") # Default to WEB translation
-             st.success(f"**{ref} (WEB)**\n\n> {text}") # Use blockquote
+            text = fetch_bible_verse(ref, "web") # Default to WEB translation
+            st.success(f"**{ref} (WEB)**\n\n> {text}") # Use blockquote
 
-             reflection_prompt = f"Offer a brief (2-3 sentences), warm, and practical reflection on this Bible verse, focusing on one simple takeaway: '{text}' ({ref})"
-             reflection = ask_gpt_conversation(reflection_prompt)
-             st.markdown("**💬 Reflection & Takeaway:**")
-             st.write(reflection)
+            reflection_prompt = f"Offer a brief (2-3 sentences), warm, and practical reflection on this Bible verse, focusing on one simple takeaway: '{text}' ({ref})"
+            reflection = ask_gpt_conversation(reflection_prompt)
+            st.markdown("**💬 Reflection & Takeaway:**")
+            st.write(reflection)
 
     except Exception as e: 
         # Handle cases where the random verse might be invalid
@@ -899,16 +899,16 @@ def run_prayer_starter():
     theme = st.text_input("What's on your heart? (e.g., gratitude, anxiety, guidance, forgiveness):")
     if st.button("Generate Prayer Starter") and theme:
         with st.spinner("Crafting a prayer..."):
-             prayer = ask_gpt_conversation(f"Write a short (3-5 sentences), theologically faithful prayer starter focused on '{theme}'. Address God reverently (e.g., 'Heavenly Father', 'Lord Jesus') and base it on biblical truths. Avoid clichés.")
-             st.text_area("Your Prayer Starter:", prayer, height=200)
+            prayer = ask_gpt_conversation(f"Write a short (3-5 sentences), theologically faithful prayer starter focused on '{theme}'. Address God reverently (e.g., 'Heavenly Father', 'Lord Jesus') and base it on biblical truths. Avoid clichés.")
+            st.text_area("Your Prayer Starter:", prayer, height=200)
 
 def run_fast_devotional():
     st.subheader("⚡ Fast Devotional")
     topic = st.text_input("Devotional Topic (e.g., hope, perseverance, love, faith):")
     if st.button("Generate Fast Devotional") and topic:
-         with st.spinner("Writing devotional..."):
-             devo = ask_gpt_conversation(f"Compose a short devotional (approx. 150-200 words) on the topic of '{topic}'. Include one primary Bible verse, 1-2 related cross-references, a brief explanation connecting them to the topic, and one practical challenge or encouragement for today.")
-             st.text_area(f"Devotional on {topic}:", devo, height=350)
+        with st.spinner("Writing devotional..."):
+            devo = ask_gpt_conversation(f"Compose a short devotional (approx. 150-200 words) on the topic of '{topic}'. Include one primary Bible verse, 1-2 related cross-references, a brief explanation connecting them to the topic, and one practical challenge or encouragement for today.")
+            st.text_area(f"Devotional on {topic}:", devo, height=350)
 
 def run_small_group_generator():
     st.subheader("👥 Small Group Guide Generator")
@@ -963,20 +963,20 @@ def _learn_extract_json_any(response_text: str):
             open_count = 0
             end_index = -1
             for i, char in enumerate(response_text[start_index:]):
-                 if char == response_text[start_index]:
-                     open_count += 1
-                 elif char == end_char:
-                     open_count -= 1
-                 if open_count == 0:
-                     end_index = start_index + i + 1
-                     break
+                if char == response_text[start_index]:
+                    open_count += 1
+                elif char == end_char:
+                    open_count -= 1
+                if open_count == 0:
+                    end_index = start_index + i + 1
+                    break
             if end_index != -1:
-                 json_str = response_text[start_index:end_index]
+                json_str = response_text[start_index:end_index]
             else: # Fallback if matching bracket not found
-                 json_str = response_text[start_index:] 
+                json_str = response_text[start_index:] 
         else:
-             st.error("No JSON object or array found in AI response.")
-             return None
+            st.error("No JSON object or array found in AI response.")
+            return None
 
     try:
         return json.loads(json_str)
@@ -1027,8 +1027,8 @@ def ask_gpt_json(prompt: str, max_tokens: int = 4000):
             )
             return resp.choices[0].message.content
         except Exception as e2:
-             st.error(f"GPT JSON call failed completely: {e2}")
-             return None
+            st.error(f"GPT JSON call failed completely: {e2}")
+            return None
 
 
 def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
@@ -1096,10 +1096,68 @@ Output ONLY a single, valid JSON object with keys "plan_title", "introduction", 
 Example level object: {{"name": "Level 1: Title", "topic": "Brief topic description", "num_lessons": {num_lessons_per_level}}}
 """
 
-def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None) -> str:
-    """Generates a robust, theologically sound prompt for a single lesson."""
-    context_clause = f" This lesson must logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
+# ================================================================
+# <<< NEW FUNCTION >>>
+# create_remediation_question_prompt
+# ================================================================
+def create_remediation_question_prompt(original_question: dict, user_answer: str) -> str:
+    """
+    Generates a prompt to create a new question in a different format
+    for a concept the user failed.
+    """
+    q_data = original_question
+    original_type = q_data.get('question_type', 'unknown')
     
+    # Determine which new formats are allowed
+    possible_formats = ["multiple_choice", "true_false", "fill_in_the_blank"]
+    # Remove the original format to ensure it's different
+    if original_type in possible_formats:
+        possible_formats.remove(original_type)
+    
+    # Ensure we have at least one format
+    if not possible_formats:
+        possible_formats = ["multiple_choice"] # Default fallback
+
+    new_format_options = ", ".join(possible_formats)
+
+    return f"""
+You are an expert Bible quiz designer. A student needs a remediation question.
+They were asked the following question:
+- **Original Question:** {q_data.get('question')}
+- **Original Type:** {original_type}
+- **Their Incorrect Answer:** {user_answer}
+- **The Correct Answer:** {q_data.get('correct_answer')}
+- **Core Concept (from verse):** {q_data.get('biblical_reference')}
+
+**Your Task:**
+Create one new question that tests the **exact same core concept** but in a **different format**.
+- The new question's format MUST be one of: [{new_format_options}].
+- The question must be clear and test the same knowledge.
+
+**Output Format:**
+Respond ONLY with a single, valid JSON object with these keys:
+- "question": (The new question text)
+- "question_type": (The new format, e.g., "multiple_choice")
+- "correct_answer": (The correct answer string for the new question)
+- "biblical_reference": "{q_data.get('biblical_reference')}"
+- "options": (A list of 4 strings, ONLY if `question_type` is "multiple_choice". Must include the correct answer.)
+"""
+
+# ================================================================
+# <<< MODIFIED FUNCTION >>>
+# create_lesson_prompt
+# ================================================================
+def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None, previous_struggles: str = None) -> str:
+    """Generates a robust, theologically sound prompt for a single lesson."""
+    
+    # --- Context Clauses ---
+    context_clause_lesson = f" This lesson must logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
+    # <<< NEW >>> Add struggle context
+    context_clause_struggle = (
+        f" **Adaptive Learning Note:** This user has previously struggled with these topics: [{previous_struggles}]. "
+        "If relevant to this lesson, you **MUST** add a 'Review' section at the beginning to briefly re-explain one of those concepts before teaching new material."
+    ) if previous_struggles else ""
+
     knowledge_level = form_data['knowledge_level']
     learning_style = form_data['learning_style']
     time_commitment = form_data['time_commitment']
@@ -1125,15 +1183,18 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
         style_instructions = "Your teaching method is **Introspective**. Focus on internal transformation. Ask probing, *italicized, bolded questions* directly within the text to make the user connect the doctrine to their own heart and motivations."
 
     # --- Define the *exact* section structure ---
+    # <<< NEW >>> Added {{REVIEW_SECTION_IF_NEEDED}} placeholder
     section_structure_instructions = ""
     if time_commitment == "15 minutes":
         section_structure_instructions = """
+        {{REVIEW_SECTION_IF_NEEDED}}
         - A 'text' section with the role 'Introduction'.
         - A 'text' section with the role 'Core Teaching & Application'.
         - A 'knowledge_check' section testing the 'Core Teaching'.
         """
     elif time_commitment == "30 minutes":
         section_structure_instructions = """
+        {{REVIEW_SECTION_IF_NEEDED}}
         - A 'text' section with the role 'Introduction' (State the main topic and passage).
         - A 'text' section with the role 'Exposition' (Teach the theological principles *from* the passage).
         - A 'knowledge_check' section testing the 'Exposition'.
@@ -1142,6 +1203,7 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
         """
     else: # 45 minutes
         section_structure_instructions = """
+        {{REVIEW_SECTION_IF_NEEDED}}
         - A 'text' section with the role 'Introduction' (A compelling hook and the main theological question).
         - A 'text' section with the role 'Exposition' (A deep dive into the *theological principles* of the passage).
         - A 'knowledge_check' section testing the 'Exposition'.
@@ -1150,10 +1212,20 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
         - A 'text' section with the role 'Practical Application' (A clear, actionable takeaway for daily life).
         - A 'text' section with the role 'Guided Reflection' (A closing prayer prompt or reflective questions).
         """
+    
+    # <<< NEW >>> Dynamically insert the review block based on struggles
+    review_block = ""
+    if previous_struggles:
+        review_block = f"- A 'text' section with the role 'Review'. (Content: Briefly re-explain a concept from: {previous_struggles}, as a warm-up.)"
+    
+    # Replace the placeholder with the dynamic block
+    section_structure_instructions = section_structure_instructions.replace("{{REVIEW_SECTION_IF_NEEDED}}", review_block)
+
 
     return f"""
 You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_level} on the topic of "{level_topic}".
-{context_clause}
+{context_clause_lesson}
+{context_clause_struggle}
 
 **User Profile:**
 - Knowledge Level: {knowledge_level}
@@ -1209,109 +1281,181 @@ Example: {{"quiz": [ {{...question 1...}}, {{...question 2...}} ]}}
 # -------------------------
 # KNOWLEDGE CHECK & QUIZ UI
 # -------------------------
+# ================================================================
+# <<< HEAVILY MODIFIED FUNCTION >>>
+# display_knowledge_check_question
+# This now includes the remediation loop.
+# ================================================================
 def display_knowledge_check_question(S):
-    """Displays knowledge check, handles submission, and shows explanation on incorrect."""
+    """Displays knowledge check, handles submission, and shows breakdown + remediation question."""
+    
     level_data = S["levels"][S["current_level"]]
     current_lesson = level_data["lessons"][S["current_lesson_index"]]
-    q = current_lesson["lesson_content_sections"][S["current_section_index"]]
+    # The original question from the lesson plan
+    q_original = current_lesson["lesson_content_sections"][S["current_section_index"]]
 
-    st.markdown("---")
-    st.markdown(f"#### ✅ Knowledge Check")
-    st.markdown(f"**{q.get('question', 'Missing question text.')}**")
+    input_key_base = f"kc_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"
 
-    user_answer = None
-    input_key = f"kc_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"
-    q_type = q.get('question_type')
+    # --- STATE 1: User is answering the *original* question ---
+    if not S.get("awaiting_remediation"):
+        st.markdown("---")
+        st.markdown(f"#### ✅ Knowledge Check")
+        st.markdown(f"**{q_original.get('question', 'Missing question text.')}**")
 
-    # Display input widget based on question type
-    if q_type == 'multiple_choice':
-        user_answer = st.radio("Select your answer:", q.get('options', []), key=input_key, index=None)
-    elif q_type == 'true_false':
-        user_answer = st.radio("True or False?", ['True', 'False'], key=input_key, index=None)
-    elif q_type == 'fill_in_the_blank':
-        user_answer = st.text_input("Fill in the blank:", key=input_key)
-    else:
-        st.error(f"Unknown question type: {q_type}")
-        # --- NEW: Navigation on Error ---
-        if st.button("⬅️ Previous Section", key=f"prev_sec_kc_err_{S['current_section_index']}"):
-            S["current_section_index"] -= 1
-            st.rerun()
-        return # Avoid proceeding if type is wrong
+        user_answer = None
+        input_key = f"{input_key_base}_original"
+        q_type = q_original.get('question_type')
 
-    # Handle submission
-    if st.button("Submit Answer", key=f"submit_{input_key}"):
-        # Basic validation for radio buttons
-        if user_answer is None and q_type in ['multiple_choice', 'true_false']:
-             st.warning("Please select an answer.")
-             if S.get("kc_answered_incorrectly"): st.rerun() 
-             return # Don't proceed without an answer
-
-        is_correct = _answers_match(user_answer, q.get('correct_answer'), q_type)
-        if is_correct:
-            st.success("Correct! Moving on.")
-            S["current_section_index"] += 1
-            # Clear flags if they were set from a previous attempt
-            if "kc_answered_incorrectly" in S: del S["kc_answered_incorrectly"]
-            if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
-            st.rerun()
+        if q_type == 'multiple_choice':
+            user_answer = st.radio("Select your answer:", q_original.get('options', []), key=input_key, index=None)
+        elif q_type == 'true_false':
+            user_answer = st.radio("True or False?", ['True', 'False'], key=input_key, index=None)
+        elif q_type == 'fill_in_the_blank':
+            user_answer = st.text_input("Fill in the blank:", key=input_key)
         else:
-            S["kc_answered_incorrectly"] = True
-            S["last_incorrect_answer"] = user_answer # Store the incorrect answer
-            st.rerun() # Rerun to display the explanation section
+            st.error(f"Unknown question type: {q_type}"); return
 
-    # Display explanation if answered incorrectly on the previous run
-    if S.get("kc_answered_incorrectly"):
-        st.error(f"Not quite. The correct answer is: **{q.get('correct_answer')}**")
-        
-        reference = q.get('biblical_reference', '')
-        if reference:
-            try:
-                # Use a spinner while fetching verse and explanation
-                with st.spinner("Loading context and explanation..."):
-                    verse_text = fetch_bible_verse(reference)
-                    incorrect_ans = S.get("last_incorrect_answer", "their answer") # Get the stored wrong answer
-                    
-                    explanation_prompt = (
-                        f"You are a pastoral Bible teacher. A student was asked: '{q.get('question')}' "
-                        f"They incorrectly answered: '{incorrect_ans}'. The correct answer is: '{q.get('correct_answer')}'. "
-                        f"The relevant Bible verse is '{reference}', which says: '{verse_text}'. "
-                        f"In one concise paragraph, please do two things: "
-                        f"1. Explain the *theological reason* why '{q.get('correct_answer')}' is correct, based on the verse. "
-                        f"2. Gently explain the *misunderstanding* that might have led them to choose '{incorrect_ans}'. "
-                        f"Be encouraging, not shaming."
-                    )
-                    
-                    explanation = ask_gpt_conversation(explanation_prompt)
+        if st.button("Submit Answer", key=f"submit_{input_key}"):
+            if user_answer is None and q_type in ['multiple_choice', 'true_false']:
+                st.warning("Please select an answer.")
+                return
 
-                # Display verse and explanation in an expander
-                with st.expander(f"📖 See {reference} for context and explanation"):
-                    st.markdown(f"**Verse Text:**\n\n> *{verse_text}*") # Use blockquote for verse
-                    st.markdown("---")
-                    st.markdown(f"**Explanation:**\n\n{explanation}")
-
-            except Exception as e:
-                # Fallback message if fetching fails
-                st.info(f"See {reference} for context. (Could not load additional details: {e})")
-        else:
-             st.info("No specific Bible reference was provided for this question.") # Handle missing reference
-
-        # Continue button appears only after showing the error/explanation
-        if st.button("Continue Lesson", key=f"continue_{input_key}"):
-            # Clear flags before moving on
-            if "kc_answered_incorrectly" in S: del S["kc_answered_incorrectly"]
-            if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
-            S["current_section_index"] += 1
-            st.rerun()
+            is_correct = _answers_match(user_answer, q_original.get('correct_answer'), q_type)
             
-    # --- NEW: "Previous Section" button for Knowledge Checks ---
-    if S["current_section_index"] > 0:
-        if st.button("⬅️ Previous Section", key=f"prev_sec_kc_{S['current_section_index']}"):
-            S["current_section_index"] -= 1
-            # Clear any pending incorrect flags
-            if "kc_answered_incorrectly" in S: del S["kc_answered_incorrectly"]
-            if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
+            if is_correct:
+                st.success("Correct! Moving on.")
+                S["current_section_index"] += 1
+                st.rerun()
+            else:
+                # --- INCORRECT ---
+                # 1. Log the struggle
+                topic = q_original.get('biblical_reference', 'general_knowledge')
+                S["struggle_log"][topic] = S["struggle_log"].get(topic, 0) + 1
+                
+                # 2. Set state for remediation loop
+                S["awaiting_remediation"] = True
+                S["last_incorrect_answer"] = user_answer
+                S["remediation_question"] = None # Ensure it's cleared
+                st.rerun()
+        
+        # Navigation to go back
+        if S["current_section_index"] > 0:
+            if st.button("⬅️ Previous Section", key=f"prev_sec_kc_{S['current_section_index']}"):
+                S["current_section_index"] -= 1
+                st.rerun()
+        return
+
+    # --- STATE 2: User is in the remediation loop (Breakdown + New Question) ---
+    if S.get("awaiting_remediation"):
+        st.error(f"Not quite. The correct answer to the first question was: **{q_original.get('correct_answer')}**")
+        
+        # --- Display Theological Breakdown ---
+        if "breakdown_content" not in S: # Generate breakdown only once
+            reference = q_original.get('biblical_reference', '')
+            breakdown_data = {"explanation": "Loading...", "verse_text": "", "reference": reference}
+            if reference:
+                try:
+                    with st.spinner("Loading Theological Breakdown..."):
+                        verse_text = fetch_bible_verse(reference)
+                        incorrect_ans = S.get("last_incorrect_answer", "their answer")
+                        
+                        explanation_prompt = (
+                            f"You are a pastoral Bible teacher providing a 'Theological Breakdown'. A student was asked: '{q_original.get('question')}' "
+                            f"They incorrectly answered: '{incorrect_ans}'. The correct answer is: '{q_original.get('correct_answer')}'. "
+                            f"The relevant Bible verse is '{reference}', which says: '{verse_text}'. "
+                            f"In 2-3 concise paragraphs, please do three things: "
+                            f"1. **Analyze the Verse:** Briefly explain the *theological principle* taught in '{reference}'. "
+                            f"2. **Correct the Misunderstanding:** Gently explain the *specific error* in thinking that led to the answer '{incorrect_ans}'. "
+                            f"3. **Reinforce the Truth:** Clearly explain why '{q_original.get('correct_answer')}' is the correct answer, tying it back to the verse's principle. "
+                            f"Be encouraging and analytical."
+                        )
+                        explanation = ask_gpt_conversation(explanation_prompt)
+                        breakdown_data["explanation"] = explanation
+                        breakdown_data["verse_text"] = verse_text
+                except Exception as e:
+                    breakdown_data["explanation"] = f"Could not load full breakdown: {e}"
+            else:
+                breakdown_data["explanation"] = "No specific Bible reference was provided, but the correct answer is as stated above because... [AI would genericallly explain based on question]"
+            
+            S["breakdown_content"] = breakdown_data # Save to state
+        
+        # Display the breakdown
+        breakdown = S["breakdown_content"]
+        with st.expander(f"📖 Theological Breakdown: {breakdown.get('reference')}", expanded=True):
+            if breakdown.get("verse_text"):
+                st.markdown(f"**Verse Text ({breakdown.get('reference')}):**\n\n> *{breakdown.get('verse_text')}*")
+                st.markdown("---")
+            st.markdown(f"**Explanation:**\n\n{breakdown.get('explanation')}")
+
+        # --- Display Remediation Question ---
+        st.markdown("---")
+        st.markdown("#### 💡 Let's Try That Concept Again")
+
+        # 2a. Generate the remediation question if it doesn't exist
+        if not S.get("remediation_question"):
+            with st.spinner("Preparing a new question..."):
+                try:
+                    remediation_prompt = create_remediation_question_prompt(q_original, S.get("last_incorrect_answer", ""))
+                    q_resp = ask_gpt_json(remediation_prompt, 1000)
+                    q_data = _learn_extract_json_any(q_resp)
+                    if not q_data or 'question' not in q_data:
+                        raise Exception("Failed to generate valid remediation question JSON.")
+                    S["remediation_question"] = q_data
+                    st.rerun() # Rerun to display the new question
+                except Exception as e:
+                    st.error(f"Error generating remediation question: {e}. Moving on.")
+                    # Abort remediation and show 'Continue'
+                    S["awaiting_remediation"] = False 
+                    S["current_section_index"] += 1
+                    if "breakdown_content" in S: del S["breakdown_content"]
+                    st.rerun()
+            return
+
+        # 2b. Display and process the remediation question
+        q_remediation = S.get("remediation_question")
+        if not q_remediation: return # Should be handled above, but as a safeguard
+
+        st.markdown(f"**{q_remediation.get('question')}**")
+        
+        user_answer_remediation = None
+        input_key_remediation = f"{input_key_base}_remediation"
+        q_type_remediation = q_remediation.get('question_type')
+
+        if q_type_remediation == 'multiple_choice':
+            user_answer_remediation = st.radio("Select your answer:", q_remediation.get('options', []), key=input_key_remediation, index=None)
+        elif q_type_remediation == 'true_false':
+            user_answer_remediation = st.radio("True or False?", ['True', 'False'], key=input_key_remediation, index=None)
+        elif q_type_remediation == 'fill_in_the_blank':
+            user_answer_remediation = st.text_input("Fill in the blank:", key=input_key_remediation)
+        
+        if st.button("Submit Reworked Answer", key=f"submit_{input_key_remediation}"):
+            if user_answer_remediation is None and q_type_remediation in ['multiple_choice', 'true_false']:
+                st.warning("Please select an answer.")
+                return
+
+            is_correct_remediation = _answers_match(user_answer_remediation, q_remediation.get('correct_answer'), q_type_remediation)
+            
+            if is_correct_remediation:
+                st.success("✅ Excellent! You've grasped the concept.")
+            else:
+                st.error(f"❌ Still not quite. The correct answer was **{q_remediation.get('correct_answer')}**. We'll move on for now, but be sure to review this concept!")
+            
+            # Set flag to show 'Continue' button
+            S["awaiting_remediation"] = "completed" 
             st.rerun()
-    # --- End of NEW Button ---
+
+    # --- STATE 3: Remediation is done, show 'Continue' button ---
+    if S.get("awaiting_remediation") == "completed":
+        if st.button("Continue Lesson", key=f"continue_{input_key_base}"):
+            # Clear all remediation flags
+            S["awaiting_remediation"] = False
+            if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
+            if "remediation_question" in S: del S["remediation_question"]
+            if "breakdown_content" in S: del S["breakdown_content"]
+            
+            # Move to the next section
+            S["current_section_index"] += 1
+            st.rerun()
 
 def run_level_quiz(S):
     # --- NEW: Add Back to Syllabus Button ---
@@ -1379,6 +1523,9 @@ def run_level_quiz(S):
                 S["user_score"] = S.get("user_score", 0) + 1
             else:
                 st.error(f"Incorrect. The correct answer was: **{q.get('correct_answer')}**")
+                # <<< ADAPTIVE LEARNING >>> Log struggle topic from quiz
+                topic = q.get('biblical_reference', 'general_knowledge')
+                S["struggle_log"][topic] = S["struggle_log"].get(topic, 0) + 1
             
             S["current_question_index"] = q_index + 1
             st.rerun()
@@ -1509,7 +1656,7 @@ def run_learn_module_setup():
         if form_data['knowledge_level'] == "Not determined":
              st.error("Knowledge level could not be determined. Please restart.")
              return
-            
+             
         with st.spinner("Our AI is designing your personalized curriculum..."):
             master_prompt = create_full_learning_plan_prompt(form_data)
             plan_resp = ask_gpt_json(master_prompt, max_tokens=2500)
@@ -1705,7 +1852,7 @@ def run_dashboard_view(S):
                         S["view_mode"] = "lesson"
                         st.rerun()
                 elif not is_lesson_locked: # Not completed, not in progress, but not locked = ready to start
-                     if st.button("Start Lesson", type="primary", key=f"start_{level_index}_{lesson_index}"):
+                    if st.button("Start Lesson", type="primary", key=f"start_{level_index}_{lesson_index}"):
                         S["view_mode"] = "lesson"
                         S["current_level"] = level_index
                         S["current_lesson_index"] = lesson_index
@@ -1813,11 +1960,15 @@ def run_lesson_view(S):
         with st.spinner(f"Generating Lesson {S['current_lesson_index'] + 1}..."):
             prev_summary = None
             if S["current_lesson_index"] > 0:
-                 prev_summary = level_data["lessons"][S["current_lesson_index"] - 1].get("lesson_summary")
+                prev_summary = level_data["lessons"][S["current_lesson_index"] - 1].get("lesson_summary")
             elif S["current_level"] > 0:
-                 prev_level_lessons = S["levels"][S["current_level"]-1].get("lessons", [])
-                 if prev_level_lessons:
-                     prev_summary = prev_level_lessons[-1].get("lesson_summary")
+                prev_level_lessons = S["levels"][S["current_level"]-1].get("lessons", [])
+                if prev_level_lessons:
+                    prev_summary = prev_level_lessons[-1].get("lesson_summary")
+
+            # <<< NEW >>> Get struggle topics to pass to prompt
+            struggles = [topic for topic, count in S.get("struggle_log", {}).items() if count > 0]
+            struggle_summary = ", ".join(struggles) if struggles else None
 
             lesson_max_tokens = TOKENS_BY_TIME.get(S["form_data"]['time_commitment'], 4000)
             lesson_prompt = create_lesson_prompt(
@@ -1825,7 +1976,8 @@ def run_lesson_view(S):
                 lesson_number=S["current_lesson_index"] + 1,
                 total_lessons_in_level=num_lessons,
                 form_data=S["form_data"],
-                previous_lesson_summary=prev_summary
+                previous_lesson_summary=prev_summary,
+                previous_struggles=struggle_summary # <<< NEW >>> Pass struggles
             )
             lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=lesson_max_tokens)
             lesson_data = _learn_extract_json_any(lesson_resp) if lesson_resp else None
@@ -1862,12 +2014,20 @@ def run_lesson_view(S):
         section_type = section.get("type")
 
         if section_type == "text":
-            st.markdown(section.get("content", "*No content for this section.*"))
+            # <<< NEW >>> Handle new "Review" role
+            if section.get("role") == "Review":
+                st.info(f"**Review Section:** {section.get('content', '*No content for this section.*')}")
+            else:
+                st.markdown(section.get("content", "*No content for this section.*"))
             
             nav_cols = st.columns([1, 1, 1])
             with nav_cols[0]:
                 if S["current_section_index"] > 0:
                     if st.button("⬅️ Previous Section", key=f"prev_sec_{S['current_section_index']}"):
+                        # <<< NEW >>> Clear remediation flags when moving
+                        S["awaiting_remediation"] = False
+                        if "remediation_question" in S: del S["remediation_question"]
+                        if "breakdown_content" in S: del S["breakdown_content"]
                         S["current_section_index"] -= 1
                         st.rerun()
             
@@ -1930,6 +2090,10 @@ def run_learn_module():
     if "learn_state" not in st.session_state: st.session_state.learn_state = {}
     S = st.session_state.learn_state
 
+    # <<< NEW >>> Initialize struggle log
+    if "struggle_log" not in S:
+        S["struggle_log"] = {}
+
     # --- 1. Run Diagnostic Quiz if not completed ---
     if not S.get("diagnostic_complete", False):
         run_diagnostic_quiz() 
@@ -1987,9 +2151,9 @@ if mode in mode_functions:
     try:
         mode_functions[mode]()
     except Exception as e:
-         st.error(f"An unexpected error occurred in {mode}: {e}")
-         # Optionally add more detailed error logging here
-         # import traceback
-         # st.code(traceback.format_exc()) 
+        st.error(f"An unexpected error occurred in {mode}: {e}")
+        # Optionally add more detailed error logging here
+        # import traceback
+        # st.code(traceback.format_exc()) 
 else:
     st.warning("Selected mode not found or mapped.")
