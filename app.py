@@ -544,7 +544,7 @@ def run_practice_chat():
         if not S.get("awaiting_next", False):
             if st.button("Submit Answer"):
                  if ans is None and (q_type == 'multiple_choice' or q_type == 'true_false'):
-                      st.warning("Please select an answer.")
+                     st.warning("Please select an answer.")
                  elif ans is not None:
                     if _answers_match(ans, q["correct"], q_type): # Using fuzzy match function
                         S["score"] += 1; st.success("✅ Correct!"); S["current"] += 1; st.rerun()
@@ -586,8 +586,8 @@ def run_faith_journal():
             # Added option for AI insight after saving
             if st.checkbox("Get spiritual insight from this entry?"):
                  with st.spinner("Analyzing your entry..."):
-                      insight = ask_gpt_conversation(f"Analyze this faith journal entry and offer spiritual insight and encouragement based on biblical principles: {entry}")
-                      st.markdown("**💡 Insight:**"); st.write(insight)
+                     insight = ask_gpt_conversation(f"Analyze this faith journal entry and offer spiritual insight and encouragement based on biblical principles: {entry}")
+                     st.markdown("**💡 Insight:**"); st.write(insight)
         except Exception as e:
             st.error(f"Failed to save entry: {e}")
 
@@ -803,7 +803,7 @@ Transcript Snippet (first ~{summary_input_limit} characters):
                 try:
                     os.remove(cleanup_path)
                 except Exception as e_clean:
-                     st.warning(f"Could not delete temporary file {cleanup_path}: {e_clean}")
+                   st.warning(f"Could not delete temporary file {cleanup_path}: {e_clean}")
 
 # ================================================================
 # SIMPLE STUDY PLAN
@@ -907,8 +907,8 @@ def run_fast_devotional():
     topic = st.text_input("Devotional Topic (e.g., hope, perseverance, love, faith):")
     if st.button("Generate Fast Devotional") and topic:
          with st.spinner("Writing devotional..."):
-              devo = ask_gpt_conversation(f"Compose a short devotional (approx. 150-200 words) on the topic of '{topic}'. Include one primary Bible verse, 1-2 related cross-references, a brief explanation connecting them to the topic, and one practical challenge or encouragement for today.")
-              st.text_area(f"Devotional on {topic}:", devo, height=350)
+             devo = ask_gpt_conversation(f"Compose a short devotional (approx. 150-200 words) on the topic of '{topic}'. Include one primary Bible verse, 1-2 related cross-references, a brief explanation connecting them to the topic, and one practical challenge or encouragement for today.")
+             st.text_area(f"Devotional on {topic}:", devo, height=350)
 
 def run_small_group_generator():
     st.subheader("👥 Small Group Guide Generator")
@@ -964,12 +964,12 @@ def _learn_extract_json_any(response_text: str):
             end_index = -1
             for i, char in enumerate(response_text[start_index:]):
                  if char == response_text[start_index]:
-                      open_count += 1
+                     open_count += 1
                  elif char == end_char:
-                      open_count -= 1
+                     open_count -= 1
                  if open_count == 0:
-                      end_index = start_index + i + 1
-                      break
+                     end_index = start_index + i + 1
+                     break
             if end_index != -1:
                  json_str = response_text[start_index:end_index]
             else: # Fallback if matching bracket not found
@@ -989,13 +989,23 @@ def _learn_extract_json_any(response_text: str):
 # ============================
 TOKENS_BY_TIME = {"15 minutes": 1800, "30 minutes": 3000, "45 minutes": 4000} # Rough estimates
 
+# --- NEW SYSTEM PROMPT FOR LEARN MODULE ---
+LEARN_MODULE_SYSTEM_PROMPT = """
+You are a master theologian and pastoral teacher, an expert in creating biblically-dense, theologically sound, and highly structured curriculum.
+Your primary goal is to guide the user to a deep, accurate, and practical understanding of Scripture.
+- **Theology:** You adhere to a high view of Scripture (inerrant, infallible, and sufficient).
+- **Tone:** Pastoral, encouraging, clear, and authoritative.
+- **Clarity:** You MUST define complex theological terms (e.g., "justification," "sanctification") in simple ways, especially for lower-level learners.
+- **Output:** You respond ONLY with the valid JSON structure requested. Do not add any conversational text outside the JSON.
+"""
+
 def ask_gpt_json(prompt: str, max_tokens: int = 4000):
     """Makes a call to the OpenAI API expecting a JSON response."""
     try:
         resp = client.chat.completions.create(
             model=MODEL,
             messages=[
-                {"role": "system", "content": "You are a helpful curriculum designer. Respond ONLY with valid JSON that adheres to the requested structure."}, # Emphasize JSON only
+                {"role": "system", "content": LEARN_MODULE_SYSTEM_PROMPT}, # <-- MODIFIED
                 {"role": "user", "content": prompt}
             ],
             max_tokens=max_tokens,
@@ -1009,7 +1019,7 @@ def ask_gpt_json(prompt: str, max_tokens: int = 4000):
             resp = client.chat.completions.create(
                 model=MODEL,
                 messages=[
-                    {"role": "system", "content": "You are a helpful curriculum designer. Respond ONLY with valid JSON wrapped in ```json ``` tags."}, # Instruct wrapping
+                    {"role": "system", "content": LEARN_MODULE_SYSTEM_PROMPT + "\nRespond ONLY with valid JSON wrapped in ```json ``` tags."}, # <-- MODIFIED
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=max_tokens,
@@ -1087,48 +1097,101 @@ Example level object: {{"name": "Level 1: Title", "topic": "Brief topic descript
 """
 
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None) -> str:
-    """Generates prompt for creating a single lesson, tailored to user level."""
-    length_instructions = {
-        "15 minutes": "Generate exactly 3 short teaching sections (approx. 250 words each) and 2-3 knowledge checks.",
-        "30 minutes": "Generate exactly 5 medium teaching sections (approx. 300 to 375 words each) and 3-4 knowledge checks.",
-        "45 minutes": "Generate exactly 7 detailed teaching sections (approx. 400 to 450 words each) and 5-7 knowledge checks."
-    }
-    context_clause = f" This lesson should logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
+    """Generates a robust, theologically sound prompt for a single lesson."""
+    context_clause = f" This lesson must logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
+
+    # --- Deeper, more specific instructions ---
+    time_commitment = form_data['time_commitment']
+    knowledge_level = form_data['knowledge_level']
+    learning_style = form_data['learning_style']
+
+    # Define lesson structure based on time
+    if time_commitment == "15 minutes":
+        structure_instructions = """
+        1.  **Introduction (text):** A brief hook and the lesson's main question.
+        2.  **Core Teaching (text):** The main Bible passage and its core meaning.
+        3.  **Knowledge Check (knowledge_check):** One question on the Core Teaching.
+        4.  **Application (text):** One clear, practical takeaway.
+        5.  **Final Check (knowledge_check):** One question on the Application or main theme.
+        """
+    elif time_commitment == "30 minutes":
+        structure_instructions = """
+        1.  **Introduction (text):** A hook, the main theme, and the key Bible passage.
+        2.  **Exposition (text):** Explain the context and meaning of the main passage.
+        3.  **Knowledge Check (knowledge_check):** A question on the Exposition.
+        4.  **Biblical Connection (text):** Connect this passage to another part of the Bible (Old or New Testament).
+        5.  **Knowledge Check (knowledge_check):** A question on the Biblical Connection.
+        6.  **Practical Application (text):** A "So what?" section for daily life.
+        7.  **Final Check (knowledge_check):** A reflective or application-based question.
+        """
+    else: # 45 minutes
+        structure_instructions = """
+        1.  **Introduction (text):** A compelling hook, the main theological question, and the primary Scripture for the lesson.
+        2.  **Exposition & Context (text):** A deep dive into the primary passage. What did it mean to its original audience?
+        3.  **Knowledge Check (knowledge_check):** A question on the Exposition.
+        4.  **Theological Synthesis (text):** Connect the passage to a core doctrine (e.g., if the text is John 1, connect to the Trinity or Incarnation).
+        5.  **Knowledge Check (knowledge_check):** A question on the Theological Synthesis.
+        6.  **Broader Biblical Connection (text):** Connect this theme across the entire canon (e.g., how this New Testament idea was foreshadowed in the Old Testament).
+        7.  **Knowledge Check (knowledge_check):** A question on the Broader Connection.
+        8.  **Practical Application (text):** A clear "So what?" section for daily life, addressing potential struggles.
+        9.  **Guided Reflection (text):** A final paragraph with questions or a prayer prompt to help the user internalize the lesson.
+        """
+
+    # --- Deeper instructions for level and style ---
+    level_instructions = ""
+    if knowledge_level == "Just starting out":
+        level_instructions = "Focus on the core narrative and clear application. Define ALL theological terms (e.g., 'grace', 'justification', 'redemption'). Assume no prior knowledge."
+    elif knowledge_level == "I know the main stories":
+        level_instructions = "Connect the text to broader biblical themes (e.g., covenant, kingdom). Introduce and define one or two key theological concepts per lesson."
+    else: # "I'm comfortable with deeper concepts"
+        level_instructions = "Include historical context, connections to original languages (e.g., 'the Greek word for love here is *agape*...'), and deeper doctrinal synthesis. Do not shy away from complex ideas."
+
+    style_instructions = ""
+    if learning_style == "analytical":
+        style_instructions = "Use bullet points, logical arguments, and defined terms."
+    elif learning_style == "storytelling":
+        style_instructions = "Use narrative, parables, and historical stories to illustrate points."
+    elif learning_style == "practical":
+        style_instructions = "Focus heavily on the 'Practical Application' section with concrete, actionable steps."
+    elif learning_style == "reflective":
+        style_instructions = "Embed 1-2 additional short, italicized reflection questions *within* the 'text' sections to make the user pause and think."
 
     return f"""
-You are an expert theologian creating Lesson {lesson_number}/{total_lessons_in_level} on "{level_topic}".
-User Profile:
-- Knowledge Level: {form_data['knowledge_level']}
-- Learning Style: {form_data['learning_style']}
-- Time Commitment: {form_data['time_commitment']}
+You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_level} on the topic of "{level_topic}".
+{context_clause}
 
-**INSTRUCTIONS:**
-1.  **Tailor Depth & Vocabulary:** Adjust content complexity for the '{form_data['knowledge_level']}' user. Use simpler language and core concepts for 'Just starting out'; introduce richer theology for 'comfortable with deeper concepts'.
-2.  **Cite Scripture:** Embed specific Bible references (e.g., Genesis 1:1) within the `content` of text sections.
-3.  **Content & Structure:** Fulfill the requirements: {length_instructions.get(form_data['time_commitment'], 'Generate content fitting the time.')} Build sections logically.{context_clause}
-4.  **Knowledge Checks:** Ensure checks directly relate to the preceding text section and include `question`, `question_type`, `options`/`correct_answer`, and `biblical_reference`.
-5.  **Tone:** Maintain a pastoral, encouraging, and biblically sound tone.
+**User Profile:**
+- Knowledge Level: {knowledge_level}
+- Learning Style: {learning_style}
 
-Output ONLY a valid JSON object with keys "lesson_title", "lesson_content_sections" (list of objects with "type" ['text' or 'knowledge_check'] and relevant fields), and "summary_points" (list of 3 key takeaways).
-Example text section: {{"type": "text", "content": "Start here (Reference 1:1)... then consider this (Reference 1:2)."}}
-Example check: {{"type": "knowledge_check", "question_type": "multiple_choice", "question": "Q?", "options": ["A","B","C","D"], "correct_answer": "A", "biblical_reference": "Ref 1:1"}}
+**CRITICAL INSTRUCTIONS:**
+1.  **Biblical Density:** Every `text` section MUST be rooted in Scripture, citing specific passages (e.g., John 3:16).
+2.  **Theological Soundness:** All content must be biblically orthodox and theologically robust.
+3.  **Knowledge Level Tailoring:** {level_instructions}
+4.  **Learning Style Tailoring:** {style_instructions}
+5.  **Lesson Structure:** Generate the lesson sections *exactly* in this order:
+{structure_instructions}
+6.  **Knowledge Checks:** Ensure each `knowledge_check` directly relates to the preceding `text` section. Each check *must* include `question`, `question_type`, `correct_answer`, and a `biblical_reference`. For `multiple_choice`, include an `options` list of 4 strings. For `true_false`, the `correct_answer` is "True" or "False".
+
+Output ONLY a valid JSON object with keys "lesson_title", "lesson_content_sections" (a list of objects following the structure above), and "summary_points" (a list of 3-4 key takeaways from the lesson).
 """
 
-def create_level_quiz_prompt(level_topic: str, lesson_summaries: list) -> str:
+def create_level_quiz_prompt(level_topic: str, lesson_summaries: list, level_name: str) -> str:
     """Generates prompt for creating the end-of-level quiz."""
     summaries_text = "\n".join(f"- {s}" for i, s in enumerate(lesson_summaries) if s) # Filter empty summaries
     return f"""
-You are a Bible teacher creating a 10-question cumulative quiz for the level titled "{level_topic}".
+You are a Bible teacher creating a 10-question cumulative quiz for the level titled "{level_name}" which covers the topic of "{level_topic}".
 The lessons covered these key points:
 {summaries_text}
 
-**Instructions:** Create a quiz based *only* on the topics mentioned in the lesson summaries above.
+**Instructions:** Create a quiz based on the *theological concepts, scriptural connections, and applications* implied by these lesson summaries.
 - Generate exactly 10 questions.
+- Questions should test for *deep understanding* of the concepts, not just surface-level facts.
 - Mix question types: 'multiple_choice', 'true_false', 'fill_in_the_blank'.
 - Each question object MUST include: 'question' (string), 'question_type' (string), 'correct_answer' (string).
-- For 'multiple_choice', also include 'options' (list of 4 strings).
-- For 'true_false', `correct_answer` should be "True" or "False", and you can optionally include `options` as ["True", "False"].
-- Include a relevant 'biblical_reference' (string) for each question if applicable.
+- For 'multiple_choice', also include 'options' (list of 4 strings, including the correct one).
+- For 'true_false', `correct_answer` must be "True" or "False".
+- Include a relevant 'biblical_reference' (string) for each question.
 
 Output ONLY a valid JSON array containing the 10 question objects.
 """
@@ -1196,10 +1259,13 @@ def display_knowledge_check_question(S):
                     incorrect_ans = S.get("last_incorrect_answer", "their answer") # Get the stored wrong answer
                     
                     explanation_prompt = (
-                        f"A student was asked: '{q.get('question')}' "
+                        f"You are a pastoral Bible teacher. A student was asked: '{q.get('question')}' "
                         f"They incorrectly answered: '{incorrect_ans}'. The correct answer is: '{q.get('correct_answer')}'. "
-                        f"Based on the Bible verse '{reference}' which says: '{verse_text}', "
-                        f"please provide a brief, one-paragraph explanation focusing on why their answer '{incorrect_ans}' was incorrect and why '{q.get('correct_answer')}' is the right one according to the verse."
+                        f"The relevant Bible verse is '{reference}', which says: '{verse_text}'. "
+                        f"In one concise paragraph, please do two things: "
+                        f"1. Explain the *theological reason* why '{q.get('correct_answer')}' is correct, based on the verse. "
+                        f"2. Gently explain the *misunderstanding* that might have led them to choose '{incorrect_ans}'. "
+                        f"Be encouraging, not shaming."
                     )
                     
                     explanation = ask_gpt_conversation(explanation_prompt)
@@ -1316,8 +1382,8 @@ def run_level_quiz(S):
                  # This was the last level
                  st.info("You've completed all levels in this plan!")
                  if st.button("Start a New Journey"):
-                      st.session_state.learn_state = {} # Reset everything
-                      st.rerun()
+                     st.session_state.learn_state = {} # Reset everything
+                     st.rerun()
 
         else:
             st.error("You didn't reach the passing score. Please review the lessons and try the quiz again.")
@@ -1401,7 +1467,7 @@ def run_diagnostic_quiz():
         # Automatically proceed by rerunning, removing the need for the button
         st.rerun() 
         # if st.button("Continue to Plan Setup"):
-        #      st.rerun() # Proceed to the main form
+        #     st.rerun() # Proceed to the main form
 
 # ================================================================
 # LEARNING PLAN SETUP (QUESTIONNAIRE)
@@ -1516,9 +1582,9 @@ def run_learn_module():
                      prev_summary = level_data["lessons"][S["current_lesson_index"] - 1].get("lesson_summary")
                 # Or get summary from last lesson of previous level if first lesson
                 elif S["current_level"] > 0:
-                    prev_level_lessons = S["levels"][S["current_level"]-1].get("lessons", [])
-                    if prev_level_lessons:
-                        prev_summary = prev_level_lessons[-1].get("lesson_summary")
+                     prev_level_lessons = S["levels"][S["current_level"]-1].get("lessons", [])
+                     if prev_level_lessons:
+                         prev_summary = prev_level_lessons[-1].get("lesson_summary")
 
                 lesson_max_tokens = TOKENS_BY_TIME.get(S["form_data"]['time_commitment'], 4000)
                 lesson_prompt = create_lesson_prompt(
@@ -1554,8 +1620,8 @@ def run_learn_module():
              st.warning("This lesson appears to be empty.")
              # Automatically move to next lesson or quiz? For now, show button.
              if st.button("Proceed Anyway"):
-                  S["current_section_index"] = 999 # Force completion check below
-                  st.rerun()
+                 S["current_section_index"] = 999 # Force completion check below
+                 st.rerun()
              return
 
         # Check if current section index is valid
@@ -1599,7 +1665,11 @@ def run_learn_module():
                     if "quiz_questions" not in level_data:
                         with st.spinner("Generating your level quiz..."):
                             all_summaries = [l.get("lesson_summary", "") for l in level_data["lessons"]]
-                            quiz_prompt = create_level_quiz_prompt(level_data.get("topic"), all_summaries)
+                            quiz_prompt = create_level_quiz_prompt(
+                                level_topic=level_data.get("topic"), 
+                                lesson_summaries=all_summaries,
+                                level_name=level_data.get("name") # <-- MODIFIED: Pass level_name
+                            )
                             quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500) 
                             quiz_data = _learn_extract_json_any(quiz_resp)
                             # Validate quiz data structure
@@ -1630,12 +1700,12 @@ def run_learn_module():
                   pass # Placeholder for quiz gen logic if needed here
              # Switch to quiz mode
              if "quiz_questions" in level_data and level_data["quiz_questions"]:
-                  S["quiz_mode"] = True
-                  S["current_question_index"] = 0
-                  S["user_score"] = 0
-                  st.rerun()
+                 S["quiz_mode"] = True
+                 S["current_key_index"] = 0
+                 S["user_score"] = 0
+                 st.rerun()
              else:
-                  st.error("Could not prepare quiz questions.")
+                 st.error("Could not prepare quiz questions.")
 
 
 # ================================================================
