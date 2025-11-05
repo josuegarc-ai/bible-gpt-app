@@ -1104,25 +1104,26 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     learning_style = form_data['learning_style']
     time_commitment = form_data['time_commitment']
 
-    # --- Define Level and Style Instructions ---
+    # --- Define Level Instructions ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
-        level_instructions = "Focus on the core narrative and clear application. Define ALL theological terms (e..g., 'grace', 'justification', 'redemption'). Assume no prior knowledge."
+        level_instructions = "Focus on the core narrative and clear application. Define ALL theological terms (e.g., 'grace', 'justification', 'redemption'). Assume no prior knowledge."
     elif knowledge_level == "I know the main stories":
         level_instructions = "Connect the text to broader biblical themes (e.g., covenant, kingdom). Introduce and define one or two key theological concepts per lesson."
     else: # "I'm comfortable with deeper concepts"
         level_instructions = "Include historical context, connections to original languages (e.g., 'the Greek word for love here is *agape*...'), and deeper doctrinal synthesis. Do not shy away from complex ideas."
 
     # --- NEW: Enhanced Style Instructions ---
+    # This block is now focused on HOW to teach theology, not just what to write.
     style_instructions = ""
     if learning_style == "analytical":
-        style_instructions = "Your *primary method* should be logical. Use bullet points, clear definitions, and structured arguments in 'text' sections. Focus on *what* the text says and *why* it matters doctrinally."
+        style_instructions = "Your teaching method is **Analytical**. Focus on theological terms, logical structure, and doctrinal categories. Use bullet points. Ask 'WHAT' does this text teach us about God, sin, and salvation?"
     elif learning_style == "storytelling":
-        style_instructions = "Your *primary method* should be narrative. For teaching sections ('Exposition'), **tell the biblical story directly** in an engaging, narrative style. Then, follow up with the theological meaning. *Do not just summarize what the story is about.*"
+        style_instructions = "Your teaching method is **Narrative Illustration**. Focus on the *theological principles* within the story. Use narrative examples (from the text or modern life) to *illustrate* these principles. Ask 'WHY' is this story in the Bible and what truth does it reveal?"
     elif learning_style == "practical":
-        style_instructions = "Your *primary method* should be application-focused. Keep the 'Exposition' brief and make the 'Application' sections the most detailed, with concrete, scannable, actionable steps."
+        style_instructions = "Your teaching method is **Practical Application**. State the biblical principle clearly and briefly. Then, spend *most* of the section on 'How to use this' and 'What this looks like today' with concrete, actionable steps."
     elif learning_style == "reflective":
-        style_instructions = "Your *primary method* should be introspective. Intersperse *italicized, bolded questions* directly within the 'text' sections to make the user pause. Focus on the 'why' and 'how' this impacts their inner life."
+        style_instructions = "Your teaching method is **Introspective**. Focus on internal transformation. Ask probing, *italicized, bolded questions* directly within the text to make the user connect the doctrine to their own heart and motivations."
 
     # --- Define the *exact* section structure ---
     section_structure_instructions = ""
@@ -1135,7 +1136,7 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     elif time_commitment == "30 minutes":
         section_structure_instructions = """
         - A 'text' section with the role 'Introduction' (State the main topic and passage).
-        - A 'text' section with the role 'Exposition' (Explain the passage's context and meaning, following the learning style).
+        - A 'text' section with the role 'Exposition' (Teach the theological principles *from* the passage).
         - A 'knowledge_check' section testing the 'Exposition'.
         - A 'text' section with the role 'Application' (Provide a 'So what?' for daily life).
         - A 'knowledge_check' section testing the 'Application'.
@@ -1143,9 +1144,9 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     else: # 45 minutes
         section_structure_instructions = """
         - A 'text' section with the role 'Introduction' (A compelling hook and the main theological question).
-        - A 'text' section with the role 'Exposition' (A deep dive into the primary passage's meaning and context, following the learning style).
+        - A 'text' section with the role 'Exposition' (A deep dive into the *theological principles* of the passage).
         - A 'knowledge_check' section testing the 'Exposition'.
-        - A 'text' section with the role 'Theological Connection' (Connect this passage to another part of the Bible or a core doctrine).
+        - A 'text' section with the role 'Theological Connection' (Connect these principles to another part of the Bible or a core doctrine).
         - A 'knowledge_check' section testing the 'Theological Connection'.
         - A 'text' section with the role 'Practical Application' (A clear, actionable takeaway for daily life).
         - A 'text' section with the role 'Guided Reflection' (A closing prayer prompt or reflective questions).
@@ -1160,13 +1161,14 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 - Learning Style: {learning_style}
 
 **CRITICAL INSTRUCTIONS:**
-1.  **JSON Structure:** You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
-2.  **Lesson Title:** Create a **unique and specific** `lesson_title` for this lesson. **DO NOT** just repeat the overall level topic ("{level_topic}"). For example, if the topic is "The Patriarchs" and this is Lesson 2, a good title would be "The Faith of Abraham" or "Jacob's Struggle at Peniel".
-3.  **Lesson Content:** The "lesson_content_sections" MUST be a list of objects. You will generate *exactly* these sections in this order:
+1.  **Core Teaching Philosophy:** Your goal is to *teach theology* (what is true about God) and *doctrine* (what we believe) that is *derived from* the biblical text. **DO NOT simply paraphrase or summarize the plot of the Bible passage.** Extract the *principles* from the story and teach those principles.
+2.  **Lesson Title:** Create a **unique and specific** `lesson_title` for this lesson. **DO NOT** just repeat the overall level topic ("{level_topic}"). For example, if the topic is "The Fall" a good title would be "The Origin of Sin and the Promise of Redemption".
+3.  **JSON Structure:** You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
+4.  **Lesson Content:** The "lesson_content_sections" MUST be a list of objects. You will generate *exactly* these sections in this order:
 {section_structure_instructions}
-4.  **Style is Primary:** The *most important* instruction is to follow the user's `learning_style`. Apply this style to all 'text' sections: {style_instructions}
-5.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense (citing specific passages like John 3:16), and tailored to the user's `knowledge_level`: {level_instructions}
-6.  **Knowledge Checks:** Each `knowledge_check` must directly test the content of the `text` section *immediately preceding it*. It MUST include `question`, `question_type` (e.g., 'multiple_choice'), `correct_answer`, `options` (if multiple_choice), and a `biblical_reference`.
+5.  **Style is Primary:** The *most important* instruction is to follow the user's `learning_style`. Apply this method to all 'text' sections: {style_instructions}
+6.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense (citing specific passages like John 3:16), and tailored to the user's `knowledge_level`: {level_instructions}
+7.  **Knowledge Checks:** Each `knowledge_check` must directly test the content of the `text` section *immediately preceding it*. It MUST include `question`, `question_type` (e.g., 'multiple_choice'), `correct_answer`, `options` (if multiple_choice), and a `biblical_reference`.
 
 Output ONLY the valid JSON object.
 """
