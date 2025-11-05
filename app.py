@@ -1113,8 +1113,7 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     else: # "I'm comfortable with deeper concepts"
         level_instructions = "Include historical context, connections to original languages (e.g., 'the Greek word for love here is *agape*...'), and deeper doctrinal synthesis. Do not shy away from complex ideas."
 
-    # --- NEW: Enhanced Style Instructions ---
-    # This block is now focused on HOW to teach theology, not just what to write.
+    # --- Enhanced Style Instructions ---
     style_instructions = ""
     if learning_style == "analytical":
         style_instructions = "Your teaching method is **Analytical**. Focus on theological terms, logical structure, and doctrinal categories. Use bullet points. Ask 'WHAT' does this text teach us about God, sin, and salvation?"
@@ -1162,13 +1161,22 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 
 **CRITICAL INSTRUCTIONS:**
 1.  **Core Teaching Philosophy:** Your goal is to *teach theology* (what is true about God) and *doctrine* (what we believe) that is *derived from* the biblical text. **DO NOT simply paraphrase or summarize the plot of the Bible passage.** Extract the *principles* from the story and teach those principles.
-2.  **Lesson Title:** Create a **unique and specific** `lesson_title` for this lesson. **DO NOT** just repeat the overall level topic ("{level_topic}"). For example, if the topic is "The Fall" a good title would be "The Origin of Sin and the Promise of Redemption".
+2.  **Lesson Title:** Create a **unique and specific** `lesson_title` for this lesson. **DO NOT** just repeat the overall level topic ("{level_topic}").
 3.  **JSON Structure:** You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
 4.  **Lesson Content:** The "lesson_content_sections" MUST be a list of objects. You will generate *exactly* these sections in this order:
 {section_structure_instructions}
 5.  **Style is Primary:** The *most important* instruction is to follow the user's `learning_style`. Apply this method to all 'text' sections: {style_instructions}
 6.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense (citing specific passages like John 3:16), and tailored to the user's `knowledge_level`: {level_instructions}
-7.  **Knowledge Checks:** Each `knowledge_check` must directly test the content of the `text` section *immediately preceding it*. It MUST include `question`, `question_type` (e.g., 'multiple_choice'), `correct_answer`, `options` (if multiple_choice), and a `biblical_reference`.
+
+7.  **CRITICAL KEY REQUIREMENT FOR 'knowledge_check':**
+    - Every 'knowledge_check' object MUST include *all* of these keys:
+    - `type`: "knowledge_check"
+    - `question`: "The question text..."
+    - `question_type`: "multiple_choice" or "true_false" or "fill_in_the_blank"
+    - `correct_answer`: "The correct answer string..."
+    - `biblical_reference`: "The relevant verse, e.g., Genesis 1:1"
+    - `options`: (A list of 4 strings, ONLY if `question_type` is "multiple_choice")
+    - **Failure to include all required keys for *every* knowledge check will fail the lesson.**
 
 Output ONLY the valid JSON object.
 """
