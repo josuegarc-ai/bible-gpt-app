@@ -1550,6 +1550,13 @@ def run_learn_module():
     st.title(S["plan"].get("plan_title", "Your Learning Journey"))
     st.write(S["plan"].get("introduction", ""))
 
+    # --- NEW: Check for Deep Dive Mode ---
+    # If we are in deep dive, render that UI instead of the lesson and stop
+    if S.get("deep_dive_mode", False):
+        run_deep_dive_chat(S)
+        return
+    # --- End of Deep Dive Check ---
+
     # Check for plan completion
     if S["current_level"] >= len(S["levels"]):
         st.success("🎉 You've completed your entire learning journey!")
@@ -1567,6 +1574,15 @@ def run_learn_module():
     num_lessons = level_data.get("num_lessons", 1)
     st.caption(f"Level {S['current_level'] + 1} of {len(S['levels'])} | Lesson {S['current_lesson_index'] + 1} of {num_lessons}")
 
+    # --- NEW: Level Navigation ---
+    if S["current_level"] > 0:
+        if st.button("⬅️ Review Previous Level", key="prev_level"):
+            S["current_level"] -= 1
+            S["current_lesson_index"] = 0 # Go to first lesson of prev level
+            S["current_section_index"] = 0
+            S["quiz_mode"] = False # Ensure not in quiz mode
+            st.rerun()
+    # --- End Level Navigation ---
 
     # --- Run Quiz Mode ---
     if S.get("quiz_mode"):
@@ -1623,7 +1639,6 @@ def run_learn_module():
         lesson_sections = current_lesson.get("lesson_content_sections", [])
         if not lesson_sections: # Handle empty lesson case
              st.warning("This lesson appears to be empty.")
-             # Automatically move to next lesson or quiz? For now, show button.
              if st.button("Proceed Anyway"):
                  S["current_section_index"] = 999 # Force completion check below
                  st.rerun()
@@ -1636,11 +1651,40 @@ def run_learn_module():
 
             if section_type == "text":
                 st.markdown(section.get("content", "*No content for this section.*"))
-                if st.button("Continue Reading", key=f"cont_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"):
-                    S["current_section_index"] += 1
-                    st.rerun()
+                
+                # --- NEW: Section Navigation with Deep Dive ---
+                nav_cols = st.columns([1, 1, 1])
+                with nav_cols[0]:
+                    if S["current_section_index"] > 0:
+                        if st.button("⬅️ Previous Section", key=f"prev_sec_{S['current_section_index']}"):
+                            S["current_section_index"] -= 1
+                            st.rerun()
+                
+                with nav_cols[1]:
+                    if st.button("Continue Reading ➡️", key=f"cont_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"):
+                        S["current_section_index"] += 1
+                        st.rerun()
+                
+                with nav_cols[2]:
+                    if st.button("🤔 Ask a question...", key=f"deep_dive_{S['current_section_index']}"):
+                        S["deep_dive_mode"] = True
+                        S["deep_dive_context"] = section.get("content", "No content provided.")
+                        st.rerun()
+                # --- End of NEW Section Navigation ---
+                        
             elif section_type == "knowledge_check":
                 display_knowledge_check_question(S) # This function handles its own state and rerun
+                
+                # --- NEW: "Previous Section" button for Knowledge Checks ---
+                if S["current_section_index"] > 0:
+                    if st.button("⬅️ Previous Section", key=f"prev_sec_kc_{S['current_section_index']}"):
+                        S["current_section_index"] -= 1
+                        # Clear any pending incorrect flags
+                        if "kc_answered_incorrectly" in S: del S["kc_answered_incorrectly"]
+                        if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
+                        st.rerun()
+                # --- End of NEW Button ---
+                
             else:
                  st.warning(f"Unknown section type '{section_type}'. Skipping.")
                  S["current_section_index"] += 1
@@ -1655,64 +1699,165 @@ def run_learn_module():
                 for point in summary_points: st.markdown(f"- {point}")
             else:
                  st.write("*No summary points provided.*")
-
-            # Check if there are more lessons in this level
-            if S["current_lesson_index"] + 1 < num_lessons:
-                if st.button("Go to Next Lesson ▶️"):
-                    S["current_lesson_index"] += 1
-                    S["current_section_index"] = 0 # Reset for new lesson
-                    st.rerun()
-            # Last lesson of the level completed, move to quiz
-            else:
-                st.info("You've completed all lessons for this level. Time for the final quiz!")
-                if st.button("Start Level Quiz"):
-                    # Generate quiz questions if they don't exist
-                    if "quiz_questions" not in level_data:
-                        with st.spinner("Generating your level quiz..."):
-                            all_summaries = [l.get("lesson_summary", "") for l in level_data["lessons"]]
-                            quiz_prompt = create_level_quiz_prompt(
-                                level_topic=level_data.get("topic"), 
-                                lesson_summaries=all_summaries,
-                                level_name=level_data.get("name") # <-- MODIFIED: Pass level_name
-                            )
-                            quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500) 
-                            quiz_data = _learn_extract_json_any(quiz_resp)
-                            # Validate quiz data structure
-                            if quiz_data and isinstance(quiz_data, list):
-                                level_data["quiz_questions"] = quiz_data
-                            else:
-                                st.error("Failed to generate valid quiz questions. Please try starting the quiz again.")
-                                if quiz_resp: st.text_area("Raw AI Quiz Response (for debugging):", quiz_resp, height=200)
-                                return # Stop if generation failed
-                    
-                    # Check again if questions were generated successfully before switching modes
-                    if "quiz_questions" in level_data and level_data["quiz_questions"]:
-                        S["quiz_mode"] = True
-                        S["current_question_index"] = 0
-                        S["user_score"] = 0
+            
+            # --- NEW: Lesson Navigation ---
+            nav_cols = st.columns(2)
+            with nav_cols[0]:
+                if S["current_lesson_index"] > 0:
+                    if st.button("⬅️ Review Previous Lesson", key="prev_lesson"):
+                        S["current_lesson_index"] -= 1
+                        S["current_section_index"] = 0 # Reset to start of prev lesson
                         st.rerun()
-                    else:
-                         st.error("Quiz questions are still missing. Cannot start quiz.")
+            
+            with nav_cols[1]:
+                # Check if there are more lessons in this level
+                if S["current_lesson_index"] + 1 < num_lessons:
+                    if st.button("Go to Next Lesson ▶️", type="primary"): # <-- MODIFIED
+                        S["current_lesson_index"] += 1
+                        S["current_section_index"] = 0 # Reset for new lesson
+                        st.rerun()
+                # Last lesson of the level completed, move to quiz
+                else:
+                    st.info("You've completed all lessons for this level. Time for the final quiz!")
+                    if st.button("Start Level Quiz", type="primary"): # <-- MODIFIED
+                        # Generate quiz questions if they don't exist
+                        if "quiz_questions" not in level_data:
+                            with st.spinner("Generating your level quiz..."):
+                                all_summaries = [l.get("lesson_summary", "") for l in level_data["lessons"]]
+                                quiz_prompt = create_level_quiz_prompt(
+                                    level_topic=level_data.get("topic"), 
+                                    lesson_summaries=all_summaries,
+                                    level_name=level_data.get("name")
+                                )
+                                quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500) 
+                                quiz_data = _learn_extract_json_any(quiz_resp)
+                                # Validate quiz data structure
+                                if quiz_data and isinstance(quiz_data, list):
+                                    level_data["quiz_questions"] = quiz_data
+                                else:
+                                    st.error("Failed to generate valid quiz questions. Please try starting the quiz again.")
+                                    if quiz_resp: st.text_area("Raw AI Quiz Response (for debugging):", quiz_resp, height=200)
+                                    return # Stop if generation failed
+                        
+                        # Check again if questions were generated successfully before switching modes
+                        if "quiz_questions" in level_data and level_data["quiz_questions"]:
+                            S["quiz_mode"] = True
+                            S["current_question_index"] = 0
+                            S["user_score"] = 0
+                            st.rerun()
+                        else:
+                             st.error("Quiz questions are still missing. Cannot start quiz.")
+            # --- End of NEW Lesson Navigation ---
 
     # Fallback/Error case: Lesson index is beyond expected number but not in quiz mode
-    # This might happen if num_lessons logic changes or state gets corrupted
     elif not S.get("quiz_mode"):
         st.warning("It looks like you've finished the lessons for this level.")
-        if st.button("Proceed to Level Quiz"):
-             # Attempt to generate quiz if needed
-             if "quiz_questions" not in level_data:
-                  # ... (Quiz generation logic as above) ...
-                  pass # Placeholder for quiz gen logic if needed here
-             # Switch to quiz mode
-             if "quiz_questions" in level_data and level_data["quiz_questions"]:
-                 S["quiz_mode"] = True
-                 S["current_key_index"] = 0
-                 S["user_score"] = 0
-                 st.rerun()
-             else:
-                 st.error("Could not prepare quiz questions.")
+        
+        # --- NEW: Navigation for Fallback Case ---
+        col1, col2 = st.columns(2)
+        with col1:
+             if S["current_lesson_index"] > 0: # Should be true if we are here
+                if st.button("⬅️ Review Previous Lesson", key="prev_lesson_fallback"):
+                    S["current_lesson_index"] -= 1
+                    S["current_section_index"] = 0 # Reset to start of prev lesson
+                    st.rerun()
+        with col2:
+            if st.button("Proceed to Level Quiz", type="primary"): # <-- MODIFIED
+                # Attempt to generate quiz if needed
+                if "quiz_questions" not in level_data:
+                    with st.spinner("Generating your level quiz..."): # <-- NEW
+                        all_summaries = [l.get("lesson_summary", "") for l in level_data["lessons"]]
+                        quiz_prompt = create_level_quiz_prompt(
+                            level_topic=level_data.get("topic"), 
+                            lesson_summaries=all_summaries,
+                            level_name=level_data.get("name")
+                        )
+                        quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500) 
+                        quiz_data = _learn_extract_json_any(quiz_resp)
+                        if quiz_data and isinstance(quiz_data, list):
+                            level_data["quiz_questions"] = quiz_data
+                        else:
+                            st.error("Failed to generate valid quiz questions. Please try starting the quiz again.")
+                            if quiz_resp: st.text_area("Raw AI Quiz Response (for debugging):", quiz_resp, height=200)
+                            return
+                
+                # Switch to quiz mode
+                if "quiz_questions" in level_data and level_data["quiz_questions"]:
+                    S["quiz_mode"] = True
+                    S["current_question_index"] = 0
+                    S["user_score"] = 0
+                    st.rerun()
+                else:
+                    st.error("Could not prepare quiz questions.")
+        # --- End of NEW Navigation ---
+        
+# ================================================================
+# LEARN MODULE: DEEP DIVE CHAT (NEW FUNCTION)
+# ================================================================
+def run_deep_dive_chat(S):
+    """
+    Renders an in-lesson chat interface for a "Deep Dive" on a specific section.
+    Uses the main THEOLOGICAL_SYSTEM_PROMPT.
+    """
+    st.markdown("---")
+    st.subheader("Deep Dive Q&A")
+    st.info(f"You are asking a question about the section you just read. Your chat history here is temporary.")
+    
+    # Initialize deep dive history if it doesn't exist
+    if "deep_dive_history" not in S:
+        S["deep_dive_history"] = []
 
+    # Display the mini-chat history
+    chat_container = st.container(height=300, border=True)
+    with chat_container:
+        if not S["deep_dive_history"]:
+            st.caption("Ask your question below...")
+            
+        for msg in S["deep_dive_history"]:
+            who = "✝️ Bible GPT" if msg["role"] == "assistant" else "🧍 You"
+            st.markdown(f"**{who}:** {msg['content']}")
 
+    # Get user input
+    user_input = st.text_input("Ask your question about this section:")
+
+    if st.button("Send Question", key="deep_dive_send"):
+        if user_input:
+            # Add user message to history and API message list
+            S["deep_dive_history"].append({"role": "user", "content": user_input})
+            
+            # Prepare messages for AI
+            context_prompt = {
+                "role": "system",
+                "content": f"You are a master theologian answering a user's question about a specific lesson section they just read. Do not re-introduce yourself. Answer with depth and clarity. The lesson text is: '{S.get('deep_dive_context', 'No context provided.')}'"
+            }
+            
+            messages_for_api = [
+                {"role": "system", "content": THEOLOGICAL_SYSTEM_PROMPT}, # Your main theological prompt
+                context_prompt
+            ] + S["deep_dive_history"] # Add the mini-chat history
+
+            with st.spinner("Thinking..."):
+                try:
+                    response = client.chat.completions.create(
+                        model=MODEL,
+                        messages=messages_for_api,
+                        temperature=0.3
+                    )
+                    ai_reply = response.choices[0].message.content.strip()
+                    S["deep_dive_history"].append({"role": "assistant", "content": ai_reply})
+                    st.rerun() # Rerun to show the new messages
+                except Exception as e:
+                    st.error(f"Error getting answer: {e}")
+                    S["deep_dive_history"].pop() # Remove user message if AI failed
+    
+    st.markdown("---")
+    if st.button("Return to Lesson"):
+        # Clear the deep dive state and return to the lesson
+        S["deep_dive_mode"] = False
+        del S["deep_dive_context"]
+        del S["deep_dive_history"]
+        st.rerun()
+        
 # ================================================================
 # MAIN UI
 # ================================================================
