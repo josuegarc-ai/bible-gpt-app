@@ -1102,24 +1102,7 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     
     knowledge_level = form_data['knowledge_level']
     learning_style = form_data['learning_style']
-
-    # --- Define Section Counts (Simpler Logic) ---
     time_commitment = form_data['time_commitment']
-    if time_commitment == "15 minutes":
-        # Total 3 sections: Text, Text, Check
-        structure_desc = "exactly 2 'text' sections and 1 'knowledge_check' section"
-        flow_hint = "[Text 1: Introduction], [Text 2: Core Teaching], [Check 1 (on Text 2)]"
-        total_sections = 3
-    elif time_commitment == "30 minutes":
-        # Total 5 sections: Text, Check, Text, Check, Text
-        structure_desc = "exactly 3 'text' sections and 2 'knowledge_check' sections"
-        flow_hint = "[Text 1: Introduction], [Check 1 (on Text 1)], [Text 2: Main Point], [Check 2 (on Text 2)], [Text 3: Application]"
-        total_sections = 5
-    else: # 45 minutes
-        # Total 7 sections: Text, Check, Text, Check, Text, Check, Text
-        structure_desc = "exactly 4 'text' sections and 3 'knowledge_check' sections"
-        flow_hint = "[Text 1: Intro], [Check 1], [Text 2: Exposition], [Check 2], [Text 3: Connection], [Check 3], [Text 4: Application]"
-        total_sections = 7
 
     # --- Define Level and Style Instructions ---
     level_instructions = ""
@@ -1140,6 +1123,33 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     elif learning_style == "reflective":
         style_instructions = "Embed 1-2 additional short, italicized reflection questions *within* the 'text' sections to make the user pause and think."
 
+    # --- NEW: Define the *exact* section structure ---
+    section_structure_instructions = ""
+    if time_commitment == "15 minutes":
+        section_structure_instructions = """
+        - A 'text' section with the role 'Introduction'.
+        - A 'text' section with the role 'Core Teaching & Application'.
+        - A 'knowledge_check' section testing the 'Core Teaching'.
+        """
+    elif time_commitment == "30 minutes":
+        section_structure_instructions = """
+        - A 'text' section with the role 'Introduction' (State the main topic and passage).
+        - A 'text' section with the role 'Exposition' (Explain the passage's context and meaning).
+        - A 'knowledge_check' section testing the 'Exposition'.
+        - A 'text' section with the role 'Application' (Provide a 'So what?' for daily life).
+        - A 'knowledge_check' section testing the 'Application'.
+        """
+    else: # 45 minutes
+        section_structure_instructions = """
+        - A 'text' section with the role 'Introduction' (A compelling hook and the main theological question).
+        - A 'text' section with the role 'Exposition' (A deep dive into the primary passage's meaning and context).
+        - A 'knowledge_check' section testing the 'Exposition'.
+        - A 'text' section with the role 'Theological Connection' (Connect this passage to another part of the Bible or a core doctrine).
+        - A 'knowledge_check' section testing the 'Theological Connection'.
+        - A 'text' section with the role 'Practical Application' (A clear, actionable takeaway for daily life).
+        - A 'text' section with the role 'Guided Reflection' (A closing prayer prompt or reflective questions).
+        """
+
     return f"""
 You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_level} on the topic of "{level_topic}".
 {context_clause}
@@ -1149,19 +1159,14 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 - Learning Style: {learning_style}
 
 **CRITICAL INSTRUCTIONS:**
-1.  **Content & Structure:** Generate **{structure_desc}**, for a total of {total_sections} sections.
-2.  **Flow:** You MUST intersperse them. A 'knowledge_check' must always follow a 'text' section. A good flow is: {flow_hint}.
-3.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense, and cite specific Bible passages (e.g., John 3:16).
-4.  **Level Tailoring:** {level_instructions}
-5.  **Style Tailoring:** {style_instructions}
-6.  **Knowledge Checks:** Each `knowledge_check` must directly test the content of the `text` section *immediately preceding it*. It MUST include `question`, `question_type`, `correct_answer`, and a `biblical_reference`.
-7.  **JSON Format:** Output ONLY a valid JSON object with keys "lesson_title", "lesson_content_sections" (a list of all {total_sections} objects), and "summary_points" (a list of 3-4 key takeaways).
+1.  **JSON Structure:** You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
+2.  **Lesson Content:** The "lesson_content_sections" MUST be a list of objects. You will generate *exactly* these sections in this order:
+{section_structure_instructions}
+3.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense (citing specific passages like John 3:16), and tailored to the user's profile.
+4.  **Level & Style:** Apply these tailoring instructions: {level_instructions} {style_instructions}
+5.  **Knowledge Checks:** Each `knowledge_check` must directly test the content of the `text` section *immediately preceding it*. It MUST include `question`, `question_type` (e.g., 'multiple_choice'), `correct_answer`, `options` (if multiple_choice), and a `biblical_reference`.
 
-**Example 'text' section object:**
-{{"type": "text", "content": "The introduction to the lesson goes here (Genesis 1:1)..."}}
-
-**Example 'knowledge_check' object:**
-{{"type": "knowledge_check", "question_type": "multiple_choice", "question": "What is the key theme?", "options": ["A","B","C","D"], "correct_answer": "A", "biblical_reference": "Genesis 1:1"}}
+Output ONLY the valid JSON object.
 """
 
 def create_level_quiz_prompt(level_topic: str, lesson_summaries: list, level_name: str) -> str:
