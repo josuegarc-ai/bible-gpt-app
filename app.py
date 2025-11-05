@@ -1282,9 +1282,8 @@ Example: {{"quiz": [ {{...question 1...}}, {{...question 2...}} ]}}
 # KNOWLEDGE CHECK & QUIZ UI
 # -------------------------
 # ================================================================
-# <<< HEAVILY MODIFIED FUNCTION >>>
+# <<< FIXED & ENHANCED FUNCTION >>>
 # display_knowledge_check_question
-# This now includes the remediation loop.
 # ================================================================
 def display_knowledge_check_question(S):
     """Displays knowledge check, handles submission, and shows breakdown + remediation question."""
@@ -1333,7 +1332,7 @@ def display_knowledge_check_question(S):
                 S["struggle_log"][topic] = S["struggle_log"].get(topic, 0) + 1
                 
                 # 2. Set state for remediation loop
-                S["awaiting_remediation"] = True
+                S["awaiting_remediation"] = True # Set to True to start loop
                 S["last_incorrect_answer"] = user_answer
                 S["remediation_question"] = None # Ensure it's cleared
                 st.rerun()
@@ -1346,7 +1345,7 @@ def display_knowledge_check_question(S):
         return
 
     # --- STATE 2: User is in the remediation loop (Breakdown + New Question) ---
-    if S.get("awaiting_remediation"):
+    if S.get("awaiting_remediation") == True: # State is True (not False, not "completed")
         st.error(f"Not quite. The correct answer to the first question was: **{q_original.get('correct_answer')}**")
         
         # --- Display Theological Breakdown ---
@@ -1359,15 +1358,15 @@ def display_knowledge_check_question(S):
                         verse_text = fetch_bible_verse(reference)
                         incorrect_ans = S.get("last_incorrect_answer", "their answer")
                         
+                        # <<< ENHANCED PROMPT >>>
                         explanation_prompt = (
                             f"You are a pastoral Bible teacher providing a 'Theological Breakdown'. A student was asked: '{q_original.get('question')}' "
                             f"They incorrectly answered: '{incorrect_ans}'. The correct answer is: '{q_original.get('correct_answer')}'. "
                             f"The relevant Bible verse is '{reference}', which says: '{verse_text}'. "
-                            f"In 2-3 concise paragraphs, please do three things: "
-                            f"1. **Analyze the Verse:** Briefly explain the *theological principle* taught in '{reference}'. "
-                            f"2. **Correct the Misunderstanding:** Gently explain the *specific error* in thinking that led to the answer '{incorrect_ans}'. "
-                            f"3. **Reinforce the Truth:** Clearly explain why '{q_original.get('correct_answer')}' is the correct answer, tying it back to the verse's principle. "
-                            f"Be encouraging and analytical."
+                            f"Your task is to provide a clear, structured breakdown. Respond using these exact bolded headers:\n\n"
+                            f"**1. Theological Principle:** (Briefly explain the *theological principle* taught in '{reference}'.)\n\n"
+                            f"**2. Misunderstanding Analysis:** (Gently explain the *specific error* in thinking that led to the answer '{incorrect_ans}'.)\n\n"
+                            f"**3. Truth Reinforced:** (Clearly explain why '{q_original.get('correct_answer')}' is the correct answer, tying it back to the verse's principle.)"
                         )
                         explanation = ask_gpt_conversation(explanation_prompt)
                         breakdown_data["explanation"] = explanation
@@ -1375,7 +1374,13 @@ def display_knowledge_check_question(S):
                 except Exception as e:
                     breakdown_data["explanation"] = f"Could not load full breakdown: {e}"
             else:
-                breakdown_data["explanation"] = "No specific Bible reference was provided, but the correct answer is as stated above because... [AI would genericallly explain based on question]"
+                # Fallback if no verse is provided
+                explanation = (
+                    f"**1. Theological Principle:** The question addresses the core concept of '{q_original.get('correct_answer')}'."
+                    f"**2. Misunderstanding Analysis:** Your answer '{S.get('last_incorrect_answer', 'their answer')}' was likely incorrect because [AI to infer reasoning]."
+                    f"**3. Truth Reinforced:** The answer is '{q_original.get('correct_answer')}' because [AI to infer reasoning]."
+                )
+                breakdown_data["explanation"] = explanation
             
             S["breakdown_content"] = breakdown_data # Save to state
         
@@ -1385,7 +1390,7 @@ def display_knowledge_check_question(S):
             if breakdown.get("verse_text"):
                 st.markdown(f"**Verse Text ({breakdown.get('reference')}):**\n\n> *{breakdown.get('verse_text')}*")
                 st.markdown("---")
-            st.markdown(f"**Explanation:**\n\n{breakdown.get('explanation')}")
+            st.markdown(f"{breakdown.get('explanation')}") # Explanation now has its own markdown formatting
 
         # --- Display Remediation Question ---
         st.markdown("---")
@@ -1402,18 +1407,18 @@ def display_knowledge_check_question(S):
                         raise Exception("Failed to generate valid remediation question JSON.")
                     S["remediation_question"] = q_data
                     st.rerun() # Rerun to display the new question
+                    return # <<< BUG FIX >>> Add return to stop script
                 except Exception as e:
                     st.error(f"Error generating remediation question: {e}. Moving on.")
                     # Abort remediation and show 'Continue'
-                    S["awaiting_remediation"] = False 
-                    S["current_section_index"] += 1
+                    S["awaiting_remediation"] = "completed" # Use "completed" to skip to continue button
                     if "breakdown_content" in S: del S["breakdown_content"]
                     st.rerun()
-            return
-
+                    return # <<< BUG FIX >>> Add return to stop script
+            
         # 2b. Display and process the remediation question
         q_remediation = S.get("remediation_question")
-        if not q_remediation: return # Should be handled above, but as a safeguard
+        if not q_remediation: return # Safeguard
 
         st.markdown(f"**{q_remediation.get('question')}**")
         
@@ -1446,7 +1451,8 @@ def display_knowledge_check_question(S):
 
     # --- STATE 3: Remediation is done, show 'Continue' button ---
     if S.get("awaiting_remediation") == "completed":
-        if st.button("Continue Lesson", key=f"continue_{input_key_base}"):
+        st.markdown("---") # Add a separator
+        if st.button("Continue Lesson", type="primary", key=f"continue_{input_key_base}"):
             # Clear all remediation flags
             S["awaiting_remediation"] = False
             if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
@@ -1456,6 +1462,7 @@ def display_knowledge_check_question(S):
             # Move to the next section
             S["current_section_index"] += 1
             st.rerun()
+
 
 def run_level_quiz(S):
     # --- NEW: Add Back to Syllabus Button ---
