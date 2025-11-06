@@ -49,113 +49,23 @@ VALID_TRANSLATIONS = ["web", "kjv", "asv", "bbe", "oeb-us"]
 client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
 MODEL = "gpt-4o"
 
-# ================================================================
-# [--- NEW ---]
-# NEW ONBOARDING QUESTION POOL
-# We now define all preference and quiz questions here.
-# 'type': 'quiz' or 'preference'
-# 'key': The key to save the data in form_data
-# ================================================================
-ONBOARDING_QUESTIONS = {
-    # --- Quiz Questions ---
-    "q1_genesis": {
-        "type": "quiz",
-        "question": "What is the first book of the Bible?",
-        "options": ["Exodus", "Genesis", "Leviticus", "Numbers"],
-        "correct": "Genesis"
-    },
-    "q2_ten_commandments": {
-        "type": "quiz",
-        "question": "Who received the Ten Commandments on Mount Sinai?",
-        "options": ["Abraham", "Moses", "Elijah", "David"],
+# Diagnostic Quiz Questions (with "I don't know")
+DIAGNOSTIC_QUESTIONS = [
+    {
+        "question": "Who led the Israelites out of Egypt?",
+        "options": ["Abraham", "Moses", "David", "Noah", "I don't know"],
         "correct": "Moses"
     },
-    "q3_lions_den": {
-        "type": "quiz",
-        "question": "Who was thrown into a lions' den but survived unharmed?",
-        "options": ["Samson", "Daniel", "Jonah", "Joseph"],
-        "correct": "Daniel"
+    {
+        "question": "Which disciple denied Jesus three times before the rooster crowed?",
+        "options": ["Judas", "John", "Peter", "Thomas", "I don't know"],
+        "correct": "Peter"
     },
-    "q4_doubting_apostle": {
-        "type": "quiz",
-        "question": "In the New Testament, who is known as the \"Doubting Apostle\"?",
-        "options": ["Peter", "Thomas", "Judas", "Matthew"],
-        "correct": "Thomas"
-    },
-    "q5_not_a_plague": {
-        "type": "quiz",
-        "question": "Which of the following is NOT one of the Ten Plagues of Egypt?",
-        "options": ["Locusts", "Boils", "Flood", "Darkness"],
-        "correct": "Flood"
-    },
-    
-    # --- Preference Questions (from screenshots) ---
-    "p1_time_commitment": {
-        "type": "preference",
-        "key": "time_commitment", # This will map to your `form_data`
-        "question": "How much time will you spend reading daily?",
-        "options": ["5 - 10 min", "10 - 30 min", "30 min - 1 hr", "1+ hrs"],
-        "map_to": { # Maps readable option to the value your code expects
-            "5 - 10 min": "15 minutes",
-            "10 - 30 min": "30 minutes",
-            "30 min - 1 hr": "45 minutes",
-            "1+ hrs": "45 minutes" # Map 1hr+ to max lesson time
-        }
-    },
-    "p2_journey_length": {
-        "type": "preference",
-        "key": "journey_length",
-        "question": "How long have you been with God?",
-        "options": ["Less than 1 year", "1-3 years", "4-10 years", "Over 10 years"]
-    },
-    "p3_felt_connection": {
-        "type": "preference",
-        "key": "felt_connection",
-        "question": "What's the connection you feel with God?",
-        "options": ["I feel deeply connected", "I feel connected, but still growing", "I'm exploring my connection", "I'm open to learning more"]
-    },
-    "p4_bible_relationship": {
-        "type": "preference",
-        "key": "bible_relationship",
-        "question": "What's your relationship with Bible?",
-        "options": ["I find it easy to apply", "I find it easy to understand", "I understand it well", "I find it hard to understand", "I am not sure yet"]
-    },
-    "p5_learning_style": {
-        "type": "preference",
-        "key": "learning_style",
-        "question": "How do you like to learn?",
-        "options": ["Analytical", "Storytelling", "Practical", "Reflective"],
-        "map_to": { # Maps to the lowercase key your code expects
-            "Analytical": "analytical",
-            "Storytelling": "storytelling",
-            "Practical": "practical",
-            "Reflective": "reflective"
-        }
+    {
+        "question": "What theological term refers to the study of 'last things' or end times?",
+        "options": ["Soteriology", "Eschatology", "Christology", "Pneumatology", "I don't know"],
+        "correct": "Eschatology"
     }
-}
-
-# [--- NEW ---]
-# Define the onboarding flows
-# This defines the *order* of questions for each fork.
-# Fork 1: New User Express Lane
-NEW_USER_FLOW = [
-    "p3_felt_connection", 
-    "p1_time_commitment", 
-    "p5_learning_style"
-]
-
-# Fork 2: Experienced User Calibration (Interleaved)
-EXPERIENCED_USER_FLOW = [
-    "q1_genesis",
-    "p2_journey_length",
-    "q2_ten_commandments",
-    "p3_felt_connection",
-    "q3_lions_den",
-    "p4_bible_relationship",
-    "q4_doubting_apostle",
-    "p1_time_commitment",
-    "q5_not_a_plague",
-    "p5_learning_style"
 ]
 
 # ================================================================
@@ -253,7 +163,7 @@ def extract_json_from_response(response_text: str):
         if match:
             json_text = match.group(1)
         else:
-            # Fallback to finding the first curly brace object
+             # Fallback to finding the first curly brace object
             json_text_match = re.search(r"\{.*\}", response_text, re.DOTALL)
             if not json_text_match: return None
             json_text = json_text_match.group(0)
@@ -723,7 +633,7 @@ def run_bible_beta():
             if st.checkbox("✨ Summarize this passage?"):
                 with st.spinner("Generating summary..."):
                     summary = ask_gpt_conversation(f"Summarize and explain the key points of this Bible passage: {text} ({full_ref})")
-                    st.markdown("💬 Summary & Key Points:"); st.markdown(summary)
+                    st.markdown("**💬 Summary & Key Points:**"); st.markdown(summary)
 
         except Exception as e:
             st.error(f"Error fetching passage: {e}")
@@ -1077,11 +987,7 @@ def _learn_extract_json_any(response_text: str):
 # ============================
 # LEARN MODULE SUPPORT HELPERS
 # ============================
-TOKENS_BY_TIME = {
-    "15 minutes": 1800, 
-    "30 minutes": 3000, 
-    "45 minutes": 4000
-} # Rough estimates
+TOKENS_BY_TIME = {"15 minutes": 1800, "30 minutes": 3000, "45 minutes": 4000} # Rough estimates
 
 # --- NEW SYSTEM PROMPT FOR LEARN MODULE ---
 LEARN_MODULE_SYSTEM_PROMPT = """
@@ -1157,67 +1063,84 @@ def summarize_lesson_content(lesson_data: dict) -> str:
         return lesson_data.get("lesson_title", "Summary unavailable.") # Fallback
 
 # -------------------------
-# [--- MODIFIED ---]
-# UPDATED PROMPT TO USE NEW PROXY DATA
+# PROMPTS
 # -------------------------
 def create_full_learning_plan_prompt(form_data: dict) -> str:
     """Creates the master prompt to generate the entire curriculum."""
-    
-    # --- Infer Pacing ---
-    # We can infer pacing from time commitment now, or just set a default.
-    # Let's set a default of "A steady, detailed study" (2 lessons/level)
-    # You could also let time_commitment define this (e.g., 15min = quick)
     pacing_to_lessons_per_level = {
-        "15 minutes": 1, # A quick, high-level overview
-        "30 minutes": 2, # A steady, detailed study
-        "45 minutes": 3  # A deep, comprehensive dive
+        "A quick, high-level overview": 1,
+        "A steady, detailed study": 2,
+        "A deep, comprehensive dive": 3
     }
-    # Use '30 minutes' as default if key not found
-    time_commit = form_data.get('time_commitment', '30 minutes')
-    num_lessons_per_level = pacing_to_lessons_per_level.get(time_commit, 2)
-    
-    # --- Build a rich user profile for the AI ---
-    # This is much more powerful than the old prompt.
-    profile_lines = [
-        f"- **Primary Goal:** {form_data.get('goal', 'Not specified')}",
-        f"- **Current Knowledge Level:** {form_data.get('knowledge_level', 'Not specified')}",
-        f"- **Preferred Learning Style:** {form_data.get('learning_style', 'Not specified')}",
-        f"- **Time Commitment per Lesson:** {time_commit}",
-    ]
-    
-    # Add proxy data *if it exists*
-    if form_data.get('journey_length'):
-        profile_lines.append(f"- **User's Journey Length:** {form_data.get('journey_length')}")
-    if form_data.get('felt_connection'):
-        profile_lines.append(f"- **User's Felt Connection:** {form_data.get('felt_connection')}")
-    if form_data.get('bible_relationship'):
-        profile_lines.append(f"- **User's Relationship with Bible:** {form_data.get('bible_relationship')}")
-
-    user_profile = "\n".join(profile_lines)
+    num_lessons_per_level = pacing_to_lessons_per_level.get(form_data['pacing'], 2) # Default to steady
 
     return f"""
-You are an expert theologian and personalized curriculum designer.
-Your goal is to create a curriculum that feels *perfectly* tailored to this user.
+You are an expert theologian and personalized curriculum designer creating a Bible study plan.
+User Profile:
+- Topics of Interest: {form_data['topics']}
+- Current Knowledge: {form_data['knowledge_level']} (Derived from diagnostic)
+- Learning Goal: {", ".join(form_data['objectives'])}
+- Common Struggles: {", ".join(form_data['struggles'])}
+- Preferred Learning Style: {form_data['learning_style']}
+- Desired Pacing: {form_data['pacing']}
+- Time Commitment per Lesson: {form_data['time_commitment']}
 
-**User Profile:**
-{user_profile}
+Task: Design a complete Bible study curriculum plan based on this profile.
+1. Create a personalized `plan_title`.
+2. Write a brief, encouraging `introduction`.
+3. Determine the appropriate number of levels based on the pacing (`quick`: 2-3 levels, `steady`: 3-5 levels, `deep`: 5-7 levels).
+4. For each level, create a concise `name` and `topic` that flows logically towards the user's goals.
+5. For each level, set `num_lessons` based on the user's 'Desired Pacing' (1 for 'quick', 2 for 'steady', 3 for 'deep').
 
-**Task: Design a complete Bible study curriculum plan based on this rich profile.**
-1.  **Analyze the Profile:**
-    - "Journey Length" and "Felt Connection" are proxies for **spiritual maturity**. Use them to set the tone (e.g., "Exploring" = gentle, foundational; "Deeply connected" = deeper, richer).
-    - "Bible Relationship" is a proxy for **struggles**. If "hard to understand," the first level MUST focus on hermeneutics or core stories.
-    - "Knowledge Level" determines the *doctrinal depth* ("Just starting out" vs. "comfortable with concepts").
-2.  **Create a Plan:**
-    - Create a personalized `plan_title` that matches the user's goal.
-    - Write a brief, encouraging `introduction` that *acknowledges* their profile (e.g., "Since you're exploring your connection...").
-    - Determine 3-5 logical `levels` (each a JSON object).
-    - For each level, create a `name` (e.g., "Level 1: The Foundations of Faith") and a `topic` (e.g., "Understanding God's character and the core stories").
-    - For each level, set `num_lessons` to {num_lessons_per_level}.
-3.  **Logical Flow:** The levels MUST flow logically. If the user is new ("Less than 1 year," "hard to understand"), start with foundations. Do not jump to deep, abstract theology.
-
-**Output:**
 Output ONLY a single, valid JSON object with keys "plan_title", "introduction", and "levels" (a list of objects, each with "name", "topic", and "num_lessons").
 Example level object: {{"name": "Level 1: Title", "topic": "Brief topic description", "num_lessons": {num_lessons_per_level}}}
+"""
+
+# ================================================================
+# <<< NEW FUNCTION >>>
+# create_remediation_question_prompt
+# ================================================================
+def create_remediation_question_prompt(original_question: dict, user_answer: str) -> str:
+    """
+    Generates a prompt to create a new question in a different format
+    for a concept the user failed.
+    """
+    q_data = original_question
+    original_type = q_data.get('question_type', 'unknown')
+    
+    # Determine which new formats are allowed
+    possible_formats = ["multiple_choice", "true_false", "fill_in_the_blank"]
+    # Remove the original format to ensure it's different
+    if original_type in possible_formats:
+        possible_formats.remove(original_type)
+    
+    # Ensure we have at least one format
+    if not possible_formats:
+        possible_formats = ["multiple_choice"] # Default fallback
+
+    new_format_options = ", ".join(possible_formats)
+
+    return f"""
+You are an expert Bible quiz designer. A student needs a remediation question.
+They were asked the following question:
+- **Original Question:** {q_data.get('question')}
+- **Original Type:** {original_type}
+- **Their Incorrect Answer:** {user_answer}
+- **The Correct Answer:** {q_data.get('correct_answer')}
+- **Core Concept (from verse):** {q_data.get('biblical_reference')}
+
+**Your Task:**
+Create one new question that tests the **exact same core concept** but in a **different format**.
+- The new question's format MUST be one of: [{new_format_options}].
+- The question must be clear and test the same knowledge.
+
+**Output Format:**
+Respond ONLY with a single, valid JSON object with these keys:
+- "question": (The new question text)
+- "question_type": (The new format, e.g., "multiple_choice")
+- "correct_answer": (The correct answer string for the new question)
+- "biblical_reference": "{q_data.get('biblical_reference')}"
+- "options": (A list of 4 strings, ONLY if `question_type` is "multiple_choice". Must include the correct answer.)
 """
 
 # ================================================================
@@ -1229,30 +1152,16 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     
     # --- Context Clauses ---
     context_clause_lesson = f" This lesson must logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
+    # <<< NEW >>> Add struggle context
     context_clause_struggle = (
         f" **Adaptive Learning Note:** This user has previously struggled with these topics: [{previous_struggles}]. "
         "If relevant to this lesson, you **MUST** add a 'Review' section at the beginning to briefly re-explain one of those concepts before teaching new material."
     ) if previous_struggles else ""
 
-    knowledge_level = form_data.get('knowledge_level', 'I know the main stories')
-    learning_style = form_data.get('learning_style', 'practical')
-    time_commitment = form_data.get('time_commitment', '30 minutes')
+    knowledge_level = form_data['knowledge_level']
+    learning_style = form_data['learning_style']
+    time_commitment = form_data['time_commitment']
 
-    # [--- MODIFIED ---]
-    # Build the rich user profile for the lesson prompt
-    profile_lines = [
-        f"- **Knowledge Level:** {knowledge_level}",
-        f"- **Learning Style:** {learning_style}",
-    ]
-    if form_data.get('journey_length'):
-        profile_lines.append(f"- **Journey Length:** {form_data.get('journey_length')}")
-    if form_data.get('felt_connection'):
-        profile_lines.append(f"- **Felt Connection:** {form_data.get('felt_connection')}")
-    if form_data.get('bible_relationship'):
-        profile_lines.append(f"- **Bible Relationship:** {form_data.get('bible_relationship')}")
-    
-    user_profile = "\n".join(profile_lines)
-    
     # --- Define Level Instructions ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
@@ -1274,20 +1183,18 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
         style_instructions = "Your teaching method is **Introspective**. Focus on internal transformation. Ask probing, *italicized, bolded questions* directly within the text to make the user connect the doctrine to their own heart and motivations."
 
     # --- Define the *exact* section structure ---
-    review_block = f"- A 'text' section with the role 'Review'. (Content: Briefly re-explain a concept from: {previous_struggles}, as a warm-up.)" if previous_struggles else ""
-    
+    # <<< NEW >>> Added {{REVIEW_SECTION_IF_NEEDED}} placeholder
     section_structure_instructions = ""
-    # [--- MODIFIED ---] Simplified time commitment logic
     if time_commitment == "15 minutes":
-        section_structure_instructions = f"""
-        {review_block}
+        section_structure_instructions = """
+        {{REVIEW_SECTION_IF_NEEDED}}
         - A 'text' section with the role 'Introduction'.
         - A 'text' section with the role 'Core Teaching & Application'.
         - A 'knowledge_check' section testing the 'Core Teaching'.
         """
     elif time_commitment == "30 minutes":
-        section_structure_instructions = f"""
-        {review_block}
+        section_structure_instructions = """
+        {{REVIEW_SECTION_IF_NEEDED}}
         - A 'text' section with the role 'Introduction' (State the main topic and passage).
         - A 'text' section with the role 'Exposition' (Teach the theological principles *from* the passage).
         - A 'knowledge_check' section testing the 'Exposition'.
@@ -1295,8 +1202,8 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
         - A 'knowledge_check' section testing the 'Application'.
         """
     else: # 45 minutes
-        section_structure_instructions = f"""
-        {review_block}
+        section_structure_instructions = """
+        {{REVIEW_SECTION_IF_NEEDED}}
         - A 'text' section with the role 'Introduction' (A compelling hook and the main theological question).
         - A 'text' section with the role 'Exposition' (A deep dive into the *theological principles* of the passage).
         - A 'knowledge_check' section testing the 'Exposition'.
@@ -1305,6 +1212,15 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
         - A 'text' section with the role 'Practical Application' (A clear, actionable takeaway for daily life).
         - A 'text' section with the role 'Guided Reflection' (A closing prayer prompt or reflective questions).
         """
+    
+    # <<< NEW >>> Dynamically insert the review block based on struggles
+    review_block = ""
+    if previous_struggles:
+        review_block = f"- A 'text' section with the role 'Review'. (Content: Briefly re-explain a concept from: {previous_struggles}, as a warm-up.)"
+    
+    # Replace the placeholder with the dynamic block
+    section_structure_instructions = section_structure_instructions.replace("{{REVIEW_SECTION_IF_NEEDED}}", review_block)
+
 
     return f"""
 You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_level} on the topic of "{level_topic}".
@@ -1312,21 +1228,19 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 {context_clause_struggle}
 
 **User Profile:**
-{user_profile}
+- Knowledge Level: {knowledge_level}
+- Learning Style: {learning_style}
 
 **CRITICAL INSTRUCTIONS:**
-1.  **Analyze Profile:** Use the *full* profile to set the tone.
-    - If "Journey Length" is "Less than 1 year" or "Felt Connection" is "Exploring," the tone MUST be gentle, foundational, and highly encouraging. Define all terms.
-    - If "Bible Relationship" is "hard to understand," the 'Exposition' section MUST be extra clear and focus on the main point, not complex side-topics.
-2.  **Core Teaching Philosophy:** Your goal is to *teach theology* (what is true about God) and *doctrine* (what we believe) that is *derived from* the biblical text. **DO NOT simply paraphrase or summarize the plot of the Bible passage.** Extract the *principles* from the story and teach those principles.
-3.  **Lesson Title:** Create a **unique and specific** `lesson_title` for this lesson. **DO NOT** just repeat the overall level topic ("{level_topic}").
-4.  **JSON Structure:** You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
-5.  **Lesson Content:** The "lesson_content_sections" MUST be a list of objects. You will generate *exactly* these sections in this order:
+1.  **Core Teaching Philosophy:** Your goal is to *teach theology* (what is true about God) and *doctrine* (what we believe) that is *derived from* the biblical text. **DO NOT simply paraphrase or summarize the plot of the Bible passage.** Extract the *principles* from the story and teach those principles.
+2.  **Lesson Title:** Create a **unique and specific** `lesson_title` for this lesson. **DO NOT** just repeat the overall level topic ("{level_topic}").
+3.  **JSON Structure:** You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
+4.  **Lesson Content:** The "lesson_content_sections" MUST be a list of objects. You will generate *exactly* these sections in this order:
 {section_structure_instructions}
-6.  **Style is Primary:** The *most important* instruction is to follow the user's `learning_style`. Apply this method to all 'text' sections: {style_instructions}
-7.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense (citing specific passages like John 3:16), and tailored to the user's `knowledge_level`: {level_instructions}
+5.  **Style is Primary:** The *most important* instruction is to follow the user's `learning_style`. Apply this method to all 'text' sections: {style_instructions}
+6.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense (citing specific passages like John 3:16), and tailored to the user's `knowledge_level`: {level_instructions}
 
-8.  **CRITICAL KEY REQUIREMENT FOR 'knowledge_check':**
+7.  **CRITICAL KEY REQUIREMENT FOR 'knowledge_check':**
     - Every 'knowledge_check' object MUST include *all* of these keys:
     - `type`: "knowledge_check"
     - `question`: "The question text..."
@@ -1343,268 +1257,430 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 Output ONLY the valid JSON object.
 """
 
-# ... (Rest of your prompt/UI functions are UNCHANGED) ...
-# create_remediation_question_prompt
-# create_level_quiz_prompt
+def create_level_quiz_prompt(level_topic: str, lesson_summaries: list, level_name: str) -> str:
+    """Generates prompt for creating the end-of-level quiz."""
+    summaries_text = "\n".join(f"- {s}" for i, s in enumerate(lesson_summaries) if s) # Filter empty summaries
+    return f"""
+You are a Bible teacher creating a 10-question cumulative quiz for the level titled "{level_name}" which covers the topic of "{level_topic}".
+The lessons covered these key points:
+{summaries_text}
+
+**Instructions:** Create a quiz based on the *theological concepts, scriptural connections, and applications* implied by these lesson summaries.
+- Generate exactly 10 questions.
+- Mix question types: 'multiple_choice', 'true_false', 'fill_in_the_blank'.
+- Each question object MUST include: 'question' (string), 'question_type' (string), 'correct_answer' (string).
+- For 'multiple_choice', also include 'options' (list of 4 strings, including the correct one).
+- For 'true_false', `correct_answer` must be "True" or "False".
+- Include a relevant 'biblical_reference' (string) for each question.
+
+**Output Format:**
+Output ONLY a valid JSON object with a *single key* named "quiz". The value of "quiz" MUST be the JSON *array* containing the 10 question objects.
+Example: {{"quiz": [ {{...question 1...}}, {{...question 2...}} ]}}
+"""
+
+# -------------------------
+# KNOWLEDGE CHECK & QUIZ UI
+# -------------------------
+# ================================================================
+# <<< FIXED & ENHANCED FUNCTION >>>
 # display_knowledge_check_question
-# run_level_quiz
-
 # ================================================================
-# [--- DELETED ---]
-# The old `run_diagnostic_quiz` and `run_learn_module_setup` functions
-# (lines 1162-1305 in your original file) are completely removed.
-# They are replaced by the new functions below.
-# ================================================================
-
-# ================================================================
-# [--- NEW ---]
-# ALL NEW ONBOARDING LOGIC
-# ================================================================
-def process_and_generate_plan(S):
-    """
-    Final step of onboarding. 
-    Calculates derived data, builds the full form_data object,
-    and generates the personalized plan.
-    """
-    S['onboarding_step'] = "processing" # Set state to processing
+def display_knowledge_check_question(S):
+    """Displays knowledge check, handles submission, and shows breakdown + remediation question."""
     
-    form_data = S.get('form_data', {})
-    
-    # --- 1. Calculate Derived Knowledge Level ---
-    if form_data.get('bifurcation_choice') == "start_at_l1":
-        form_data['knowledge_level'] = "Just starting out"
-    else:
-        # Calculate from quiz score (experienced user fork)
-        score = S.get('diag_score', 0)
-        total_quiz_qs = len([q for q in EXPERIENCED_USER_FLOW if ONBOARDING_QUESTIONS[q]['type'] == 'quiz'])
-        
-        if total_quiz_qs > 0:
-            score_percent = score / total_quiz_qs
-            if score_percent <= 0.4:
-                form_data['knowledge_level'] = "Just starting out"
-            elif score_percent <= 0.8: # Adjusted to be more forgiving
-                form_data['knowledge_level'] = "I know the main stories"
-            else:
-                form_data['knowledge_level'] = "I'm comfortable with deeper concepts"
+    level_data = S["levels"][S["current_level"]]
+    current_lesson = level_data["lessons"][S["current_lesson_index"]]
+    # The original question from the lesson plan
+    q_original = current_lesson["lesson_content_sections"][S["current_section_index"]]
+
+    input_key_base = f"kc_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"
+
+    # --- STATE 1: User is answering the *original* question ---
+    if not S.get("awaiting_remediation"):
+        st.markdown("---")
+        st.markdown(f"#### ✅ Knowledge Check")
+        st.markdown(f"**{q_original.get('question', 'Missing question text.')}**")
+
+        user_answer = None
+        input_key = f"{input_key_base}_original"
+        q_type = q_original.get('question_type')
+
+        if q_type == 'multiple_choice':
+            user_answer = st.radio("Select your answer:", q_original.get('options', []), key=input_key, index=None)
+        elif q_type == 'true_false':
+            user_answer = st.radio("True or False?", ['True', 'False'], key=input_key, index=None)
+        elif q_type == 'fill_in_the_blank':
+            user_answer = st.text_input("Fill in the blank:", key=input_key)
         else:
-            form_data['knowledge_level'] = "I know the main stories" # Fallback
+            st.error(f"Unknown question type: {q_type}"); return
 
-    # --- 2. Set Default/Missing Values ---
-    if 'learning_style' not in form_data:
-        form_data['learning_style'] = 'practical' # Default
-    if 'time_commitment' not in form_data:
-        form_data['time_commitment'] = '30 minutes' # Default
+        if st.button("Submit Answer", key=f"submit_{input_key}"):
+            if user_answer is None and q_type in ['multiple_choice', 'true_false']:
+                st.warning("Please select an answer.")
+                return
+
+            is_correct = _answers_match(user_answer, q_original.get('correct_answer'), q_type)
+            
+            if is_correct:
+                st.success("Correct! Moving on.")
+                S["current_section_index"] += 1
+                st.rerun()
+            else:
+                # --- INCORRECT ---
+                # 1. Log the struggle
+                topic = q_original.get('biblical_reference', 'general_knowledge')
+                S["struggle_log"][topic] = S["struggle_log"].get(topic, 0) + 1
+                
+                # 2. Set state for remediation loop
+                S["awaiting_remediation"] = True # Set to True to start loop
+                S["last_incorrect_answer"] = user_answer
+                S["remediation_question"] = None # Ensure it's cleared
+                st.rerun()
         
-    # Infer objectives/struggles from proxy data (simplified)
-    # This can be made more complex later
-    form_data['objectives'] = [form_data.get('goal', "Gain knowledge and understanding")]
-    if form_data.get('bible_relationship') == "I find it hard to understand":
-        form_data['struggles'] = ["Understanding difficult passages"]
-    else:
-        form_data['struggles'] = []
+        # Navigation to go back
+        if S["current_section_index"] > 0:
+            if st.button("⬅️ Previous Section", key=f"prev_sec_kc_{S['current_section_index']}"):
+                S["current_section_index"] -= 1
+                st.rerun()
+        return
 
-    # --- 3. Generate Plan ---
-    with st.spinner("Our AI is designing your personalized curriculum..."):
-        try:
+    # --- STATE 2: User is in the remediation loop (Breakdown + New Question) ---
+    if S.get("awaiting_remediation") == True: # State is True (not False, not "completed")
+        st.error(f"Not quite. The correct answer to the first question was: **{q_original.get('correct_answer')}**")
+        
+        # --- Display Theological Breakdown ---
+        if "breakdown_content" not in S: # Generate breakdown only once
+            reference = q_original.get('biblical_reference', '')
+            breakdown_data = {"explanation": "Loading...", "verse_text": "", "reference": reference}
+            if reference:
+                try:
+                    with st.spinner("Loading Theological Breakdown..."):
+                        verse_text = fetch_bible_verse(reference)
+                        incorrect_ans = S.get("last_incorrect_answer", "their answer")
+                        
+                        # <<< ENHANCED PROMPT >>>
+                        explanation_prompt = (
+                            f"You are a pastoral Bible teacher providing a 'Theological Breakdown'. A student was asked: '{q_original.get('question')}' "
+                            f"They incorrectly answered: '{incorrect_ans}'. The correct answer is: '{q_original.get('correct_answer')}'. "
+                            f"The relevant Bible verse is '{reference}', which says: '{verse_text}'. "
+                            f"Your task is to provide a clear, structured breakdown. Respond using these exact bolded headers:\n\n"
+                            f"**1. Theological Principle:** (Briefly explain the *theological principle* taught in '{reference}'.)\n\n"
+                            f"**2. Misunderstanding Analysis:** (Gently explain the *specific error* in thinking that led to the answer '{incorrect_ans}'.)\n\n"
+                            f"**3. Truth Reinforced:** (Clearly explain why '{q_original.get('correct_answer')}' is the correct answer, tying it back to the verse's principle.)"
+                        )
+                        explanation = ask_gpt_conversation(explanation_prompt)
+                        breakdown_data["explanation"] = explanation
+                        breakdown_data["verse_text"] = verse_text
+                except Exception as e:
+                    breakdown_data["explanation"] = f"Could not load full breakdown: {e}"
+            else:
+                # Fallback if no verse is provided
+                explanation = (
+                    f"**1. Theological Principle:** The question addresses the core concept of '{q_original.get('correct_answer')}'."
+                    f"**2. Misunderstanding Analysis:** Your answer '{S.get('last_incorrect_answer', 'their answer')}' was likely incorrect because [AI to infer reasoning]."
+                    f"**3. Truth Reinforced:** The answer is '{q_original.get('correct_answer')}' because [AI to infer reasoning]."
+                )
+                breakdown_data["explanation"] = explanation
+            
+            S["breakdown_content"] = breakdown_data # Save to state
+        
+        # Display the breakdown
+        breakdown = S["breakdown_content"]
+        with st.expander(f"📖 Theological Breakdown: {breakdown.get('reference')}", expanded=True):
+            if breakdown.get("verse_text"):
+                st.markdown(f"**Verse Text ({breakdown.get('reference')}):**\n\n> *{breakdown.get('verse_text')}*")
+                st.markdown("---")
+            st.markdown(f"{breakdown.get('explanation')}") # Explanation now has its own markdown formatting
+
+        # --- Display Remediation Question ---
+        st.markdown("---")
+        st.markdown("#### 💡 Let's Try That Concept Again")
+
+        # 2a. Generate the remediation question if it doesn't exist
+        if not S.get("remediation_question"):
+            with st.spinner("Preparing a new question..."):
+                try:
+                    remediation_prompt = create_remediation_question_prompt(q_original, S.get("last_incorrect_answer", ""))
+                    q_resp = ask_gpt_json(remediation_prompt, 1000)
+                    q_data = _learn_extract_json_any(q_resp)
+                    if not q_data or 'question' not in q_data:
+                        raise Exception("Failed to generate valid remediation question JSON.")
+                    S["remediation_question"] = q_data
+                    st.rerun() # Rerun to display the new question
+                    return # <<< BUG FIX >>> Add return to stop script
+                except Exception as e:
+                    st.error(f"Error generating remediation question: {e}. Moving on.")
+                    # Abort remediation and show 'Continue'
+                    S["awaiting_remediation"] = "completed" # Use "completed" to skip to continue button
+                    if "breakdown_content" in S: del S["breakdown_content"]
+                    st.rerun()
+                    return # <<< BUG FIX >>> Add return to stop script
+            
+        # 2b. Display and process the remediation question
+        q_remediation = S.get("remediation_question")
+        if not q_remediation: return # Safeguard
+
+        st.markdown(f"**{q_remediation.get('question')}**")
+        
+        user_answer_remediation = None
+        input_key_remediation = f"{input_key_base}_remediation"
+        q_type_remediation = q_remediation.get('question_type')
+
+        if q_type_remediation == 'multiple_choice':
+            user_answer_remediation = st.radio("Select your answer:", q_remediation.get('options', []), key=input_key_remediation, index=None)
+        elif q_type_remediation == 'true_false':
+            user_answer_remediation = st.radio("True or False?", ['True', 'False'], key=input_key_remediation, index=None)
+        elif q_type_remediation == 'fill_in_the_blank':
+            user_answer_remediation = st.text_input("Fill in the blank:", key=input_key_remediation)
+        
+        if st.button("Submit Reworked Answer", key=f"submit_{input_key_remediation}"):
+            if user_answer_remediation is None and q_type_remediation in ['multiple_choice', 'true_false']:
+                st.warning("Please select an answer.")
+                return
+
+            is_correct_remediation = _answers_match(user_answer_remediation, q_remediation.get('correct_answer'), q_type_remediation)
+            
+            if is_correct_remediation:
+                st.success("✅ Excellent! You've grasped the concept.")
+            else:
+                st.error(f"❌ Still not quite. The correct answer was **{q_remediation.get('correct_answer')}**. We'll move on for now, but be sure to review this concept!")
+            
+            # Set flag to show 'Continue' button
+            S["awaiting_remediation"] = "completed" 
+            st.rerun()
+
+    # --- STATE 3: Remediation is done, show 'Continue' button ---
+    if S.get("awaiting_remediation") == "completed":
+        st.markdown("---") # Add a separator
+        if st.button("Continue Lesson", type="primary", key=f"continue_{input_key_base}"):
+            # Clear all remediation flags
+            S["awaiting_remediation"] = False
+            if "last_incorrect_answer" in S: del S["last_incorrect_answer"]
+            if "remediation_question" in S: del S["remediation_question"]
+            if "breakdown_content" in S: del S["breakdown_content"]
+            
+            # Move to the next section
+            S["current_section_index"] += 1
+            st.rerun()
+
+
+def run_level_quiz(S):
+    # --- NEW: Add Back to Syllabus Button ---
+    if st.button("⬅️ Back to Syllabus"):
+        S["quiz_mode"] = False
+        S["view_mode"] = "dashboard"
+        # Reset quiz progress
+        S["current_question_index"] = 0 
+        S["user_score"] = 0
+        st.rerun()
+    # --- End of NEW Button ---
+
+    level_data = S["levels"][S["current_level"]]
+    quiz_questions = level_data.get("quiz_questions", [])
+    q_index = S.get("current_question_index", 0)
+
+    st.markdown("### 📝 Final Level Quiz")
+    if not quiz_questions: 
+        st.warning("Quiz questions not generated yet or generation failed.")
+        return
+
+    if not isinstance(quiz_questions, list):
+         st.error("Quiz data is not in the expected format (list). Please restart the level.")
+         return
+
+    total_questions = len(quiz_questions)
+    if total_questions == 0:
+         st.warning("No quiz questions found for this level.")
+         return
+         
+    st.progress(q_index / total_questions) # Use q_index for progress
+    st.markdown(f"**Score: {S.get('user_score', 0)}/{total_questions}**")
+
+    if q_index < total_questions:
+        q = quiz_questions[q_index]
+        if not isinstance(q, dict) or 'question' not in q or 'correct_answer' not in q:
+             st.error(f"Error: Invalid question format at index {q_index}. Skipping question.")
+             S["current_question_index"] = q_index + 1
+             st.rerun()
+             return
+
+        st.markdown(f"**Question {q_index + 1}:** {q.get('question', '')}")
+        user_answer = None
+        q_key = f"quiz_{S['current_level']}_{q_index}"
+        q_type = q.get('question_type')
+
+        if q_type == 'multiple_choice':
+            options = q.get('options', [])
+            if not options: st.error("Error: Multiple choice question has no options."); return
+            user_answer = st.radio("Answer:", options, key=q_key, index=None)
+        elif q_type == 'true_false':
+            user_answer = st.radio("Answer:", ["True", "False"], key=q_key, index=None)
+        elif q_type == 'fill_in_the_blank':
+            user_answer = st.text_input("Answer:", key=q_key)
+        else:
+             st.error(f"Unknown quiz question type: {q_type}"); return
+
+        if st.button("Submit Quiz Answer", key=f"submit_{q_key}"):
+            if user_answer is None and q_type in ['multiple_choice', 'true_false']:
+                 st.warning("Please select an answer.")
+                 return
+                 
+            if _answers_match(user_answer, q.get('correct_answer'), q_type):
+                st.success("Correct!")
+                S["user_score"] = S.get("user_score", 0) + 1
+            else:
+                st.error(f"Incorrect. The correct answer was: **{q.get('correct_answer')}**")
+                # <<< ADAPTIVE LEARNING >>> Log struggle topic from quiz
+                topic = q.get('biblical_reference', 'general_knowledge')
+                S["struggle_log"][topic] = S["struggle_log"].get(topic, 0) + 1
+            
+            S["current_question_index"] = q_index + 1
+            st.rerun()
+    else:
+        # Quiz completed
+        score = S.get('user_score', 0)
+        passing_score = total_questions * 0.7 
+        st.success(f"### Quiz Completed! Final Score: {score}/{total_questions}")
+        
+        if score >= passing_score:
+            st.balloons()
+            st.markdown(f"Congratulations! You passed {level_data.get('name','this level')}!")
+            level_data["quiz_completed"] = True # <-- NEW: Set level complete flag
+            
+            if S["current_level"] + 1 < len(S["levels"]):
+                if st.button("Go to Next Level ▶️"):
+                    S["current_level"] += 1
+                    S["current_lesson_index"] = 0
+                    S["current_section_index"] = 0
+                    S["quiz_mode"] = False
+                    S["current_question_index"] = 0 
+                    S["user_score"] = 0 
+                    S["view_mode"] = "dashboard" # <-- NEW: Go back to dashboard
+                    st.rerun()
+            else:
+                 S["plan_completed"] = True # <-- NEW: Set plan complete flag
+                 st.info("You've completed all levels in this plan!")
+                 if st.button("Back to Syllabus"):
+                    S["view_mode"] = "dashboard" # <-- NEW: Go back to dashboard
+                    S["quiz_mode"] = False
+                    st.rerun()
+        else:
+            st.error("You didn't reach the passing score. Please review the lessons and try the quiz again.")
+            if st.button("Review Lessons"):
+                 S["quiz_mode"] = False
+                 S["view_mode"] = "dashboard" # <-- NEW: Go back to dashboard
+                 S["current_question_index"] = 0 
+                 S["user_score"] = 0
+                 st.rerun()
+            if st.button("Retake Quiz"):
+                S["current_question_index"] = 0
+                S["user_score"] = 0
+                st.rerun()
+
+# ================================================================
+# DIAGNOSTIC QUIZ FUNCTION
+# ================================================================
+def run_diagnostic_quiz():
+    st.subheader("Quick Bible Knowledge Check")
+    st.info("Let's figure out the best starting point for you with a few quick questions.")
+    S_learn = st.session_state.learn_state 
+    if 'diag_q_index' not in S_learn:
+        S_learn['diag_q_index'] = 0
+        S_learn['diag_score'] = 0
+    q_index = S_learn['diag_q_index']
+    if q_index < len(DIAGNOSTIC_QUESTIONS):
+        q_data = DIAGNOSTIC_QUESTIONS[q_index]
+        st.markdown(f"**Question {q_index + 1} of {len(DIAGNOSTIC_QUESTIONS)}:**")
+        st.markdown(f"*{q_data['question']}*")
+        
+        options = q_data['options']
+        if "I don't know" not in options: options.append("I don't know")
+        
+        user_answer = st.radio(
+            "Select your answer:",
+            options,
+            key=f"diag_q_{q_index}",
+            index=None 
+        )
+        if st.button("Submit Answer", key=f"diag_submit_{q_index}"):
+            if user_answer:
+                if user_answer == q_data['correct']:
+                    S_learn['diag_score'] += 1
+                S_learn['diag_q_index'] += 1
+                st.rerun() 
+            else:
+                st.warning("Please select an answer.")
+    else:
+        score = S_learn['diag_score']
+        total = len(DIAGNOSTIC_QUESTIONS)
+        knowledge_level = ""
+        if score / total <= 0.4: # Covers 0 or 1 out of 3
+            knowledge_level = "Just starting out"
+        elif score / total <= 0.7: # Covers 2 out of 3
+            knowledge_level = "I know the main stories"
+        else: # Covers 3 out of 3
+            knowledge_level = "I'm comfortable with deeper concepts"
+
+        st.success(f"Knowledge check complete! Score: {score}/{total}")
+        st.info(f"Based on your answers, we'll tailor the plan using the **'{knowledge_level}'** level as a starting point.")
+        
+        S_learn['derived_knowledge_level'] = knowledge_level
+        S_learn['diagnostic_complete'] = True
+        st.rerun() 
+
+# ================================================================
+# LEARNING PLAN SETUP (QUESTIONNAIRE)
+# ================================================================
+def run_learn_module_setup():
+    st.info("Now, let's create a personalized learning plan based on your unique needs.")
+    derived_knowledge_level = st.session_state.learn_state.get('derived_knowledge_level', "Not determined")
+    st.markdown(f"**Assessed Knowledge Level:** {derived_knowledge_level}") 
+
+    with st.form("user_profile_form"):
+        topics_input = st.text_input("**What topics are on your heart to learn about?** (Separate with commas)", "Understanding grace, The life of David")
+        objectives_input = st.multiselect("**What do you hope to achieve with this study?**", ["Gain knowledge and understanding", "Find practical life application", "Strengthen my faith", "Prepare to teach others"], default=["Gain knowledge and understanding"])
+        struggles_input = st.multiselect("**What are some of your common challenges?**", ["Understanding historical context", "Connecting it to my daily life", "Staying consistent", "Dealing with difficult passages"])
+        learning_style_input = st.selectbox("**Preferred learning style:**", ["Analytical", "Storytelling", "Practical", "Reflective"])
+        pacing_input = st.select_slider("**How would you like to pace your learning?**", options=["A quick, high-level overview", "A steady, detailed study", "A deep, comprehensive dive"], value="A steady, detailed study")
+        time_commitment_input = st.selectbox("**How much time can you realistically commit to each lesson?**", ["15 minutes", "30 minutes", "45 minutes"], index=1)
+        
+        submitted = st.form_submit_button("🚀 Generate My Tailor-Made Plan")
+    
+    if submitted:
+        form_data = {
+            'topics': topics_input,
+            'knowledge_level': derived_knowledge_level, 
+            'objectives': objectives_input,
+            'struggles': struggles_input,
+            'learning_style': learning_style_input.lower(),
+            'pacing': pacing_input,
+            'time_commitment': time_commitment_input
+        }
+        
+        if not form_data['topics'] or not form_data['objectives']:
+            st.warning("Please fill out the topics and objectives to generate a plan.")
+            return
+        if form_data['knowledge_level'] == "Not determined":
+             st.error("Knowledge level could not be determined. Please restart.")
+             return
+             
+        with st.spinner("Our AI is designing your personalized curriculum..."):
             master_prompt = create_full_learning_plan_prompt(form_data)
             plan_resp = ask_gpt_json(master_prompt, max_tokens=2500)
             plan_data = _learn_extract_json_any(plan_resp) if plan_resp else None
             
-            if (plan_data and isinstance(plan_data, dict) and 
-                "levels" in plan_data and isinstance(plan_data["levels"], list)):
-                
-                # --- SUCCESS ---
-                # Save all data to the main session state
+            if plan_data and isinstance(plan_data, dict) and "levels" in plan_data and isinstance(plan_data["levels"], list):
+                S = st.session_state.learn_state
                 S.update({
-                    "plan": plan_data, 
-                    "levels": plan_data["levels"], 
-                    "form_data": form_data, # Save the complete form data
-                    "current_level": 0, 
-                    "current_lesson_index": 0, 
-                    "current_section_index": 0,
-                    "quiz_mode": False, 
-                    "current_question_index": 0, 
-                    "user_score": 0,
-                    "view_mode": "dashboard", # Go to dashboard
-                    "onboarding_complete": True # Flag onboarding as done
+                    "plan": plan_data, "levels": plan_data["levels"], "form_data": form_data,
+                    "current_level": 0, "current_lesson_index": 0, "current_section_index": 0,
+                    "quiz_mode": False, "current_question_index": 0, "user_score": 0,
+                    "view_mode": "dashboard", # <-- NEW: Set default view
                 })
                 st.rerun()
             else:
                 st.error("Failed to generate a valid learning plan from AI response. Please try adjusting your inputs or try again later.")
                 if plan_resp: st.text_area("Raw AI Response (for debugging):", plan_resp, height=200)
-                S['onboarding_step'] = 0 # Reset to start
-                st.rerun()
-        except Exception as e:
-            st.error(f"An error occurred during plan generation: {e}")
-            S['onboarding_step'] = 0 # Reset to start
-            st.rerun()
-
-def render_onboarding_question(S, question_key, step_num):
-    """
-    Renders a single preference or quiz question from the ONBOARDING_QUESTIONS dict.
-    Handles submission and advances the state.
-    """
-    if question_key not in ONBOARDING_QUESTIONS:
-        st.error("Onboarding question key not found. Resetting.")
-        S['onboarding_step'] = 0
-        st.rerun()
-        return
-
-    q_data = ONBOARDING_QUESTIONS[question_key]
-    q_type = q_data['type']
-    form_key = q_data.get('key')
-    
-    st.subheader(q_data['question'])
-    
-    # Use st.radio for a cleaner, button-like UI (index=None makes it require selection)
-    user_answer = st.radio(
-        "Select one:", 
-        q_data['options'], 
-        key=f"onboard_{step_num}",
-        index=None,
-        label_visibility="collapsed"
-    )
-
-    if user_answer:
-        # This block executes *immediately* when a radio button is clicked
-        
-        # 1. Process the answer
-        if q_type == 'quiz':
-            if user_answer == q_data['correct']:
-                S['diag_score'] = S.get('diag_score', 0) + 1
-                # You could show immediate feedback, but Duolingo-style often just moves on
-                # st.success("Correct!") 
-            else:
-                # st.error("Not quite!")
-                pass # Just move on
-        
-        elif q_type == 'preference':
-            # Map the readable answer to the system value (e.g., "5 - 10 min" -> "15 minutes")
-            final_value = q_data.get('map_to', {}).get(user_answer, user_answer)
-            S['form_data'][form_key] = final_value
-            
-        # 2. Advance the state
-        S['onboarding_step'] += 1
-        st.rerun()
-
-def run_onboarding_flow(S):
-    """
-    The new state machine for the entire onboarding flow.
-    """
-    
-    # Initialize form_data and step
-    if 'form_data' not in S:
-        S['form_data'] = {}
-    if 'onboarding_step' not in S:
-        S['onboarding_step'] = 0
-    if 'diag_score' not in S:
-        S['diag_score'] = 0
-        
-    step = S['onboarding_step']
-
-    # --- Step 0: Goal (Felt Need) ---
-    if step == 0:
-        st.subheader("Welcome. What's your primary goal for this journey?")
-        goals = {
-            "I'm new to the Bible and want to learn the basics.": {
-                "goal": "Learn the foundations of the Bible",
-                "topics": "Core stories, Key figures, What is the Gospel",
-                "learning_style": "storytelling" # Good default
-            },
-            "I'm looking for practical wisdom for my daily life.": {
-                "goal": "Find practical wisdom for daily life",
-                "topics": "Decision making, Relationships, Purpose, Peace",
-                "learning_style": "practical"
-            },
-            "I want to do a deep, analytical study of a topic.": {
-                "goal": "Deep analytical study",
-                "topics": "Theology, Covenants, Eschatology, Book of Romans",
-                "learning_style": "analytical"
-            },
-            "I'm feeling lost or anxious and am looking for peace.": {
-                "goal": "Find peace and comfort",
-                "topics": "Anxiety, Trust, Hope, God's love",
-                "learning_style": "reflective"
-            }
-        }
-        
-        goal_choice = st.radio(
-            "Select your goal:", 
-            goals.keys(), 
-            key="goal_step", 
-            index=None, 
-            label_visibility="collapsed"
-        )
-        
-        if goal_choice:
-            selected_goal_data = goals[goal_choice]
-            S['form_data']['goal'] = selected_goal_data['goal']
-            S['form_data']['topics'] = selected_goal_data['topics']
-            S['form_data']['learning_style'] = selected_goal_data['learning_style'] # Pre-set
-            S['onboarding_step'] = 1
-            st.rerun()
-        return
-
-    # --- Step 1: Bifurcation (Placement) ---
-    if step == 1:
-        st.subheader("Great. Let's find your starting point.")
-        bifurcation_choice = st.radio(
-            "Select your path:",
-            ["Start me at Lesson 1 (The basics)", "Find my level (I know some basics)"],
-            key="bifurcation_step",
-            index=None,
-            label_visibility="collapsed"
-        )
-        
-        if bifurcation_choice:
-            if bifurcation_choice == "Start me at Lesson 1 (The basics)":
-                S['form_data']['bifurcation_choice'] = "start_at_l1"
-                S['onboarding_step'] = 100 # Jump to "New User" flow
-            else:
-                S['form_data']['bifurcation_choice'] = "find_my_level"
-                S['onboarding_step'] = 200 # Jump to "Experienced User" flow
-            st.rerun()
-        return
-
-    # --- FORK 1: New User Express Lane ---
-    if 100 <= step < 100 + len(NEW_USER_FLOW):
-        flow_index = step - 100
-        question_key = NEW_USER_FLOW[flow_index]
-        # Show progress
-        st.progress((flow_index + 1) / len(NEW_USER_FLOW))
-        render_onboarding_question(S, question_key, step)
-        return
-
-    if step == 100 + len(NEW_USER_FLOW):
-        # End of New User flow, generate plan
-        process_and_generate_plan(S)
-        return
-
-    # --- FORK 2: Experienced User Calibration ---
-    if 200 <= step < 200 + len(EXPERIENCED_USER_FLOW):
-        flow_index = step - 200
-        question_key = EXPERIENCED_USER_FLOW[flow_index]
-        # Show progress
-        st.progress((flow_index + 1) / len(EXPERIENCED_USER_FLOW))
-        render_onboarding_question(S, question_key, step)
-        return
-
-    if step == 200 + len(EXPERIENCED_USER_FLOW):
-        # End of Experienced User flow, generate plan
-        process_and_generate_plan(S)
-        return
-
-    # --- Fallback/Processing State ---
-    if S['onboarding_step'] == "processing":
-        st.spinner("Our AI is designing your personalized curriculum...")
-    else:
-        # Catch-all in case state is broken
-        st.error("An error occurred. Resetting onboarding.")
-        S['onboarding_step'] = 0
-        S['form_data'] = {}
-        if st.button("Restart"):
-            st.rerun()
-
 
 # ================================================================
 # LEARN MODULE: DEEP DIVE CHAT (NEW FUNCTION)
@@ -1897,7 +1973,7 @@ def run_lesson_view(S):
                 if prev_level_lessons:
                     prev_summary = prev_level_lessons[-1].get("lesson_summary")
 
-            # Get struggle topics to pass to prompt
+            # <<< NEW >>> Get struggle topics to pass to prompt
             struggles = [topic for topic, count in S.get("struggle_log", {}).items() if count > 0]
             struggle_summary = ", ".join(struggles) if struggles else None
 
@@ -1908,7 +1984,7 @@ def run_lesson_view(S):
                 total_lessons_in_level=num_lessons,
                 form_data=S["form_data"],
                 previous_lesson_summary=prev_summary,
-                previous_struggles=struggle_summary
+                previous_struggles=struggle_summary # <<< NEW >>> Pass struggles
             )
             lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=lesson_max_tokens)
             lesson_data = _learn_extract_json_any(lesson_resp) if lesson_resp else None
@@ -1945,6 +2021,7 @@ def run_lesson_view(S):
         section_type = section.get("type")
 
         if section_type == "text":
+            # <<< NEW >>> Handle new "Review" role
             if section.get("role") == "Review":
                 st.info(f"**Review Section:** {section.get('content', '*No content for this section.*')}")
             else:
@@ -1954,6 +2031,7 @@ def run_lesson_view(S):
             with nav_cols[0]:
                 if S["current_section_index"] > 0:
                     if st.button("⬅️ Previous Section", key=f"prev_sec_{S['current_section_index']}"):
+                        # <<< NEW >>> Clear remediation flags when moving
                         S["awaiting_remediation"] = False
                         if "remediation_question" in S: del S["remediation_question"]
                         if "breakdown_content" in S: del S["breakdown_content"]
@@ -2012,31 +2090,34 @@ def run_lesson_view(S):
                     st.rerun()
 
 # ================================================================
-# [--- MODIFIED ---]
 # MAIN LEARN MODULE FLOW (THE NEW ROUTER)
 # ================================================================
 def run_learn_module():
     st.subheader("📚 Learn Module — Personalized Bible Learning")
-    if "learn_state" not in st.session_state: 
-        st.session_state.learn_state = {}
+    if "learn_state" not in st.session_state: st.session_state.learn_state = {}
     S = st.session_state.learn_state
 
-    # Initialize struggle log
+    # <<< NEW >>> Initialize struggle log
     if "struggle_log" not in S:
         S["struggle_log"] = {}
 
-    # --- 1. Check if a plan already exists ---
-    if S.get("plan"):
-        # --- 2. Main Router: Show Dashboard or Lesson View ---
-        if S.get("view_mode") == "lesson":
-            run_lesson_view(S)
-        else:
-            # Default view is the dashboard
-            S["view_mode"] = "dashboard" # Ensure it's set
-            run_dashboard_view(S)
+    # --- 1. Run Diagnostic Quiz if not completed ---
+    if not S.get("diagnostic_complete", False):
+        run_diagnostic_quiz() 
+        return 
+    
+    # --- 2. Run Plan Setup if plan not generated ---
+    if "plan" not in S:
+        run_learn_module_setup()
+        return
+
+    # --- 3. Main Router: Show Dashboard or Lesson View ---
+    if S.get("view_mode") == "lesson":
+        run_lesson_view(S)
     else:
-        # --- 3. No Plan Exists: Run the Onboarding Flow ---
-        run_onboarding_flow(S)
+        # Default view is the dashboard
+        S["view_mode"] = "dashboard" # Ensure it's set
+        run_dashboard_view(S)
         
 # ================================================================
 # MAIN UI
