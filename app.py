@@ -2234,10 +2234,10 @@ PERSONA_QUESTIONS = [
         "question": "How much time will you spend reading daily?",
         "type": "radio",
         "options": [
-            "5 - 10 min",
-            "10 - 30 min",
-            "30 min - 1 hr",
-            "1+ hrs"
+           "5 - 10 min",
+           "10 - 30 min",
+           "30 min - 1 hr",
+           "1+ hrs"
         ]
     },
     {
