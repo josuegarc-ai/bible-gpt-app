@@ -1,6 +1,3 @@
-I NEED YOU TO CORRECTLY UPDATE MY CODE BELOW:
-
-MY CODE:
 # ================================================================
 # ✅ Bible GPT — v2.9 (Personalized Plan Generator - Full & Integrated)
 # ================================================================
