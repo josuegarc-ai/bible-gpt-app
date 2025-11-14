@@ -2165,9 +2165,6 @@ if mode in mode_functions:
 else:
     st.warning("Selected mode not found or mapped.")
 
-
-WITH THESE CHANGES YOU SUGGESTED FOR ME IN ANOTHER CONVERSATION:
-
 # ================================================================
 # <<< NEW LEARN MODULE CONFIG >>>
 # ================================================================
