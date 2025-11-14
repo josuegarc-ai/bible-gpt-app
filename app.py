@@ -55,6 +55,7 @@ MODEL = "gpt-4o"
 
 # --- 1. The new "Persona" questions (inspired by screenshots) ---
 # This list drives the new multistep persona builder
+
 PERSONA_QUESTIONS = [
     {
         "key": "motivation",
@@ -1026,9 +1027,6 @@ def run_small_group_generator():
             guide = ask_gpt_conversation(guide_prompt)
             st.text_area(f"Discussion Guide for {passage}:", guide, height=500)
 
-# ================================================================
-# LEARN MODULE (NEW, PERSONALIZED WORKFLOW)
-# ================================================================
 # ================================================================
 # LEARN MODULE (HYBRID: PERSONA ONBOARDING + 10-LEVEL PATH)
 # ================================================================
@@ -2246,37 +2244,6 @@ def run_learn_module():
         # Default view is the dashboard
         S["view_mode"] = "dashboard" # Ensure it's set
         run_dashboard_view(S)
-        
-# ================================================================
-# MAIN LEARN MODULE FLOW (THE NEW ROUTER)
-# ================================================================
-def run_learn_module():
-    st.subheader("📚 Learn Module — Personalized Bible Learning")
-    if "learn_state" not in st.session_state: st.session_state.learn_state = {}
-    S = st.session_state.learn_state
-
-    # <<< NEW >>> Initialize struggle log
-    if "struggle_log" not in S:
-        S["struggle_log"] = {}
-
-    # --- 1. Run Diagnostic Quiz if not completed ---
-    if not S.get("diagnostic_complete", False):
-        run_diagnostic_quiz() 
-        return 
-    
-    # --- 2. Run Plan Setup if plan not generated ---
-    if "plan" not in S:
-        run_learn_module_setup()
-        return
-
-    # --- 3. Main Router: Show Dashboard or Lesson View ---
-    if S.get("view_mode") == "lesson":
-        run_lesson_view(S)
-    else:
-        # Default view is the dashboard
-        S["view_mode"] = "dashboard" # Ensure it's set
-        run_dashboard_view(S)
-        
 # ================================================================
 # MAIN UI
 # ================================================================
