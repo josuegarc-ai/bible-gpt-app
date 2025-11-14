@@ -49,7 +49,6 @@ VALID_TRANSLATIONS = ["web", "kjv", "asv", "bbe", "oeb-us"]
 client = openai.Client(api_key=st.secrets["OPENAI_API_KEY"])
 MODEL = "gpt-4o"
 
-# Diagnostic Quiz Questions (with "I don't know")
 # ================================================================
 # <<< NEW LEARN MODULE CONFIG >>>
 # ================================================================
@@ -57,107 +56,107 @@ MODEL = "gpt-4o"
 # --- 1. The new "Persona" questions (inspired by screenshots) ---
 # This list drives the new multistep persona builder
 PERSONA_QUESTIONS = [
-    {
-        "key": "motivation",
-        "question": "What motivates you to read the Bible?",
-        "type": "radio", # Use 'radio' for single-select
-        "options": [
-            "Spiritual Growth",
-            "Daily Inspiration",
-            "Biblical Knowledge",
-            "Finding Guidance",
-            "Personal Reflection"
-        ]
-    },
-    {
-        "key": "journey_length",
-        "question": "How long have you been with God?",
-        "type": "radio",
-        "options": [
-            "Less than 1 year",
-            "1-3 years",
-            "4-10 years",
-            "Over 10 years"
-        ]
-    },
-    {
-        "key": "knowledge_level",
-        "question": "How well do you know the Bible?",
-        "type": "radio",
-        "options": [
-            "I'm new to the Bible and faith",
-            "I know Christianity, but I'm new to the Bible",
-            "I know a little about the Bible",
-            "I know the Bible well"
-        ]
-    },
-    {
-        "key": "relationship_bible",
-        "question": "What's your relationship with the Bible?",
-        "type": "radio",
-        "options": [
-            "I find it easy to apply",
-            "I find it easy to understand",
-            "I understand it well",
-            "I find it hard to understand",
-            "I am not sure yet"
-        ]
-    },
-    {
-        "key": "connection_feel",
-        "question": "What's the connection you feel with God?",
-        "type": "radio",
-        "options": [
-            "I feel deeply connected",
-            "I feel connected, but still growing",
-            "I'm exploring my connection",
-            "I'm open to learning more"
-        ]
-    },
-    {
-        "key": "time_commitment",
-        "question": "How much time will you spend reading daily?",
-        "type": "radio",
-        "options": [
-            "5 - 10 min",
-            "10 - 30 min",
-            "30 min - 1 hr",
-            "1+ hrs"
-        ]
-    },
-    {
-        "key": "learning_style",
-        "question": "How do you prefer to learn?",
-        "type": "radio",
-        "options": [
-            "Analytical (Logical, doctrinal, and theological)",
-            "Storytelling (Narrative examples and illustrations)",
-            "Practical (Actionable steps and 'how-to's)",
-            "Reflective (Probing questions for introspection)"
-        ]
-    }
+    {
+        "key": "motivation",
+        "question": "What motivates you to read the Bible?",
+        "type": "radio", # Use 'radio' for single-select
+        "options": [
+            "Spiritual Growth",
+            "Daily Inspiration",
+            "Biblical Knowledge",
+            "Finding Guidance",
+            "Personal Reflection"
+        ]
+    },
+    {
+        "key": "journey_length",
+        "question": "How long have you been with God?",
+        "type": "radio",
+        "options": [
+            "Less than 1 year",
+            "1-3 years",
+            "4-10 years",
+            "Over 10 years"
+        ]
+    },
+    {
+        "key": "knowledge_level",
+        "question": "How well do you know the Bible?",
+        "type": "radio",
+        "options": [
+            "I'm new to the Bible and faith",
+            "I know Christianity, but I'm new to the Bible",
+            "I know a little about the Bible",
+            "I know the Bible well"
+        ]
+    },
+    {
+        "key": "relationship_bible",
+        "question": "What's your relationship with the Bible?",
+        "type": "radio",
+        "options": [
+            "I find it easy to apply",
+            "I find it easy to understand",
+            "I understand it well",
+            "I find it hard to understand",
+            "I am not sure yet"
+        ]
+    },
+    {
+        "key": "connection_feel",
+        "question": "What's the connection you feel with God?",
+        "type": "radio",
+        "options": [
+            "I feel deeply connected",
+            "I feel connected, but still growing",
+            "I'm exploring my connection",
+            "I'm open to learning more"
+        ]
+    },
+    {
+        "key": "time_commitment",
+        "question": "How much time will you spend reading daily?",
+        "type": "radio",
+        "options": [
+            "5 - 10 min",
+  _all_       "10 - 30 min",
+            "30 min - 1 hr",
+            "1+ hrs"
+        ]
+    },
+    {
+        "key": "learning_style",
+        "question": "How do you prefer to learn?",
+        "type": "radio",
+        "options": [
+            "Analytical (Logical, doctrinal, and theological)",
+            "Storytelling (Narrative examples and illustrations)",
+            "Practical (Actionable steps and 'how-to's)",
+            "Reflective (Probing questions for introspection)"
+        ]
+    }
 ]
 
 # --- 2. The new 3-question "Baseline" quiz ---
 BASELINE_QUIZ_QUESTIONS = [
-    {
-        "question": "(Easy) Who was the first man, created by God in Genesis?",
-        "options": ["Moses", "Adam", "Noah", "Abraham", "I don't know"],
-        "correct": "Adam",
-        "level": "Easy"
-    },
-    {
-        "question": "(Medium) Which book of the Bible details the new covenant, written to Jewish Christians and focusing on Christ's high priesthood?",
-        "options": ["Romans", "Acts", "Hebrews", "Revelation", "I don't know"],
-        "correct": "Hebrews",
-        "level": "Medium"
-    },
-    {
-        "question": "(Hard) What is the term for the theological doctrine that God, in His foreknowledge, destined certain people for salvation?",
-        "options": ["Sanctification", "Justification", "Predestination", "Glorification", "I don't know"],
-        "correct": "Predestination",
-        "level": "Hard"
-    }
+    {
+        "question": "(Easy) Who was the first man, created by God in Genesis?",
+        "options": ["Moses", "Adam", "Noah", "Abraham", "I don't know"],
+        "correct": "Adam",
+        "level": "Easy"
+    },
+    {
+        "question": "(Medium) Which book of the Bible details the new covenant, written to Jewish Christians and focusing on Christ's high priesthood?",
+        "options": ["Romans", "Acts", "Hebrews", "Revelation", "I don't know"],
+        "correct": "Hebrews",
+        "level": "Medium"
+    },
+    {
+        "question": "(Hard) What is the term for the theological doctrine that God, in His foreknowledge, destined certain people for salvation?",
+        "options": ["Sanctification", "Justification", "Predestination", "Glorification", "I don't know"],
+        "correct": "Predestination",
+        "level": "Hard"
+    }
 ]
 
 # ================================================================
