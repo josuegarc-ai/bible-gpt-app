@@ -2045,7 +2045,7 @@ def run_lesson_view(S):
         section = lesson_sections[S["current_section_index"]]
         section_type = section.get("type")
 
-            if section_type == "text":
+    if section_type == "text":
         section_content = section.get("content", "*No content for this section.*")
 
         # --- AUDIO: per-section ID + cache ---
@@ -2084,6 +2084,17 @@ def run_lesson_view(S):
                     if "breakdown_content" in S: del S["breakdown_content"]
                     S["current_section_index"] -= 1
                     st.rerun()
+
+        with nav_cols[1]:
+            if st.button("Continue Reading ➡️", key=f"cont_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"):
+                S["current_section_index"] += 1
+                st.rerun()
+
+        with nav_cols[2]:
+            if st.button("🤔 Ask a question...", key=f"deep_dive_{S['current_section_index']}"):
+                S["deep_dive_mode"] = True
+                S["deep_dive_context"] = section_content
+                st.rerun()
 
         with nav_cols[1]:
             if st.button("Continue Reading ➡️", key=f"cont_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"):
