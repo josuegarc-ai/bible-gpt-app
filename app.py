@@ -1147,6 +1147,10 @@ Respond ONLY with a single, valid JSON object with these keys:
 # <<< MODIFIED FUNCTION >>>
 # create_lesson_prompt
 # ================================================================
+# ================================================================
+# <<< MODIFIED FUNCTION >>>
+# create_lesson_prompt
+# ================================================================
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None, previous_struggles: str = None) -> str:
     """Generates a robust, theologically sound prompt for a single lesson."""
     
