@@ -7,7 +7,7 @@ import os
 import re
 import json
 import random
-import urllib.parse
+import urllib.parseF
 import tempfile
 import subprocess
 import requests
@@ -1894,6 +1894,9 @@ def run_dashboard_view(S):
 # ================================================================
 # LEARN MODULE: NEW LESSON VIEW
 # ================================================================
+# ================================================================
+# LEARN MODULE: NEW LESSON VIEW (RESTORED & FIXED)
+# ================================================================
 def run_lesson_view(S):
     """Displays the active lesson, quiz, or deep dive chat."""
     
@@ -2023,9 +2026,12 @@ def run_lesson_view(S):
         section_type = section.get("type")
 
         if section_type == "text":
-            # <<< NEW >>> Handle new "Review" role
+            # <<< RESTORED/NEW >>> Display the actual content first
             if section.get("role") == "Review":
                 st.info(f"**Review Section:** {section.get('content', '*No content for this section.*')}")
+            elif section.get("role"):
+                st.markdown(f"#### {section.get('role')}")
+                st.markdown(section.get("content", "*No content for this section.*"))
             else:
                 st.markdown(section.get("content", "*No content for this section.*"))
             
@@ -2037,8 +2043,6 @@ def run_lesson_view(S):
                 st.markdown(f"**🎧 Listen to the Scripture:** *{audio_ref}*")
                 
                 # --- MOCK AUDIO PLAYER ---
-                # Replace this URL with a call to a function that fetches a valid MP3/M4A 
-                # link for the specific verse (e.g., fetch_audio_url(audio_ref)).
                 mock_audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
                 
                 st.audio(mock_audio_url, format="audio/mp3")
@@ -2050,7 +2054,7 @@ def run_lesson_view(S):
             with nav_cols[0]:
                 if S["current_section_index"] > 0:
                     if st.button("⬅️ Previous Section", key=f"prev_sec_{S['current_section_index']}"):
-                        # <<< NEW >>> Clear remediation flags when moving
+                        # Clear remediation flags when moving
                         S["awaiting_remediation"] = False
                         if "remediation_question" in S: del S["remediation_question"]
                         if "breakdown_content" in S: del S["breakdown_content"]
@@ -2107,7 +2111,7 @@ def run_lesson_view(S):
                 if st.button("Go to Level Quiz", type="primary"):
                     S["view_mode"] = "dashboard" # Go to dashboard
                     st.rerun()
-
+                    
 # ================================================================
 # MAIN LEARN MODULE FLOW (THE NEW ROUTER)
 # ================================================================
