@@ -2099,10 +2099,10 @@ def run_lesson_view(S):
     elif section_type == "knowledge_check":
         display_knowledge_check_question(S)
             
-        else:
-             st.warning(f"Unknown section type '{section_type}'. Skipping.")
-             S["current_section_index"] += 1
-             st.rerun()
+    else:
+        st.warning(f"Unknown section type '{section_type}'. Skipping.")
+        S["current_section_index"] += 1
+        st.rerun()
     
     # --- End of Lesson Reached ---
     else: 
