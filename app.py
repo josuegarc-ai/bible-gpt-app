@@ -123,7 +123,8 @@ You MUST apply this core logic.
 # UTILITIES
 # ================================================================
 def fetch_bible_verse(passage: str, translation: str = "web") -> str:
-    """Fetches a Bible passage from bible-api.com."""
+      """Fetches a Bible passage from bible-api.com.""" 
+# ... and the lines following it ...
     if translation not in VALID_TRANSLATIONS:
         raise ValueError(f"Unsupported translation. Choose from: {VALID_TRANSLATIONS}")
     encoded_passage = urllib.parse.quote(passage.strip())
