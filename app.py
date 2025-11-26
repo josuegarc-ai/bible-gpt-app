@@ -7,7 +7,7 @@ import os
 import re
 import json
 import random
-import urllib.parse # <-- FIXED: Removed extraneous 'F'
+import urllib.parse
 import tempfile
 import subprocess
 import requests
@@ -77,7 +77,7 @@ GENERAL_SYSTEM_PROMPT = """
 You are Bible GPT, a mentor who speaks with the love and authority of **absolute biblical truth**.
 Your primary goal is to guide the user toward righteousness and holiness by clearly stating what the Bible teaches.
 
-- **Tone:** Be conversational, loving, and pastoral, but also **firm, direct, and unwavering in the truth**.
+- **Tone:** Be conversational, loving, and pastoral, but also **firm, direct, and unwavering in the truth**. 
 - **Format:** Your answers must be **concise and conversational**. Do NOT use long, numbered lists. Give your answer in a direct paragraph.
 
 - **Role:** You are not a neutral counselor. You are a Bible-based guide providing the truth as it is written.
@@ -163,7 +163,7 @@ def extract_json_from_response(response_text: str):
         if match:
             json_text = match.group(1)
         else:
-            # Fallback to finding the first curly brace object
+             # Fallback to finding the first curly brace object
             json_text_match = re.search(r"\{.*\}", response_text, re.DOTALL)
             if not json_text_match: return None
             json_text = json_text_match.group(0)
@@ -319,7 +319,7 @@ def run_chat_mode():
     st.subheader("💬 Chat with GPT")
     
     is_theological_mode = st.toggle(
-        "Enable Deep Theological Chat",
+        "Enable Deep Theological Chat", 
         value=False,
         help="Toggle on for in-depth, scholarly answers with web search for current events."
     )
@@ -331,7 +331,7 @@ def run_chat_mode():
     chat_container = st.container(height=400, border=False)
     with chat_container:
         if not st.session_state.chat_history:
-            st.caption("Your conversation will appear here. Your chat history is saved automatically.")
+             st.caption("Your conversation will appear here. Your chat history is saved automatically.")
         
         for msg in st.session_state.chat_history:
             # Don't show the tool call/result messages to the user, only human/ai
@@ -535,11 +535,11 @@ def run_practice_chat():
         q_type = q.get("question_type", "multiple_choice") # Default if missing
         ans = None
         if q_type == 'multiple_choice':
-            ans = st.radio("Choose:", q.get("choices", []), key=f"q{S['current']}_choice", index=None)
+             ans = st.radio("Choose:", q.get("choices", []), key=f"q{S['current']}_choice", index=None)
         elif q_type == 'true_false':
-            ans = st.radio("Choose:", ["True", "False"], key=f"q{S['current']}_choice", index=None)
+             ans = st.radio("Choose:", ["True", "False"], key=f"q{S['current']}_choice", index=None)
         elif q_type == 'fill_in_the_blank':
-            ans = st.text_input("Fill in the blank:", key=f"q{S['current']}_choice")
+             ans = st.text_input("Fill in the blank:", key=f"q{S['current']}_choice")
 
         if not S.get("awaiting_next", False):
             if st.button("Submit Answer"):
@@ -557,7 +557,7 @@ def run_practice_chat():
                         )
                         explanation = ask_gpt_conversation(explain_prompt)
                         st.markdown("**📜 Teaching Moment:**"); st.write(explanation); S["awaiting_next"] = True
-                        st.rerun() # Re-run to show teaching moment and Next button
+                        st.rerun() # Rerun to show teaching moment and Next button
         
         # Display Next button only after an incorrect answer's explanation is shown
         if S.get("awaiting_next"):
@@ -619,7 +619,7 @@ def run_bible_beta():
     st.info("🧪 Experimental: Read Bible chapters.")
     book = st.text_input("Book (e.g., John):")
     # Changed to text input for flexibility, e.g., "John 3"
-    passage_ref = st.text_input("Chapter or Passage (e.g., 3 or 3:1-16):", "1")
+    passage_ref = st.text_input("Chapter or Passage (e.g., 3 or 3:1-16):", "1") 
     translation_beta = st.selectbox("Translation:", VALID_TRANSLATIONS, key="beta_trans")
 
     if st.button("Display Passage") and book and passage_ref:
@@ -648,7 +648,7 @@ def _convert_to_wav_if_needed(src_path: str) -> str:
     cmd = [_FFMPEG_BIN, "-y", "-i", src_path, "-ar", "16000", "-ac", "1", wav_path]
     try:
         # Added timeout and capture stderr
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=120) 
     except subprocess.CalledProcessError as e:
         raise Exception(f"ffmpeg conversion failed with exit code {e.returncode}: {e.stderr}")
     except subprocess.TimeoutExpired:
@@ -658,30 +658,30 @@ def _convert_to_wav_if_needed(src_path: str) -> str:
 def download_youtube_audio(url: str) -> tuple[str, str, str]:
     """Download audio *without* postprocessing (so yt_dlp won't call ffprobe)."""
     # Use a specific file extension preferred by yt-dlp format selection
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as temp_file:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as temp_file: 
         output_path = temp_file.name
     
     ydl_opts = {
         # Prefer m4a, fallback to best audio
-        "format": "bestaudio[ext=m4a]/bestaudio/best",
+        "format": "bestaudio[ext=m4a]/bestaudio/best", 
         "outtmpl": output_path, # Use the temp file path directly
         "ffmpeg_location": os.environ.get("FFMPEG_LOCATION", _FFMPEG_DIR),
-        "quiet": True,
-        "retries": 3,
+        "quiet": True, 
+        "retries": 3, 
         "noprogress": True,
         "http_headers": { # Standard browser headers
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Language": "en-US,en;q=0.9", 
             "Referer": "https://www.youtube.com/",
         },
         # Use cookies if available
-        **({"cookiefile": "cookies.txt"} if os.path.exists("cookies.txt") else {}),
+        **({"cookiefile": "cookies.txt"} if os.path.exists("cookies.txt") else {}), 
         # Set socket timeout
         "socket_timeout": 30,
     }
     try:
         # Use context manager for yt_dlp
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl: 
             info = ydl.extract_info(url, download=True)
             title = info.get("title", "Untitled Sermon")
             uploader = info.get("uploader", "Unknown")
@@ -718,7 +718,7 @@ def run_sermon_transcriber():
                         info = ydl.extract_info(yt_link, download=False)
                         duration = info.get("duration")
                         # Add a reasonable limit, e.g., 20 mins (1200 seconds)
-                        if duration and duration > 1200:
+                        if duration and duration > 1200: 
                             st.warning(f"⚠️ Warning: Video is longer than 20 minutes ({duration}s). Transcription might be slow or fail.")
                         preacher = info.get("uploader", "Unknown") or "Unknown"
                         title = info.get("title", "Untitled Sermon") or "Untitled Sermon"
@@ -732,7 +732,7 @@ def run_sermon_transcriber():
                     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
                         temp_audio.write(audio_file.getvalue())
                         audio_path = temp_audio.name
-                    cleanup_path = audio_path # Mark for deletion
+                        cleanup_path = audio_path # Mark for deletion
                     title = os.path.splitext(audio_file.name)[0] # Use filename as title
 
                 if not audio_path:
@@ -742,9 +742,9 @@ def run_sermon_transcriber():
             with st.spinner("Transcribing audio... (This may take a few minutes)"):
                 # Load the base model (faster, less accurate)
                 # Consider 'small' or 'medium' for better accuracy if performance allows
-                model = whisper.load_model("base")
+                model = whisper.load_model("base") 
                 transcription = None
-                try:
+                try: 
                     transcription = model.transcribe(audio_path, fp16=False) # fp16=False for CPU
                 except Exception as e_transcribe:
                     st.warning(f"Initial transcription failed ({e_transcribe}), trying conversion to WAV...")
@@ -765,8 +765,8 @@ def run_sermon_transcriber():
 
             with st.spinner("Generating summary..."):
                 # Limit summary input to avoid excessive token usage
-                summary_input_limit = 4000
-                short_transcript = transcript_text[:summary_input_limit]
+                summary_input_limit = 4000 
+                short_transcript = transcript_text[:summary_input_limit] 
                 
                 summary_prompt = f"""You are a sermon summarizer. From the transcript below, provide a concise summary including:
 - **Main Topic/Theme:** (Identify the core subject)
@@ -798,12 +798,12 @@ Transcript Snippet (first ~{summary_input_limit} characters):
         except Exception as e:
             st.error(f"❌ An error occurred: {e}")
         finally:
-            # Clean up temporary audio file
+             # Clean up temporary audio file
             if cleanup_path and os.path.exists(cleanup_path):
                 try:
                     os.remove(cleanup_path)
                 except Exception as e_clean:
-                    st.warning(f"Could not delete temporary file {cleanup_path}: {e_clean}")
+                   st.warning(f"Could not delete temporary file {cleanup_path}: {e_clean}")
 
 # ================================================================
 # SIMPLE STUDY PLAN
@@ -850,7 +850,7 @@ Format clearly for each day. End with a brief closing paragraph encouraging cons
                 
                 with open(file_path, "w", encoding="utf-8") as f: f.write(plan)
                 st.success(f"✅ Study plan saved to `{file_path}`.")
-            except Exception as e:
+            except Exception as e: 
                 st.error(f"❌ Error generating study plan: {e}")
 
 # ================================================================
@@ -859,19 +859,19 @@ Format clearly for each day. End with a brief closing paragraph encouraging cons
 def run_verse_of_the_day():
     st.subheader("🌅 Verse of the Day")
     # Expanded list of commonly quoted books
-    books = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
-             "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
-             "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
-             "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
-             "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
-             "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
-             "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
-             "Haggai", "Zechariah", "Malachi",
-             "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
-             "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
-             "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
-             "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
-             "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
+    books = ["Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", 
+             "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel", 
+             "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", 
+             "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs", 
+             "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah", 
+             "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos", 
+             "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", 
+             "Haggai", "Zechariah", "Malachi", 
+             "Matthew", "Mark", "Luke", "John", "Acts", "Romans", 
+             "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians", 
+             "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians", 
+             "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews", 
+             "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John", 
              "Jude", "Revelation"]
     try:
         # Generate a reference - consider API/library for valid chapter/verse counts later
@@ -890,9 +890,9 @@ def run_verse_of_the_day():
             st.markdown("**💬 Reflection & Takeaway:**")
             st.write(reflection)
 
-    except Exception as e:
+    except Exception as e: 
         # Handle cases where the random verse might be invalid
-        st.error(f"Could not fetch Verse of the Day ({ref}): {e}")
+        st.error(f"Could not fetch Verse of the Day ({ref}): {e}") 
 
 def run_prayer_starter():
     st.subheader("🙏 Prayer Starter")
@@ -917,11 +917,11 @@ def run_small_group_generator():
     
     if st.button("Create Discussion Guide") and passage:
         with st.spinner("Generating guide..."):
-            try:
+            try: 
                 # Fetch text to provide context to the AI
-                text = fetch_bible_verse(passage, "web")
+                text = fetch_bible_verse(passage, "web") 
                 context_text = f"The passage is {passage}:\n\n> {text}\n\n"
-            except Exception:
+            except Exception: 
                 st.warning(f"Could not fetch text for {passage}, generating questions based on reference only.")
                 context_text = f"The passage is {passage}.\n\n"
 
@@ -973,7 +973,7 @@ def _learn_extract_json_any(response_text: str):
             if end_index != -1:
                 json_str = response_text[start_index:end_index]
             else: # Fallback if matching bracket not found
-                json_str = response_text[start_index:]
+                json_str = response_text[start_index:] 
         else:
             st.error("No JSON object or array found in AI response.")
             return None
@@ -1046,7 +1046,7 @@ def _answers_match(user_answer, correct_answer, question_type="text") -> bool:
     # fuzz.ratio calculates similarity from 0 to 100
     similarity_ratio = fuzz.ratio(user_ans_str.lower(), correct_ans_str.lower())
     # Adjust threshold as needed - 85 allows for minor errors
-    return similarity_ratio >= 85
+    return similarity_ratio >= 85 
 
 def summarize_lesson_content(lesson_data: dict) -> str:
     """Summarizes lesson content for context memory."""
@@ -1056,7 +1056,7 @@ def summarize_lesson_content(lesson_data: dict) -> str:
     prompt = f"Summarize the key topic of the following Bible lesson text in one concise sentence (less than 20 words): {text_content[:2000]}"
     try:
         # Use a faster/cheaper model potentially? For now, stick with primary.
-        resp = client.chat.completions.create(model=MODEL, messages=[{"role": "user", "content": prompt}], max_tokens=60, temperature=0.1)
+        resp = client.chat.completions.create(model=MODEL, messages=[{"role": "user", "content": prompt}], max_tokens=60, temperature=0.1) 
         return resp.choices[0].message.content.strip()
     except Exception as e:
         st.warning(f"Could not generate lesson summary: {e}")
@@ -1143,10 +1143,6 @@ Respond ONLY with a single, valid JSON object with these keys:
 - "options": (A list of 4 strings, ONLY if `question_type` is "multiple_choice". Must include the correct answer.)
 """
 
-# ================================================================
-# <<< MODIFIED FUNCTION >>>
-# create_lesson_prompt
-# ================================================================
 # ================================================================
 # <<< MODIFIED FUNCTION >>>
 # create_lesson_prompt
@@ -1244,9 +1240,7 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 5.  **Style is Primary:** The *most important* instruction is to follow the user's `learning_style`. Apply this method to all 'text' sections: {style_instructions}
 6.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense (citing specific passages like John 3:16), and tailored to the user's `knowledge_level`: {level_instructions}
 
-7.  **CRITICAL TEXT SECTION REQUIREMENT:** Every 'text' section **MUST** include a **`role`** key (e.g., 'Introduction', 'Exposition', 'Application') and a **`content`** key (string). Additionally, any 'text' section that directly references a single, primary Bible verse (e.g., John 3:16 or Romans 12:1) **MUST** include an **`audio_reference`** key (string) containing the exact Bible verse reference (e.g., "John 3:16"). This is for providing audio integration in the app.
-
-8.  **CRITICAL KEY REQUIREMENT FOR 'knowledge_check':**
+7.  **CRITICAL KEY REQUIREMENT FOR 'knowledge_check':**
     - Every 'knowledge_check' object MUST include *all* of these keys:
     - `type`: "knowledge_check"
     - `question`: "The question text..."
@@ -1273,7 +1267,7 @@ The lessons covered these key points:
 
 **Instructions:** Create a quiz based on the *theological concepts, scriptural connections, and applications* implied by these lesson summaries.
 - Generate exactly 10 questions.
-- Mix question types: 'multiple_choice', 'true_false', 'fill-in-the-blank'.
+- Mix question types: 'multiple_choice', 'true_false', 'fill_in_the_blank'.
 - Each question object MUST include: 'question' (string), 'question_type' (string), 'correct_answer' (string).
 - For 'multiple_choice', also include 'options' (list of 4 strings, including the correct one).
 - For 'true_false', `correct_answer` must be "True" or "False".
@@ -1452,7 +1446,7 @@ def display_knowledge_check_question(S):
                 st.error(f"❌ Still not quite. The correct answer was **{q_remediation.get('correct_answer')}**. We'll move on for now, but be sure to review this concept!")
             
             # Set flag to show 'Continue' button
-            S["awaiting_remediation"] = "completed"
+            S["awaiting_remediation"] = "completed" 
             st.rerun()
 
     # --- STATE 3: Remediation is done, show 'Continue' button ---
@@ -1476,7 +1470,7 @@ def run_level_quiz(S):
         S["quiz_mode"] = False
         S["view_mode"] = "dashboard"
         # Reset quiz progress
-        S["current_question_index"] = 0
+        S["current_question_index"] = 0 
         S["user_score"] = 0
         st.rerun()
     # --- End of NEW Button ---
@@ -1486,29 +1480,29 @@ def run_level_quiz(S):
     q_index = S.get("current_question_index", 0)
 
     st.markdown("### 📝 Final Level Quiz")
-    if not quiz_questions:
+    if not quiz_questions: 
         st.warning("Quiz questions not generated yet or generation failed.")
         return
 
     if not isinstance(quiz_questions, list):
-        st.error("Quiz data is not in the expected format (list). Please restart the level.")
-        return
+         st.error("Quiz data is not in the expected format (list). Please restart the level.")
+         return
 
     total_questions = len(quiz_questions)
     if total_questions == 0:
-        st.warning("No quiz questions found for this level.")
-        return
-        
+         st.warning("No quiz questions found for this level.")
+         return
+         
     st.progress(q_index / total_questions) # Use q_index for progress
     st.markdown(f"**Score: {S.get('user_score', 0)}/{total_questions}**")
 
     if q_index < total_questions:
         q = quiz_questions[q_index]
         if not isinstance(q, dict) or 'question' not in q or 'correct_answer' not in q:
-            st.error(f"Error: Invalid question format at index {q_index}. Skipping question.")
-            S["current_question_index"] = q_index + 1
-            st.rerun()
-            return
+             st.error(f"Error: Invalid question format at index {q_index}. Skipping question.")
+             S["current_question_index"] = q_index + 1
+             st.rerun()
+             return
 
         st.markdown(f"**Question {q_index + 1}:** {q.get('question', '')}")
         user_answer = None
@@ -1524,13 +1518,13 @@ def run_level_quiz(S):
         elif q_type == 'fill_in_the_blank':
             user_answer = st.text_input("Answer:", key=q_key)
         else:
-            st.error(f"Unknown quiz question type: {q_type}"); return
+             st.error(f"Unknown quiz question type: {q_type}"); return
 
         if st.button("Submit Quiz Answer", key=f"submit_{q_key}"):
             if user_answer is None and q_type in ['multiple_choice', 'true_false']:
-                st.warning("Please select an answer.")
-                return
-                
+                 st.warning("Please select an answer.")
+                 return
+                 
             if _answers_match(user_answer, q.get('correct_answer'), q_type):
                 st.success("Correct!")
                 S["user_score"] = S.get("user_score", 0) + 1
@@ -1545,7 +1539,7 @@ def run_level_quiz(S):
     else:
         # Quiz completed
         score = S.get('user_score', 0)
-        passing_score = total_questions * 0.7
+        passing_score = total_questions * 0.7 
         st.success(f"### Quiz Completed! Final Score: {score}/{total_questions}")
         
         if score >= passing_score:
@@ -1559,25 +1553,25 @@ def run_level_quiz(S):
                     S["current_lesson_index"] = 0
                     S["current_section_index"] = 0
                     S["quiz_mode"] = False
-                    S["current_question_index"] = 0
-                    S["user_score"] = 0
+                    S["current_question_index"] = 0 
+                    S["user_score"] = 0 
                     S["view_mode"] = "dashboard" # <-- NEW: Go back to dashboard
                     st.rerun()
             else:
-                S["plan_completed"] = True # <-- NEW: Set plan complete flag
-                st.info("You've completed all levels in this plan!")
-                if st.button("Back to Syllabus"):
+                 S["plan_completed"] = True # <-- NEW: Set plan complete flag
+                 st.info("You've completed all levels in this plan!")
+                 if st.button("Back to Syllabus"):
                     S["view_mode"] = "dashboard" # <-- NEW: Go back to dashboard
                     S["quiz_mode"] = False
                     st.rerun()
         else:
             st.error("You didn't reach the passing score. Please review the lessons and try the quiz again.")
             if st.button("Review Lessons"):
-                S["quiz_mode"] = False
-                S["view_mode"] = "dashboard" # <-- NEW: Go back to dashboard
-                S["current_question_index"] = 0
-                S["user_score"] = 0
-                st.rerun()
+                 S["quiz_mode"] = False
+                 S["view_mode"] = "dashboard" # <-- NEW: Go back to dashboard
+                 S["current_question_index"] = 0 
+                 S["user_score"] = 0
+                 st.rerun()
             if st.button("Retake Quiz"):
                 S["current_question_index"] = 0
                 S["user_score"] = 0
@@ -1589,7 +1583,7 @@ def run_level_quiz(S):
 def run_diagnostic_quiz():
     st.subheader("Quick Bible Knowledge Check")
     st.info("Let's figure out the best starting point for you with a few quick questions.")
-    S_learn = st.session_state.learn_state
+    S_learn = st.session_state.learn_state 
     if 'diag_q_index' not in S_learn:
         S_learn['diag_q_index'] = 0
         S_learn['diag_score'] = 0
@@ -1606,14 +1600,14 @@ def run_diagnostic_quiz():
             "Select your answer:",
             options,
             key=f"diag_q_{q_index}",
-            index=None
+            index=None 
         )
         if st.button("Submit Answer", key=f"diag_submit_{q_index}"):
             if user_answer:
                 if user_answer == q_data['correct']:
                     S_learn['diag_score'] += 1
                 S_learn['diag_q_index'] += 1
-                st.rerun()
+                st.rerun() 
             else:
                 st.warning("Please select an answer.")
     else:
@@ -1632,7 +1626,7 @@ def run_diagnostic_quiz():
         
         S_learn['derived_knowledge_level'] = knowledge_level
         S_learn['diagnostic_complete'] = True
-        st.rerun()
+        st.rerun() 
 
 # ================================================================
 # LEARNING PLAN SETUP (QUESTIONNAIRE)
@@ -1640,7 +1634,7 @@ def run_diagnostic_quiz():
 def run_learn_module_setup():
     st.info("Now, let's create a personalized learning plan based on your unique needs.")
     derived_knowledge_level = st.session_state.learn_state.get('derived_knowledge_level', "Not determined")
-    st.markdown(f"**Assessed Knowledge Level:** {derived_knowledge_level}")
+    st.markdown(f"**Assessed Knowledge Level:** {derived_knowledge_level}") 
 
     with st.form("user_profile_form"):
         topics_input = st.text_input("**What topics are on your heart to learn about?** (Separate with commas)", "Understanding grace, The life of David")
@@ -1655,7 +1649,7 @@ def run_learn_module_setup():
     if submitted:
         form_data = {
             'topics': topics_input,
-            'knowledge_level': derived_knowledge_level,
+            'knowledge_level': derived_knowledge_level, 
             'objectives': objectives_input,
             'struggles': struggles_input,
             'learning_style': learning_style_input.lower(),
@@ -1667,9 +1661,9 @@ def run_learn_module_setup():
             st.warning("Please fill out the topics and objectives to generate a plan.")
             return
         if form_data['knowledge_level'] == "Not determined":
-            st.error("Knowledge level could not be determined. Please restart.")
-            return
-            
+             st.error("Knowledge level could not be determined. Please restart.")
+             return
+             
         with st.spinner("Our AI is designing your personalized curriculum..."):
             master_prompt = create_full_learning_plan_prompt(form_data)
             plan_resp = ask_gpt_json(master_prompt, max_tokens=2500)
@@ -1797,7 +1791,7 @@ def run_dashboard_view(S):
         elif is_current_level:
             st.markdown(f"## 👉 {level_name}")
         elif is_level_locked:
-            st.markdown(f"## 🔒 {level_name}")
+             st.markdown(f"## 🔒 {level_name}")
         else: # Should mean it's a future, unlocked level (but not current)
             st.markdown(f"## {level_name}")
             
@@ -1932,20 +1926,20 @@ def run_lesson_view(S):
             with st.spinner("Generating your level quiz..."):
                 all_summaries = [l.get("lesson_summary", "") for l in level_data.get("lessons", [])]
                 quiz_prompt = create_level_quiz_prompt(
-                    level_topic=level_data.get("topic"),
+                    level_topic=level_data.get("topic"), 
                     lesson_summaries=all_summaries,
                     level_name=level_data.get("name")
                 )
-                quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500)
+                quiz_resp = ask_gpt_json(quiz_prompt, max_tokens=2500) 
                 quiz_data_object = _learn_extract_json_any(quiz_resp)
                 
-                if (quiz_data_object and
-                    isinstance(quiz_data_object, dict) and
-                    "quiz" in quiz_data_object and
+                if (quiz_data_object and 
+                    isinstance(quiz_data_object, dict) and 
+                    "quiz" in quiz_data_object and 
                     isinstance(quiz_data_object["quiz"], list)):
                     
                     level_data["quiz_questions"] = quiz_data_object["quiz"]
-                    st.rerun() # Re-run to show the quiz now that it's generated
+                    st.rerun() # Rerun to show the quiz now that it's generated
                 else:
                     st.error("Failed to generate valid quiz questions. Please try starting the quiz again.")
                     if quiz_resp: st.text_area("Raw AI Quiz Response (for debugging):", quiz_resp, height=200)
@@ -1995,67 +1989,49 @@ def run_lesson_view(S):
             lesson_resp = ask_gpt_json(lesson_prompt, max_tokens=lesson_max_tokens)
             lesson_data = _learn_extract_json_any(lesson_resp) if lesson_resp else None
             
-            if (lesson_data and isinstance(lesson_data, dict) and
-                "lesson_content_sections" in lesson_data and
+            if (lesson_data and isinstance(lesson_data, dict) and 
+                "lesson_content_sections" in lesson_data and 
                 isinstance(lesson_data["lesson_content_sections"], list) and
                 len(lesson_data["lesson_content_sections"]) > 0):
                 
                 lesson_data["lesson_summary"] = summarize_lesson_content(lesson_data)
                 level_data["lessons"].append(lesson_data)
-                S["current_section_index"] = 0
-                st.rerun()
+                S["current_section_index"] = 0 
+                st.rerun() 
             else:
                 st.error("Failed to generate valid lesson content. The AI response might be malformed or empty. Returning to syllabus.")
                 if lesson_resp: st.text_area("Raw AI Lesson Response (for debugging):", lesson_resp, height=200)
-                S["view_mode"] = "dashboard"
+                S["view_mode"] = "dashboard" 
                 st.rerun()
-                return
-
+                return 
+    
     # --- Display Current Lesson Section ---
     current_lesson = level_data["lessons"][S["current_lesson_index"]]
     st.markdown(f"### Lesson {S['current_lesson_index'] + 1}: {current_lesson.get('lesson_title', 'Untitled Lesson')}")
     
     lesson_sections = current_lesson.get("lesson_content_sections", [])
     if not lesson_sections:
-        st.warning("This lesson appears to be empty. Returning to syllabus.")
-        S["view_mode"] = "dashboard"
-        st.rerun()
-        return
+         st.warning("This lesson appears to be empty. Returning to syllabus.")
+         S["view_mode"] = "dashboard"
+         st.rerun()
+         return
 
     if S["current_section_index"] < len(lesson_sections):
         section = lesson_sections[S["current_section_index"]]
         section_type = section.get("type")
 
         if section_type == "text":
-            # <<< RESTORED/NEW >>> Display the actual content first
+            # <<< NEW >>> Handle new "Review" role
             if section.get("role") == "Review":
                 st.info(f"**Review Section:** {section.get('content', '*No content for this section.*')}")
-            elif section.get("role"):
-                st.markdown(f"#### {section.get('role')}")
-                st.markdown(section.get("content", "*No content for this section.*"))
             else:
                 st.markdown(section.get("content", "*No content for this section.*"))
-            
-            # --- START: New Audio Integration for Lesson Audio ---
-            audio_ref = section.get("audio_reference")
-            
-            if audio_ref:
-                st.markdown("---")
-                st.markdown(f"**🎧 Listen to the Scripture:** *{audio_ref}*")
-                
-                # --- MOCK AUDIO PLAYER ---
-                mock_audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-                
-                st.audio(mock_audio_url, format="audio/mp3")
-                st.caption(f"**Mock:** A dynamic audio link for **{audio_ref}** would be displayed here via `st.audio()` once a Bible Audio API is integrated.")
-                st.markdown("---")
-            # --- END: Audio Integration ---
             
             nav_cols = st.columns([1, 1, 1])
             with nav_cols[0]:
                 if S["current_section_index"] > 0:
                     if st.button("⬅️ Previous Section", key=f"prev_sec_{S['current_section_index']}"):
-                        # Clear remediation flags when moving
+                        # <<< NEW >>> Clear remediation flags when moving
                         S["awaiting_remediation"] = False
                         if "remediation_question" in S: del S["remediation_question"]
                         if "breakdown_content" in S: del S["breakdown_content"]
@@ -2074,15 +2050,15 @@ def run_lesson_view(S):
                     st.rerun()
                     
         elif section_type == "knowledge_check":
-            display_knowledge_check_question(S)
+            display_knowledge_check_question(S) 
             
         else:
-            st.warning(f"Unknown section type '{section_type}'. Skipping.")
-            S["current_section_index"] += 1
-            st.rerun()
-
+             st.warning(f"Unknown section type '{section_type}'. Skipping.")
+             S["current_section_index"] += 1
+             st.rerun()
+    
     # --- End of Lesson Reached ---
-    else:
+    else: 
         st.success(f"Lesson {S['current_lesson_index'] + 1} Completed!")
         current_lesson["completed"] = True # Set lesson complete flag
         
@@ -2091,7 +2067,7 @@ def run_lesson_view(S):
         if summary_points:
             for point in summary_points: st.markdown(f"- {point}")
         else:
-            st.write("*No summary points provided.*")
+             st.write("*No summary points provided.*")
         
         nav_cols = st.columns(2)
         with nav_cols[0]:
@@ -2105,7 +2081,7 @@ def run_lesson_view(S):
                 if st.button("Continue to Next Lesson ▶️", type="primary"):
                     S["view_mode"] = "dashboard" # Go to dashboard
                     S["current_lesson_index"] += 1 # Advance to next lesson
-                    S["current_section_index"] = 0
+                    S["current_section_index"] = 0 
                     st.rerun()
             else:
                 st.info("You've completed all lessons for this level. Time for the final quiz!")
@@ -2127,8 +2103,8 @@ def run_learn_module():
 
     # --- 1. Run Diagnostic Quiz if not completed ---
     if not S.get("diagnostic_complete", False):
-        run_diagnostic_quiz()
-        return
+        run_diagnostic_quiz() 
+        return 
     
     # --- 2. Run Plan Setup if plan not generated ---
     if "plan" not in S:
@@ -2153,7 +2129,7 @@ st.title("✅ Bible GPT")
 mode = st.sidebar.selectbox("Choose a mode:", [
     "Learn Module", "Bible Lookup", "Chat with GPT", "Sermon Transcriber & Summarizer",
     "Practice Chat", "Verse of the Day", "Study Plan", "Faith Journal", "Prayer Starter",
-    "Fast Devotional", "Small Group Generator",
+    "Fast Devotional", "Small Group Generator", 
     # "Tailored Learning Path", # Consider removing legacy option?
     "Bible Beta Mode",
     "Pixar Story Animation",
@@ -2185,6 +2161,6 @@ if mode in mode_functions:
         st.error(f"An unexpected error occurred in {mode}: {e}")
         # Optionally add more detailed error logging here
         # import traceback
-        # st.code(traceback.format_exc())
+        # st.code(traceback.format_exc()) 
 else:
     st.warning("Selected mode not found or mapped.")
