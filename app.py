@@ -123,25 +123,24 @@ You MUST apply this core logic.
 # UTILITIES
 # ================================================================
 def fetch_bible_verse(passage: str, translation: str = "web") -> str:
-      """Fetches a Bible passage from bible-api.com.""" 
-# ... and the lines following it ...
-    if translation not in VALID_TRANSLATIONS:
-        raise ValueError(f"Unsupported translation. Choose from: {VALID_TRANSLATIONS}")
-    encoded_passage = urllib.parse.quote(passage.strip())
-    url = f"{BIBLE_API_BASE}{encoded_passage}?translation={translation}"
-    try:
-        resp = requests.get(url, timeout=12)
-        if resp.status_code != 200:
-            raise Exception(f"Error {resp.status_code}: Unable to fetch passage. Check reference format.")
-        data = resp.json()
-        text = data.get("text", "").strip()
-        if not text:
-            raise Exception("Passage returned no text. Check book/chapter/verse.")
-        return text
-    except requests.RequestException as e:
-        raise Exception(f"Network error: {e}")
-    except Exception as e:
-        raise Exception(f"API Error: {e}")
+    """Fetches a Bible passage from bible-api.com."""
+    if translation not in VALID_TRANSLATIONS:
+        raise ValueError(f"Unsupported translation. Choose from: {VALID_TRANSLATIONS}")
+    encoded_passage = urllib.parse.quote(passage.strip())
+    url = f"{BIBLE_API_BASE}{encoded_passage}?translation={translation}"
+    try:
+        resp = requests.get(url, timeout=12)
+        if resp.status_code != 200:
+            raise Exception(f"Error {resp.status_code}: Unable to fetch passage. Check reference format.")
+        data = resp.json()
+        text = data.get("text", "").strip()
+        if not text:
+            raise Exception("Passage returned no text. Check book/chapter/verse.")
+        return text
+    except requests.RequestException as e:
+        raise Exception(f"Network error: {e}")
+    except Exception as e:
+        raise Exception(f"API Error: {e}")
 
 def ask_gpt_conversation(prompt: str) -> str:
     """Stable, conservative GPT call for summaries and guidance."""
