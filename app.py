@@ -51,21 +51,21 @@ MODEL = "gpt-4o"
 
 # Diagnostic Quiz Questions (with "I don't know")
 DIAGNOSTIC_QUESTIONS = [
-    {
-        "question": "Who led the Israelites out of Egypt?",
-        "options": ["Abraham", "Moses", "David", "Noah", "I don't know"],
-        "correct": "Moses"
-    },
-    {
-        "question": "Which disciple denied Jesus three times before the rooster crowed?",
-        "options": ["Judas", "John", "Peter", "Thomas", "I don't know"],
-        "correct": "Peter"
-    },
-    {
-        "question": "What theological term refers to the study of 'last things' or end times?",
-        "options": ["Soteriology", "Eschatology", "Christology", "Pneumatology", "I don't know"],
-        "correct": "Eschatology"
-    }
+    {
+        "question": "Who led the Israelites out of Egypt?",
+        "options": ["Abraham", "Moses", "David", "Noah", "I don't know"],
+        "correct": "Moses"
+    },
+    {
+        "question": "Which disciple denied Jesus three times before the rooster crowed?",
+        "options": ["Judas", "John", "Peter", "Thomas", "I don't know"],
+        "correct": "Peter"
+    },
+    {
+        "question": "What theological term refers to the study of 'last things' or end times?",
+        "options": ["Soteriology", "Eschatology", "Christology", "Pneumatology", "I don't know"],
+        "correct": "Eschatology"
+    }
 ]
 
 # ================================================================
