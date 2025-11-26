@@ -2045,59 +2045,56 @@ def run_lesson_view(S):
         section = lesson_sections[S["current_section_index"]]
         section_type = section.get("type")
 
-                if section_type == "text":
-            section_content = section.get("content", "*No content for this section.*")
+            if section_type == "text":
+        section_content = section.get("content", "*No content for this section.*")
 
-            # --- AUDIO: per-section ID + cache ---
-            section_id = f"lvl{S['current_level']}_les{S['current_lesson_index']}_sec{S['current_section_index']}"
-            audio_cache = S.setdefault("audio_cache", {})
+        # --- AUDIO: per-section ID + cache ---
+        section_id = f"lvl{S['current_level']}_les{S['current_lesson_index']}_sec{S['current_section_index']}"
+        audio_cache = S.setdefault("audio_cache", {})
 
-            # Show the text (with special styling for Review sections)
-            if section.get("role") == "Review":
-                st.info(f"**Review Section:** {section_content}")
-            else:
-                st.markdown(section_content)
+        # Display the lesson text
+        if section.get("role") == "Review":
+            st.info(f"**Review Section:** {section_content}")
+        else:
+            st.markdown(section_content)
 
-            # --- Audio controls row ---
-            audio_cols = st.columns([1, 2])
-            with audio_cols[0]:
-                if st.button("🔊 Listen to this section", key=f"audio_btn_{section_id}"):
-                    # Generate if not in cache
-                    if section_id not in audio_cache:
-                        with st.spinner("Generating audio for this section..."):
-                            audio_bytes = synthesize_section_audio(section_content)
-                            if audio_bytes:
-                                audio_cache[section_id] = audio_bytes
+        # --- Audio controls row ---
+        audio_cols = st.columns([1, 2])
+        with audio_cols[0]:
+            if st.button("🔊 Listen to this section", key=f"audio_btn_{section_id}"):
+                if section_id not in audio_cache:
+                    with st.spinner("Generating audio for this section..."):
+                        audio_bytes = synthesize_section_audio(section_content)
+                        if audio_bytes:
+                            audio_cache[section_id] = audio_bytes
+                st.rerun()
+
+        with audio_cols[1]:
+            if section_id in audio_cache:
+                st.audio(audio_cache[section_id], format="audio/mp3")
+
+        # --- Navigation + Deep Dive ---
+        nav_cols = st.columns([1, 1, 1])
+
+        with nav_cols[0]:
+            if S["current_section_index"] > 0:
+                if st.button("⬅️ Previous Section", key=f"prev_sec_{S['current_section_index']}"):
+                    S["awaiting_remediation"] = False
+                    if "remediation_question" in S: del S["remediation_question"]
+                    if "breakdown_content" in S: del S["breakdown_content"]
+                    S["current_section_index"] -= 1
                     st.rerun()
 
-            with audio_cols[1]:
-                # If audio already generated, show player
-                if section_id in audio_cache:
-                    st.audio(audio_cache[section_id], format="audio/mp3")
+        with nav_cols[1]:
+            if st.button("Continue Reading ➡️", key=f"cont_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"):
+                S["current_section_index"] += 1
+                st.rerun()
 
-            # --- Navigation + Deep Dive buttons ---
-            nav_cols = st.columns([1, 1, 1])
-            with nav_cols[0]:
-                if S["current_section_index"] > 0:
-                    if st.button("⬅️ Previous Section", key=f"prev_sec_{S['current_section_index']}"):
-                        # Clear remediation when moving between sections
-                        S["awaiting_remediation"] = False
-                        if "remediation_question" in S: del S["remediation_question"]
-                        if "breakdown_content" in S: del S["breakdown_content"]
-                        S["current_section_index"] -= 1
-                        st.rerun()
-            
-            with nav_cols[1]:
-                if st.button("Continue Reading ➡️", key=f"cont_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"):
-                    S["current_section_index"] += 1
-                    st.rerun()
-            
-            with nav_cols[2]:
-                if st.button("🤔 Ask a question...", key=f"deep_dive_{S['current_section_index']}"):
-                    S["deep_dive_mode"] = True
-                    S["deep_dive_context"] = section_content
-                    st.rerun()
-
+        with nav_cols[2]:
+            if st.button("🤔 Ask a question...", key=f"deep_dive_{S['current_section_index']}"):
+                S["deep_dive_mode"] = True
+                S["deep_dive_context"] = section_content
+                st.rerun()
                     
         elif section_type == "knowledge_check":
             display_knowledge_check_question(S) 
