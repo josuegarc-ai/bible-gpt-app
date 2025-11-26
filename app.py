@@ -2096,19 +2096,8 @@ def run_lesson_view(S):
                 S["deep_dive_context"] = section_content
                 st.rerun()
 
-        with nav_cols[1]:
-            if st.button("Continue Reading ➡️", key=f"cont_{S['current_level']}_{S['current_lesson_index']}_{S['current_section_index']}"):
-                S["current_section_index"] += 1
-                st.rerun()
-
-        with nav_cols[2]:
-            if st.button("🤔 Ask a question...", key=f"deep_dive_{S['current_section_index']}"):
-                S["deep_dive_mode"] = True
-                S["deep_dive_context"] = section_content
-                st.rerun()
-                    
-        elif section_type == "knowledge_check":
-            display_knowledge_check_question(S) 
+    elif section_type == "knowledge_check":
+        display_knowledge_check_question(S)
             
         else:
              st.warning(f"Unknown section type '{section_type}'. Skipping.")
