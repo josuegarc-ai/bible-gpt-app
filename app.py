@@ -14,6 +14,7 @@ import requests
 import shutil
 from datetime import datetime
 import streamlit as st
+import io  # for in-memory audio bytes
 
 # ==== AI / NLP ====
 import openai
@@ -1062,6 +1063,30 @@ def summarize_lesson_content(lesson_data: dict) -> str:
         st.warning(f"Could not generate lesson summary: {e}")
         return lesson_data.get("lesson_title", "Summary unavailable.") # Fallback
 
+def synthesize_section_audio(text: str, voice: str = "alloy") -> bytes | None:
+    """
+    Generate speech audio (mp3 bytes) for a given lesson section using OpenAI TTS.
+    Returns raw mp3 bytes or None on failure.
+    """
+    text = (text or "").strip()
+    if not text:
+        st.warning("No text available to generate audio for this section.")
+        return None
+
+    try:
+        # Text-to-speech via GPT-4o Mini TTS
+        with client.audio.speech.with_streaming_response.create(
+            model="gpt-4o-mini-tts",
+            voice=voice,
+            input=text,
+        ) as response:
+            buffer = io.BytesIO()
+            for chunk in response.iter_bytes():
+                buffer.write(chunk)
+            return buffer.getvalue()
+    except Exception as e:
+        st.error(f"Error generating audio for this section: {e}")
+        return None
 # -------------------------
 # PROMPTS
 # -------------------------
@@ -2020,18 +2045,42 @@ def run_lesson_view(S):
         section = lesson_sections[S["current_section_index"]]
         section_type = section.get("type")
 
-        if section_type == "text":
-            # <<< NEW >>> Handle new "Review" role
+                if section_type == "text":
+            section_content = section.get("content", "*No content for this section.*")
+
+            # --- AUDIO: per-section ID + cache ---
+            section_id = f"lvl{S['current_level']}_les{S['current_lesson_index']}_sec{S['current_section_index']}"
+            audio_cache = S.setdefault("audio_cache", {})
+
+            # Show the text (with special styling for Review sections)
             if section.get("role") == "Review":
-                st.info(f"**Review Section:** {section.get('content', '*No content for this section.*')}")
+                st.info(f"**Review Section:** {section_content}")
             else:
-                st.markdown(section.get("content", "*No content for this section.*"))
-            
+                st.markdown(section_content)
+
+            # --- Audio controls row ---
+            audio_cols = st.columns([1, 2])
+            with audio_cols[0]:
+                if st.button("🔊 Listen to this section", key=f"audio_btn_{section_id}"):
+                    # Generate if not in cache
+                    if section_id not in audio_cache:
+                        with st.spinner("Generating audio for this section..."):
+                            audio_bytes = synthesize_section_audio(section_content)
+                            if audio_bytes:
+                                audio_cache[section_id] = audio_bytes
+                    st.rerun()
+
+            with audio_cols[1]:
+                # If audio already generated, show player
+                if section_id in audio_cache:
+                    st.audio(audio_cache[section_id], format="audio/mp3")
+
+            # --- Navigation + Deep Dive buttons ---
             nav_cols = st.columns([1, 1, 1])
             with nav_cols[0]:
                 if S["current_section_index"] > 0:
                     if st.button("⬅️ Previous Section", key=f"prev_sec_{S['current_section_index']}"):
-                        # <<< NEW >>> Clear remediation flags when moving
+                        # Clear remediation when moving between sections
                         S["awaiting_remediation"] = False
                         if "remediation_question" in S: del S["remediation_question"]
                         if "breakdown_content" in S: del S["breakdown_content"]
@@ -2046,8 +2095,9 @@ def run_lesson_view(S):
             with nav_cols[2]:
                 if st.button("🤔 Ask a question...", key=f"deep_dive_{S['current_section_index']}"):
                     S["deep_dive_mode"] = True
-                    S["deep_dive_context"] = section.get("content", "No content provided.")
+                    S["deep_dive_context"] = section_content
                     st.rerun()
+
                     
         elif section_type == "knowledge_check":
             display_knowledge_check_question(S) 
@@ -2097,9 +2147,13 @@ def run_learn_module():
     if "learn_state" not in st.session_state: st.session_state.learn_state = {}
     S = st.session_state.learn_state
 
-    # <<< NEW >>> Initialize struggle log
+    # Initialize struggle log (existing)
     if "struggle_log" not in S:
         S["struggle_log"] = {}
+
+    # NEW: audio cache for section TTS (per level/lesson/section)
+    if "audio_cache" not in S:
+        S["audio_cache"] = {}  # key: section_id -> mp3 bytes
 
     # --- 1. Run Diagnostic Quiz if not completed ---
     if not S.get("diagnostic_complete", False):
