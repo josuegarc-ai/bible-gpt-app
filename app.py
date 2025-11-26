@@ -7,7 +7,7 @@ import os
 import re
 import json
 import random
-import urllib.parseF
+import urllib.parse # <-- FIXED: Removed extraneous 'F'
 import tempfile
 import subprocess
 import requests
@@ -557,7 +557,7 @@ def run_practice_chat():
                         )
                         explanation = ask_gpt_conversation(explain_prompt)
                         st.markdown("**📜 Teaching Moment:**"); st.write(explanation); S["awaiting_next"] = True
-                        st.rerun() # Rerun to show teaching moment and Next button
+                        st.rerun() # Re-run to show teaching moment and Next button
         
         # Display Next button only after an incorrect answer's explanation is shown
         if S.get("awaiting_next"):
@@ -1269,7 +1269,7 @@ The lessons covered these key points:
 
 **Instructions:** Create a quiz based on the *theological concepts, scriptural connections, and applications* implied by these lesson summaries.
 - Generate exactly 10 questions.
-- Mix question types: 'multiple_choice', 'true_false', 'fill_in_the_blank'.
+- Mix question types: 'multiple_choice', 'true_false', 'fill-in-the-blank'.
 - Each question object MUST include: 'question' (string), 'question_type' (string), 'correct_answer' (string).
 - For 'multiple_choice', also include 'options' (list of 4 strings, including the correct one).
 - For 'true_false', `correct_answer` must be "True" or "False".
@@ -1894,9 +1894,6 @@ def run_dashboard_view(S):
 # ================================================================
 # LEARN MODULE: NEW LESSON VIEW
 # ================================================================
-# ================================================================
-# LEARN MODULE: NEW LESSON VIEW (RESTORED & FIXED)
-# ================================================================
 def run_lesson_view(S):
     """Displays the active lesson, quiz, or deep dive chat."""
     
@@ -1944,7 +1941,7 @@ def run_lesson_view(S):
                     isinstance(quiz_data_object["quiz"], list)):
                     
                     level_data["quiz_questions"] = quiz_data_object["quiz"]
-                    st.rerun() # Rerun to show the quiz now that it's generated
+                    st.rerun() # Re-run to show the quiz now that it's generated
                 else:
                     st.error("Failed to generate valid quiz questions. Please try starting the quiz again.")
                     if quiz_resp: st.text_area("Raw AI Quiz Response (for debugging):", quiz_resp, height=200)
@@ -2111,7 +2108,7 @@ def run_lesson_view(S):
                 if st.button("Go to Level Quiz", type="primary"):
                     S["view_mode"] = "dashboard" # Go to dashboard
                     st.rerun()
-                    
+
 # ================================================================
 # MAIN LEARN MODULE FLOW (THE NEW ROUTER)
 # ================================================================
