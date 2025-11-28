@@ -1152,73 +1152,76 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     
     # --- Context Clauses ---
     context_clause_lesson = f" This lesson must logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
-    # <<< NEW >>> Add struggle context
     context_clause_struggle = (
         f" **Adaptive Learning Note:** This user has previously struggled with these topics: [{previous_struggles}]. "
-        "If relevant to this lesson, you **MUST** add a 'Review' section at the beginning to briefly re-explain one of those concepts before teaching new material."
+        "If relevant to this lesson, you **MUST** add a 'Review' section at the beginning to briefly re-explain one of those concepts."
     ) if previous_struggles else ""
 
     knowledge_level = form_data['knowledge_level']
     learning_style = form_data['learning_style']
     time_commitment = form_data['time_commitment']
 
-    # --- Define Level Instructions ---
+    # --- UPDATED: Level Instructions (Forcing Depth for ALL levels) ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
-        level_instructions = "Focus on the core narrative and clear application. Define ALL theological terms (e.g., 'grace', 'justification', 'redemption'). Assume no prior knowledge."
+        # CHANGED: "Assume no prior knowledge" -> "Explain deep concepts simply."
+        level_instructions = "Teach deep theological concepts but define terms clearly as you go. Do not water down the truth; just explain it accessibly. Use specific Bible verses to back up every claim."
     elif knowledge_level == "I know the main stories":
-        level_instructions = "Connect the text to broader biblical themes (e.g., covenant, kingdom). Introduce and define one or two key theological concepts per lesson."
+        level_instructions = "Connect the text to broader biblical themes (Covenant, Kingdom, Redemption). Introduce systematic theology concepts."
     else: # "I'm comfortable with deeper concepts"
-        level_instructions = "Include historical context, connections to original languages (e.g., 'the Greek word for love here is *agape*...'), and deeper doctrinal synthesis. Do not shy away from complex ideas."
+        level_instructions = "Include historical context, original Greek/Hebrew word studies, and cross-referencing. This must be seminary-level depth."
 
-    # --- Enhanced Style Instructions ---
+    # --- UPDATED: Style Instructions (Reducing Fluff) ---
     style_instructions = ""
-    if learning_style == "analytical":
-        style_instructions = "Your teaching method is **Analytical**. Focus on theological terms, logical structure, and doctrinal categories. Use bullet points. Ask 'WHAT' does this text teach us about God, sin, and salvation?"
-    elif learning_style == "storytelling":
-        style_instructions = "Your teaching method is **Narrative Illustration**. Focus on the *theological principles* within the story. Use narrative examples (from the text or modern life) to *illustrate* these principles. Ask 'WHY' is this story in the Bible and what truth does it reveal?"
-    elif learning_style == "practical":
-        style_instructions = "Your teaching method is **Practical Application**. State the biblical principle clearly and briefly. Then, spend *most* of the section on 'How to use this' and 'What this looks like today' with concrete, actionable steps."
-    elif learning_style == "reflective":
-        style_instructions = "Your teaching method is **Introspective**. Focus on internal transformation. Ask probing, *italicized, bolded questions* directly within the text to make the user connect the doctrine to their own heart and motivations."
+    if "storytelling" in learning_style.lower():
+        # CHANGED: Shift from "Narrative Illustration" to "Narrative Exegesis"
+        style_instructions = "Your teaching method is **Narrative Exegesis**. Teach the theology *through* the biblical story. Do not just retell the plot. Stop frequently to explain 'What does verse X mean here?' and 'Where is God in this detail?'"
+    elif "analytical" in learning_style.lower():
+        style_instructions = "Your teaching method is **Analytical**. Use logic, bullet points, and verse-by-verse breakdown. Focus on 'What is the doctrine here?'"
+    elif "practical" in learning_style.lower():
+        style_instructions = "Your teaching method is **Practical**. However, before giving application, you MUST establish the theological foundation from the text. Application without Doctrine is empty."
+    else: # Reflective/Other
+        style_instructions = "Your teaching method is **Theological Reflection**. Focus on the attributes of God revealed in the text."
 
-    # --- Define the *exact* section structure ---
-    # <<< NEW >>> Added {{REVIEW_SECTION_IF_NEEDED}} placeholder
+    # --- UPDATED: Section Structure (Removed Reflection, Added 'Scriptural Deep Dive') ---
+    # We are renaming 'Exposition' to 'Scriptural Deep Dive' to signal density to the AI.
     section_structure_instructions = ""
+    
     if time_commitment == "15 minutes":
         section_structure_instructions = """
         {{REVIEW_SECTION_IF_NEEDED}}
-        - A 'text' section with the role 'Introduction'.
-        - A 'text' section with the role 'Core Teaching & Application'.
-        - A 'knowledge_check' section testing the 'Core Teaching'.
+        - A 'text' section with the role 'Introduction' (Cite the main passage).
+        - A 'text' section with the role 'Scriptural Deep Dive' (Explain the meaning of the verses).
+        - A 'knowledge_check' section testing the deep dive.
         """
     elif time_commitment == "30 minutes":
         section_structure_instructions = """
         {{REVIEW_SECTION_IF_NEEDED}}
         - A 'text' section with the role 'Introduction' (State the main topic and passage).
-        - A 'text' section with the role 'Exposition' (Teach the theological principles *from* the passage).
-        - A 'knowledge_check' section testing the 'Exposition'.
-        - A 'text' section with the role 'Application' (Provide a 'So what?' for daily life).
-        - A 'knowledge_check' section testing the 'Application'.
+        - A 'text' section with the role 'Scriptural Deep Dive' (Detailed verse-by-verse analysis).
+        - A 'knowledge_check' section testing the analysis.
+        - A 'text' section with the role 'Theological Synthesis' (How this connects to the Gospel).
+        - A 'knowledge_check' section testing the synthesis.
         """
     else: # 45 minutes
+        # REMOVED: 'Guided Reflection' is gone.
+        # ADDED: 'Verse Analysis' and 'Doctrinal Connection'
         section_structure_instructions = """
         {{REVIEW_SECTION_IF_NEEDED}}
         - A 'text' section with the role 'Introduction' (A compelling hook and the main theological question).
-        - A 'text' section with the role 'Exposition' (A deep dive into the *theological principles* of the passage).
-        - A 'knowledge_check' section testing the 'Exposition'.
-        - A 'text' section with the role 'Theological Connection' (Connect these principles to another part of the Bible or a core doctrine).
-        - A 'knowledge_check' section testing the 'Theological Connection'.
-        - A 'text' section with the role 'Practical Application' (A clear, actionable takeaway for daily life).
-        - A 'text' section with the role 'Guided Reflection' (A closing prayer prompt or reflective questions).
+        - A 'text' section with the role 'Verse Analysis' (Go deep into specific verses. Quote them. Explain keywords).
+        - A 'knowledge_check' section testing the Verse Analysis.
+        - A 'text' section with the role 'Doctrinal Connection' (Connect this to the rest of the Bible. Use cross-references).
+        - A 'knowledge_check' section testing the Doctrinal Connection.
+        - A 'text' section with the role 'Life Application' (Strictly biblical application, not generic advice).
+        - A 'text' section with the role 'Conclusion' (A powerful summary statement).
         """
     
-    # <<< NEW >>> Dynamically insert the review block based on struggles
+    # Dynamically insert review block
     review_block = ""
     if previous_struggles:
         review_block = f"- A 'text' section with the role 'Review'. (Content: Briefly re-explain a concept from: {previous_struggles}, as a warm-up.)"
     
-    # Replace the placeholder with the dynamic block
     section_structure_instructions = section_structure_instructions.replace("{{REVIEW_SECTION_IF_NEEDED}}", review_block)
 
 
@@ -1231,28 +1234,28 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 - Knowledge Level: {knowledge_level}
 - Learning Style: {learning_style}
 
-**CRITICAL INSTRUCTIONS:**
-1.  **Core Teaching Philosophy:** Your goal is to *teach theology* (what is true about God) and *doctrine* (what we believe) that is *derived from* the biblical text. **DO NOT simply paraphrase or summarize the plot of the Bible passage.** Extract the *principles* from the story and teach those principles.
-2.  **Lesson Title:** Create a **unique and specific** `lesson_title` for this lesson. **DO NOT** just repeat the overall level topic ("{level_topic}").
-3.  **JSON Structure:** You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
-4.  **Lesson Content:** The "lesson_content_sections" MUST be a list of objects. You will generate *exactly* these sections in this order:
-{section_structure_instructions}
-5.  **Style is Primary:** The *most important* instruction is to follow the user's `learning_style`. Apply this method to all 'text' sections: {style_instructions}
-6.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense (citing specific passages like John 3:16), and tailored to the user's `knowledge_level`: {level_instructions}
+**CRITICAL INSTRUCTIONS FOR BIBLICAL DENSITY:**
+1.  **Exegesis over Summary:** Do NOT just summarize the story. Explain the *meaning* of the text.
+2.  **Scripture Saturation:** You MUST quote or reference specific Bible verses in **every single paragraph**. Use (Book Chapter:Verse) format.
+3.  **Length Requirement:** Each 'text' section MUST be substantive (approx. 200-300 words). Do not be brief.
+4.  **No Fluff:** Avoid generic phrases like "God has a plan." Be specific: "God's sovereignty is demonstrated in verse X when..."
+5.  **Definitions:** If you use a theological term (Redemption, Justification, Sanctification), define it immediately in the context of the verse.
 
-7.  **CRITICAL KEY REQUIREMENT FOR 'knowledge_check':**
-    - Every 'knowledge_check' object MUST include *all* of these keys:
+**JSON Structure:**
+Generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
+The "lesson_content_sections" MUST be a list of objects exactly in this order:
+{section_structure_instructions}
+
+**Style Application:**
+Apply this teaching style to the content: {style_instructions}
+
+**Knowledge Check Rules:**
     - `type`: "knowledge_check"
     - `question`: "The question text..."
     - `question_type`: "multiple_choice" or "true_false" or "fill_in_the_blank"
     - `correct_answer`: "The correct answer string..."
     - `biblical_reference`: "The relevant verse, e.g., Genesis 1:1"
-    - `options`: (A list of 4 strings, ONLY if `question_type` is "multiple_choice")
-    - **LOGIC CHECK:** The `question` text MUST match the `question_type`.
-    -   (Example: A 'true_false' question must be a statement that can be answered True or False, like "True or False: Genesis 3:15 is the first promise of redemption.")
-    -   (Example: A 'multiple_choice' question must be a question with a clear answer in the options.)
-    -   (Example: DO NOT create a 'true_false' question that asks "How..." or "Why...")
-    - **Failure to follow these rules will fail the lesson.**
+    - `options`: (List of 4 strings for multiple_choice)
 
 Output ONLY the valid JSON object.
 """
