@@ -1144,7 +1144,7 @@ Respond ONLY with a single, valid JSON object with these keys:
 """
 
 # ================================================================
-# <<< MODIFIED FUNCTION >>>
+# <<< FIXED & OPTIMIZED FUNCTION >>>
 # create_lesson_prompt
 # ================================================================
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None, previous_struggles: str = None) -> str:
@@ -1153,77 +1153,70 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     # --- Context Clauses ---
     context_clause_lesson = f" This lesson must logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
     context_clause_struggle = (
-        f" **Adaptive Learning Note:** This user has previously struggled with these topics: [{previous_struggles}]. "
-        "If relevant to this lesson, you **MUST** add a 'Review' section at the beginning to briefly re-explain one of those concepts."
+        f" **Adaptive Learning Note:** The user previously struggled with: [{previous_struggles}]. "
+        "You MUST include a brief 'Review' text section at the very start to clarify this concept before moving on."
     ) if previous_struggles else ""
 
     knowledge_level = form_data['knowledge_level']
     learning_style = form_data['learning_style']
     time_commitment = form_data['time_commitment']
 
-    # --- UPDATED: Level Instructions (Forcing Depth for ALL levels) ---
+    # --- Level Instructions ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
-        # CHANGED: "Assume no prior knowledge" -> "Explain deep concepts simply."
         level_instructions = "Teach deep theological concepts but define terms clearly as you go. Do not water down the truth; just explain it accessibly. Use specific Bible verses to back up every claim."
     elif knowledge_level == "I know the main stories":
         level_instructions = "Connect the text to broader biblical themes (Covenant, Kingdom, Redemption). Introduce systematic theology concepts."
-    else: # "I'm comfortable with deeper concepts"
+    else: 
         level_instructions = "Include historical context, original Greek/Hebrew word studies, and cross-referencing. This must be seminary-level depth."
 
-    # --- UPDATED: Style Instructions (Reducing Fluff) ---
+    # --- Style Instructions ---
     style_instructions = ""
     if "storytelling" in learning_style.lower():
-        # CHANGED: Shift from "Narrative Illustration" to "Narrative Exegesis"
-        style_instructions = "Your teaching method is **Narrative Exegesis**. Teach the theology *through* the biblical story. Do not just retell the plot. Stop frequently to explain 'What does verse X mean here?' and 'Where is God in this detail?'"
+        style_instructions = "Your teaching method is **Narrative Exegesis**. Teach the theology *through* the biblical story. Do not just retell the plot. Stop frequently to explain 'What does verse X mean here?'"
     elif "analytical" in learning_style.lower():
         style_instructions = "Your teaching method is **Analytical**. Use logic, bullet points, and verse-by-verse breakdown. Focus on 'What is the doctrine here?'"
     elif "practical" in learning_style.lower():
         style_instructions = "Your teaching method is **Practical**. However, before giving application, you MUST establish the theological foundation from the text. Application without Doctrine is empty."
-    else: # Reflective/Other
+    else: 
         style_instructions = "Your teaching method is **Theological Reflection**. Focus on the attributes of God revealed in the text."
 
-    # --- UPDATED: Section Structure (Removed Reflection, Added 'Scriptural Deep Dive') ---
-    # We are renaming 'Exposition' to 'Scriptural Deep Dive' to signal density to the AI.
-    section_structure_instructions = ""
-    
-    if time_commitment == "15 minutes":
-        section_structure_instructions = """
-        {{REVIEW_SECTION_IF_NEEDED}}
-        - A 'text' section with the role 'Introduction' (Cite the main passage).
-        - A 'text' section with the role 'Scriptural Deep Dive' (Explain the meaning of the verses).
-        - A 'knowledge_check' section testing the deep dive.
-        """
-    elif time_commitment == "30 minutes":
-        section_structure_instructions = """
-        {{REVIEW_SECTION_IF_NEEDED}}
-        - A 'text' section with the role 'Introduction' (State the main topic and passage).
-        - A 'text' section with the role 'Scriptural Deep Dive' (Detailed verse-by-verse analysis).
-        - A 'knowledge_check' section testing the analysis.
-        - A 'text' section with the role 'Theological Synthesis' (How this connects to the Gospel).
-        - A 'knowledge_check' section testing the synthesis.
-        """
-    else: # 45 minutes
-        # REMOVED: 'Guided Reflection' is gone.
-        # ADDED: 'Verse Analysis' and 'Doctrinal Connection'
-        section_structure_instructions = """
-        {{REVIEW_SECTION_IF_NEEDED}}
-        - A 'text' section with the role 'Introduction' (A compelling hook and the main theological question).
-        - A 'text' section with the role 'Verse Analysis' (Go deep into specific verses. Quote them. Explain keywords).
-        - A 'knowledge_check' section testing the Verse Analysis.
-        - A 'text' section with the role 'Doctrinal Connection' (Connect this to the rest of the Bible. Use cross-references).
-        - A 'knowledge_check' section testing the Doctrinal Connection.
-        - A 'text' section with the role 'Life Application' (Strictly biblical application, not generic advice).
-        - A 'text' section with the role 'Conclusion' (A powerful summary statement).
-        """
-    
-    # Dynamically insert review block
-    review_block = ""
-    if previous_struggles:
-        review_block = f"- A 'text' section with the role 'Review'. (Content: Briefly re-explain a concept from: {previous_struggles}, as a warm-up.)"
-    
-    section_structure_instructions = section_structure_instructions.replace("{{REVIEW_SECTION_IF_NEEDED}}", review_block)
+    # --- UPDATED: Dynamic Section Structure Construction ---
+    # Using a list ensures no blank lines or confusing order
+    structure_steps = []
 
+    # 1. Add Review Section (if needed) - EXPLICITLY TEXT ONLY
+    if previous_struggles:
+        structure_steps.append("- A 'text' section with the role 'Review'. (Content: Explanatory text ONLY. Briefly re-explain the concept of: " + str(previous_struggles) + ". DO NOT ask a question here.)")
+
+    # 2. Add Standard Sections based on Time
+    if time_commitment == "15 minutes":
+        structure_steps.extend([
+            "- A 'text' section with the role 'Introduction' (Cite the main passage).",
+            "- A 'text' section with the role 'Scriptural Deep Dive' (Explain the meaning of the verses).",
+            "- A 'knowledge_check' section testing the deep dive."
+        ])
+    elif time_commitment == "30 minutes":
+        structure_steps.extend([
+            "- A 'text' section with the role 'Introduction' (State the main topic and passage).",
+            "- A 'text' section with the role 'Scriptural Deep Dive' (Detailed verse-by-verse analysis).",
+            "- A 'knowledge_check' section testing the analysis.",
+            "- A 'text' section with the role 'Theological Synthesis' (How this connects to the Gospel).",
+            "- A 'knowledge_check' section testing the synthesis."
+        ])
+    else: # 45 minutes
+        structure_steps.extend([
+            "- A 'text' section with the role 'Introduction' (A compelling hook and the main theological question).",
+            "- A 'text' section with the role 'Verse Analysis' (Go deep into specific verses. Quote them. Explain keywords).",
+            "- A 'knowledge_check' section testing the Verse Analysis.",
+            "- A 'text' section with the role 'Doctrinal Connection' (Connect this to the rest of the Bible. Use cross-references).",
+            "- A 'knowledge_check' section testing the Doctrinal Connection.",
+            "- A 'text' section with the role 'Life Application' (Strictly biblical application, not generic advice).",
+            "- A 'text' section with the role 'Conclusion' (A powerful summary statement)."
+        ])
+
+    # Join the steps into a clean string
+    final_structure_instructions = "\n".join(structure_steps)
 
     return f"""
 You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_level} on the topic of "{level_topic}".
@@ -1244,7 +1237,11 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 **JSON Structure:**
 Generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
 The "lesson_content_sections" MUST be a list of objects exactly in this order:
-{section_structure_instructions}
+{final_structure_instructions}
+
+**NEGATIVE CONSTRAINTS (DO NOT IGNORE):**
+- **NEVER** start the lesson with a 'knowledge_check'. The first section MUST be a 'text' section (Introduction or Review).
+- **NEVER** include questions in a 'text' section (unless rhetorical). Questions belong ONLY in 'knowledge_check' sections.
 
 **Style Application:**
 Apply this teaching style to the content: {style_instructions}
