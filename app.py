@@ -1164,7 +1164,7 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     # --- Level Instructions ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
-        level_instructions = "T"You are a wise and loving Bible mentor. Your goal is 'Head, Heart, Hands.'
+        level_instructions = "You are a wise and loving Bible mentor. Your goal is 'Head, Heart, Hands.'
         1. HEAD: Explain the text accurately with theological depth (Commentary).
         2. HEART: Connect this truth to the user's relationship with God (Passion).
         3. HANDS: Give a specific way to live this out (Application).
