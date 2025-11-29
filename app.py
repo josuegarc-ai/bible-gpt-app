@@ -1144,11 +1144,11 @@ Respond ONLY with a single, valid JSON object with these keys:
 """
 
 # ================================================================
-# <<< FIXED & OPTIMIZED FUNCTION >>>
+# <<< PASTORAL & DENSE FUNCTION UPDATE >>>
 # create_lesson_prompt
 # ================================================================
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None, previous_struggles: str = None) -> str:
-    """Generates a robust, theologically sound prompt for a single lesson."""
+    """Generates a robust, theologically sound, and PASTORAL prompt for a single lesson."""
     
     # --- Context Clauses ---
     context_clause_lesson = f" This lesson must logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
@@ -1161,32 +1161,27 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     learning_style = form_data['learning_style']
     time_commitment = form_data['time_commitment']
 
-    # --- Level Instructions ---
+    # --- UPDATED: Level Instructions (Head-Heart-Hands Approach) ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
-        level_instructions = "You are a wise and loving Bible mentor. Your goal is 'Head, Heart, Hands.'
-        1. HEAD: Explain the text accurately with theological depth (Commentary).
-        2. HEART: Connect this truth to the user's relationship with God (Passion).
-        3. HANDS: Give a specific way to live this out (Application).
-        Tone: Authoritative yet warm. Speak TO the user, not AT them. Use 'we' and 'us' to invite them into the truth."
+        level_instructions = "You are a Mentor. Teach deep theological concepts, but explain them gently. Define terms clearly. Aim for the 'Aha!' moment where the user sees how amazing God is."
     elif knowledge_level == "I know the main stories":
-        level_instructions = "Connect the text to broader biblical themes (Covenant, Kingdom, Redemption). Introduce systematic theology concepts."
+        level_instructions = "You are a Pastor. Connect the text to the broader Redemptive Narrative (Creation, Fall, Redemption, Restoration). Show how this passage points to Jesus."
     else: 
-        level_instructions = "Include historical context, original Greek/Hebrew word studies, and cross-referencing. This must be seminary-level depth."
+        level_instructions = "You are a Scholar-Pastor. Include historical context and original language nuances, but always pivot to Doxology (worship). Knowledge must lead to love for God."
 
-    # --- Style Instructions ---
+    # --- UPDATED: Style Instructions ---
     style_instructions = ""
     if "storytelling" in learning_style.lower():
-        style_instructions = "Your teaching method is **Narrative Exegesis**. Teach the theology *through* the biblical story. Do not just retell the plot. Stop frequently to explain 'What does verse X mean here?'"
+        style_instructions = "Your method is **Narrative Exegesis**. Don't just tell the story; show God's character *within* the story. Pause to ask: 'What does this reveal about God's heart?'"
     elif "analytical" in learning_style.lower():
-        style_instructions = "Your teaching method is **Analytical**. Use logic, bullet points, and verse-by-verse breakdown. Focus on 'What is the doctrine here?'"
+        style_instructions = "Your method is **Doctrinal Clarity**. Use logic and structure, but ensure the conclusion is relational. The logic should prove why God is trustworthy."
     elif "practical" in learning_style.lower():
-        style_instructions = "Your teaching method is **Practical**. However, before giving application, you MUST establish the theological foundation from the text. Application without Doctrine is empty."
+        style_instructions = "Your method is **Applied Theology**. First establish the Truth (Head), then the conviction (Heart), then the action (Hands). No application without a biblical foundation."
     else: 
-        style_instructions = "Your teaching method is **Theological Reflection**. Focus on the attributes of God revealed in the text."
+        style_instructions = "Your method is **Reverent Reflection**. Focus on the holiness, love, and sovereignty of God found in the text."
 
-    # --- UPDATED: Dynamic Section Structure Construction ---
-    # Using a list ensures no blank lines or confusing order
+    # --- Structure Construction (Maintains the fix for no starting quiz) ---
     structure_steps = []
 
     # 1. Add Review Section (if needed) - EXPLICITLY TEXT ONLY
@@ -1196,7 +1191,7 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     # 2. Add Standard Sections based on Time
     if time_commitment == "15 minutes":
         structure_steps.extend([
-            "- A 'text' section with the role 'Introduction' (Cite the main passage).",
+            "- A 'text' section with the role 'Introduction' (Cite the main passage and the core truth).",
             "- A 'text' section with the role 'Scriptural Deep Dive' (Explain the meaning of the verses).",
             "- A 'knowledge_check' section testing the deep dive."
         ])
@@ -1215,15 +1210,14 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
             "- A 'knowledge_check' section testing the Verse Analysis.",
             "- A 'text' section with the role 'Doctrinal Connection' (Connect this to the rest of the Bible. Use cross-references).",
             "- A 'knowledge_check' section testing the Doctrinal Connection.",
-            "- A 'text' section with the role 'Life Application' (Strictly biblical application, not generic advice).",
-            "- A 'text' section with the role 'Conclusion' (A powerful summary statement)."
+            "- A 'text' section with the role 'Life Application' (Head-Heart-Hands application).",
+            "- A 'text' section with the role 'Conclusion' (A powerful closing statement to inspire worship)."
         ])
 
-    # Join the steps into a clean string
     final_structure_instructions = "\n".join(structure_steps)
 
     return f"""
-You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_level} on the topic of "{level_topic}".
+You are a wise and loving Bible Teacher creating Lesson {lesson_number}/{total_lessons_in_level} on "{level_topic}".
 {context_clause_lesson}
 {context_clause_struggle}
 
@@ -1231,31 +1225,35 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 - Knowledge Level: {knowledge_level}
 - Learning Style: {learning_style}
 
-**CRITICAL INSTRUCTIONS FOR BIBLICAL DENSITY:**
-1.  **Exegesis over Summary:** Do NOT just summarize the story. Explain the *meaning* of the text.
-2.  **Scripture Saturation:** You MUST quote or reference specific Bible verses in **every single paragraph**. Use (Book Chapter:Verse) format.
-3.  **Length Requirement:** Each 'text' section MUST be substantive (approx. 200-300 words). Do not be brief.
-4.  **No Fluff:** Avoid generic phrases like "God has a plan." Be specific: "God's sovereignty is demonstrated in verse X when..."
-5.  **Definitions:** If you use a theological term (Redemption, Justification, Sanctification), define it immediately in the context of the verse.
+**CORE PHILOSOPHY (HEAD - HEART - HANDS):**
+1. **HEAD (The Truth):** You must be biblically dense. Quote specific verses (Book Chapter:Verse) in every paragraph. Explain Greek/Hebrew terms where helpful.
+2. **HEART (The Transformation):** Don't just lecture. Speak to the user's soul. Show *why* this truth matters. Use "we" and "us" language to invite them in.
+3. **HANDS (The Action):** Ensure the application is specific to spiritual growth, not just generic advice.
+
+**CRITICAL INSTRUCTIONS:**
+1.  **Scripture Saturation:** Every main point must be anchored in a quoted verse.
+2.  **Exegesis:** Explain the text's meaning in context.
+3.  **Length:** Each 'text' section must be substantive (200-300 words).
+4.  **No Fluff:** Every sentence should add value.
 
 **JSON Structure:**
 Generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
 The "lesson_content_sections" MUST be a list of objects exactly in this order:
 {final_structure_instructions}
 
-**NEGATIVE CONSTRAINTS (DO NOT IGNORE):**
-- **NEVER** start the lesson with a 'knowledge_check'. The first section MUST be a 'text' section (Introduction or Review).
-- **NEVER** include questions in a 'text' section (unless rhetorical). Questions belong ONLY in 'knowledge_check' sections.
+**NEGATIVE CONSTRAINTS:**
+- **NEVER** start with a 'knowledge_check'.
+- **NEVER** ask questions inside a 'text' section (unless rhetorical).
 
 **Style Application:**
-Apply this teaching style to the content: {style_instructions}
+Apply this teaching style: {style_instructions}
 
 **Knowledge Check Rules:**
     - `type`: "knowledge_check"
     - `question`: "The question text..."
     - `question_type`: "multiple_choice" or "true_false" or "fill_in_the_blank"
     - `correct_answer`: "The correct answer string..."
-    - `biblical_reference`: "The relevant verse, e.g., Genesis 1:1"
+    - `biblical_reference`: "The relevant verse"
     - `options`: (List of 4 strings for multiple_choice)
 
 Output ONLY the valid JSON object.
