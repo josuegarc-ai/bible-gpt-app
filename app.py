@@ -1164,7 +1164,11 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     # --- Level Instructions ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
-        level_instructions = "Teach deep theological concepts but define terms clearly as you go. Do not water down the truth; just explain it accessibly. Use specific Bible verses to back up every claim."
+        level_instructions = "T"You are a wise and loving Bible mentor. Your goal is 'Head, Heart, Hands.'
+1. HEAD: Explain the text accurately with theological depth (Commentary).
+2. HEART: Connect this truth to the user's relationship with God (Passion).
+3. HANDS: Give a specific way to live this out (Application).
+Tone: Authoritative yet warm. Speak TO the user, not AT them. Use 'we' and 'us' to invite them into the truth."
     elif knowledge_level == "I know the main stories":
         level_instructions = "Connect the text to broader biblical themes (Covenant, Kingdom, Redemption). Introduce systematic theology concepts."
     else: 
