@@ -1147,71 +1147,75 @@ Respond ONLY with a single, valid JSON object with these keys:
 # <<< FIXED SCHEMA FUNCTION (RESTORES TEXT CONTENT) >>>
 # create_lesson_prompt
 # ================================================================
+# ================================================================
+# <<< PASTORAL & DENSE FUNCTION UPDATE >>>
+# create_lesson_prompt
+# ================================================================
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None, previous_struggles: str = None) -> str:
-    """Generates a lesson prompt with EXPLICIT schemas for both TEXT and QUIZ to prevent empty lessons."""
+    """Generates a robust, theologically sound, and PASTORAL prompt for a single lesson."""
     
     # --- Context Clauses ---
     context_clause_lesson = f" This lesson must logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
     context_clause_struggle = (
         f" **Adaptive Learning Note:** The user previously struggled with: [{previous_struggles}]. "
-        "You MUST include a brief 'Review' text section at the very start to clarify this concept."
+        "You MUST include a brief 'Review' text section at the very start to clarify this concept before moving on."
     ) if previous_struggles else ""
 
     knowledge_level = form_data['knowledge_level']
     learning_style = form_data['learning_style']
     time_commitment = form_data['time_commitment']
 
-    # --- Level Instructions ---
+    # --- UPDATED: Level Instructions (Head-Heart-Hands Approach) ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
-        level_instructions = "You are a Mentor. Teach deep theological concepts, but explain them gently. Define terms clearly. Aim for the 'Aha!' moment."
+        level_instructions = "You are a Mentor. Teach deep theological concepts, but explain them gently. Define terms clearly. Aim for the 'Aha!' moment where the user sees how amazing God is."
     elif knowledge_level == "I know the main stories":
-        level_instructions = "You are a Pastor. Connect the text to the broader Redemptive Narrative. Show how this passage points to Jesus."
+        level_instructions = "You are a Pastor. Connect the text to the broader Redemptive Narrative (Creation, Fall, Redemption, Restoration). Show how this passage points to Jesus."
     else: 
-        level_instructions = "You are a Scholar-Pastor. Include historical context and original language nuances, but always pivot to Doxology (worship)."
+        level_instructions = "You are a Scholar-Pastor. Include historical context and original language nuances, but always pivot to Doxology (worship). Knowledge must lead to love for God."
 
-    # --- Style Instructions ---
+    # --- UPDATED: Style Instructions ---
     style_instructions = ""
     if "storytelling" in learning_style.lower():
-        style_instructions = "Method: **Narrative Exegesis**. Show God's character *within* the story. Ask: 'What does this reveal about God's heart?'"
+        style_instructions = "Your method is **Narrative Exegesis**. Don't just tell the story; show God's character *within* the story. Pause to ask: 'What does this reveal about God's heart?'"
     elif "analytical" in learning_style.lower():
-        style_instructions = "Method: **Doctrinal Clarity**. Use logic and structure. The logic should prove why God is trustworthy."
+        style_instructions = "Your method is **Doctrinal Clarity**. Use logic and structure, but ensure the conclusion is relational. The logic should prove why God is trustworthy."
     elif "practical" in learning_style.lower():
-        style_instructions = "Method: **Applied Theology**. First establish the Truth (Head), then the conviction (Heart), then the action (Hands)."
+        style_instructions = "Your method is **Applied Theology**. First establish the Truth (Head), then the conviction (Heart), then the action (Hands). No application without a biblical foundation."
     else: 
-        style_instructions = "Method: **Reverent Reflection**. Focus on the holiness, love, and sovereignty of God found in the text."
+        style_instructions = "Your method is **Reverent Reflection**. Focus on the holiness, love, and sovereignty of God found in the text."
 
-    # --- Structure List ---
+    # --- Structure Construction (Maintains the fix for no starting quiz) ---
     structure_steps = []
-    
-    # 1. Review (Text)
-    if previous_struggles:
-        structure_steps.append("- { \"type\": \"text\", \"role\": \"Review\", \"content\": \"...explanation of previous struggle...\" }")
 
-    # 2. Standard Sections (Text + Checks)
+    # 1. Add Review Section (if needed) - EXPLICITLY TEXT ONLY
+    if previous_struggles:
+        structure_steps.append("- A 'text' section with the role 'Review'. (Content: Explanatory text ONLY. Briefly re-explain the concept of: " + str(previous_struggles) + ". DO NOT ask a question here.)")
+
+    # 2. Add Standard Sections based on Time
     if time_commitment == "15 minutes":
         structure_steps.extend([
-            "- { \"type\": \"text\", \"role\": \"Introduction\", \"content\": \"...cite passage and hook...\" }",
-            "- { \"type\": \"text\", \"role\": \"Scriptural Deep Dive\", \"content\": \"...dense explanation...\" }",
-            "- { \"type\": \"knowledge_check\", \"role\": \"Deep Dive Check\" }"
+            "- A 'text' section with the role 'Introduction' (Cite the main passage and the core truth).",
+            "- A 'text' section with the role 'Scriptural Deep Dive' (Explain the meaning of the verses).",
+            "- A 'knowledge_check' section testing the deep dive."
         ])
     elif time_commitment == "30 minutes":
         structure_steps.extend([
-            "- { \"type\": \"text\", \"role\": \"Introduction\", \"content\": \"...state topic...\" }",
-            "- { \"type\": \"text\", \"role\": \"Scriptural Deep Dive\", \"content\": \"...verse-by-verse analysis...\" }",
-            "- { \"type\": \"knowledge_check\", \"role\": \"Analysis Check\" }",
-            "- { \"type\": \"text\", \"role\": \"Theological Synthesis\", \"content\": \"...gospel connection...\" }",
-            "- { \"type\": \"knowledge_check\", \"role\": \"Synthesis Check\" }"
+            "- A 'text' section with the role 'Introduction' (State the main topic and passage).",
+            "- A 'text' section with the role 'Scriptural Deep Dive' (Detailed verse-by-verse analysis).",
+            "- A 'knowledge_check' section testing the analysis.",
+            "- A 'text' section with the role 'Theological Synthesis' (How this connects to the Gospel).",
+            "- A 'knowledge_check' section testing the synthesis."
         ])
     else: # 45 minutes
         structure_steps.extend([
-            "- { \"type\": \"text\", \"role\": \"Introduction\", \"content\": \"...compelling hook...\" }",
-            "- { \"type\": \"text\", \"role\": \"Verse Analysis\", \"content\": \"...Greek keywords and quotes...\" }",
-            "- { \"type\": \"knowledge_check\", \"role\": \"Verse Check\" }",
-            "- { \"type\": \"text\", \"role\": \"Doctrinal Connection\", \"content\": \"...cross-references...\" }",
-            "- { \"type\": \"knowledge_check\", \"role\": \"Doctrine Check\" }",
-            "- { \"type\": \"text\", \"role\": \"Life Application\", \"content\": \"...specific head-heart-hands...\" }",
-            "- { \"type\": \"text\", \"role\": \"Conclusion\", \"content\": \"...closing worship...\" }"
+            "- A 'text' section with the role 'Introduction' (A compelling hook and the main theological question).",
+            "- A 'text' section with the role 'Verse Analysis' (Go deep into specific verses. Quote them. Explain keywords).",
+            "- A 'knowledge_check' section testing the Verse Analysis.",
+            "- A 'text' section with the role 'Doctrinal Connection' (Connect this to the rest of the Bible. Use cross-references).",
+            "- A 'knowledge_check' section testing the Doctrinal Connection.",
+            "- A 'text' section with the role 'Life Application' (Head-Heart-Hands application).",
+            "- A 'text' section with the role 'Conclusion' (A powerful closing statement to inspire worship)."
         ])
 
     final_structure_instructions = "\n".join(structure_steps)
@@ -1225,38 +1229,36 @@ You are a wise and loving Bible Teacher creating Lesson {lesson_number}/{total_l
 - Knowledge Level: {knowledge_level}
 - Learning Style: {learning_style}
 
-**CORE PHILOSOPHY:**
-1. **HEAD:** Biblically dense. Quote specific verses (Book Chapter:Verse) in every paragraph.
-2. **HEART:** Speak to the soul. Use "we" and "us" to invite them in.
-3. **HANDS:** Specific application.
+**CORE PHILOSOPHY (HEAD - HEART - HANDS):**
+1. **HEAD (The Truth):** You must be biblically dense. Quote specific verses (Book Chapter:Verse) in every paragraph. Explain Greek/Hebrew terms where helpful.
+2. **HEART (The Transformation):** Don't just lecture. Speak to the user's soul. Show *why* this truth matters. Use "we" and "us" language to invite them in.
+3. **HANDS (The Action):** Ensure the application is specific to spiritual growth, not just generic advice.
 
-**JSON OBJECT RULES (STRICT):**
-You must generate a JSON object with keys: "lesson_title", "summary_points", and "lesson_content_sections".
-The "lesson_content_sections" is a list. You MUST use these TWO schemas for the items in the list:
+**CRITICAL INSTRUCTIONS:**
+1.  **Scripture Saturation:** Every main point must be anchored in a quoted verse.
+2.  **Exegesis:** Explain the text's meaning in context.
+3.  **Length:** Each 'text' section must be substantive (200-300 words).
+4.  **No Fluff:** Every sentence should add value.
 
-**1. The TEXT Schema (Use for Introduction, Deep Dive, Analysis, Application):**
-{{
-    "type": "text",
-    "role": "The Role Name (e.g., Introduction)",
-    "content": "The actual teaching content. MUST be 200-300 words. Biblically dense, quoting verses, explaining terms, and applying the style: {style_instructions}"
-}}
-
-**2. The KNOWLEDGE CHECK Schema (Use for Checks):**
-{{
-    "type": "knowledge_check",
-    "question": "The question text...",
-    "question_type": "multiple_choice",
-    "correct_answer": "The correct answer string...",
-    "biblical_reference": "The relevant verse",
-    "options": ["Option A", "Option B", "Option C", "Option D"]
-}}
-
-**REQUIRED LESSON ORDER (Generate these exact sections in this order):**
+**JSON Structure:**
+Generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
+The "lesson_content_sections" MUST be a list of objects exactly in this order:
 {final_structure_instructions}
 
 **NEGATIVE CONSTRAINTS:**
 - **NEVER** start with a 'knowledge_check'.
-- **NEVER** output an empty 'content' field for a text section.
+- **NEVER** ask questions inside a 'text' section (unless rhetorical).
+
+**Style Application:**
+Apply this teaching style: {style_instructions}
+
+**Knowledge Check Rules:**
+    - `type`: "knowledge_check"
+    - `question`: "The question text..."
+    - `question_type`: "multiple_choice" or "true_false" or "fill_in_the_blank"
+    - `correct_answer`: "The correct answer string..."
+    - `biblical_reference`: "The relevant verse"
+    - `options`: (List of 4 strings for multiple_choice)
 
 Output ONLY the valid JSON object.
 """
