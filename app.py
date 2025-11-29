@@ -1143,17 +1143,6 @@ Respond ONLY with a single, valid JSON object with these keys:
 - "options": (A list of 4 strings, ONLY if `question_type` is "multiple_choice". Must include the correct answer.)
 """
 
-This is a classic "JSON Schema Imbalance" error.
-
-**The Diagnosis:**
-In the previous prompt, I gave the AI extremely detailed rules for how to format a **`knowledge_check`** (keys, options, etc.), but I didn't give it a specific schema for the **`text`** sections. Because LLMs try to follow patterns, it grabbed the detailed schema it *did* see (the quiz) and ignored the one that was vague (the text).
-
-**The Fix:**
-I have updated the code to explicitly define the **`text` section schema** right next to the `knowledge_check` schema. This forces the AI to recognize that "text" is a valid object type it *must* generate.
-
-**Replace the function one last time with this fixed version:**
-
-```python
 # ================================================================
 # <<< FIXED SCHEMA FUNCTION (RESTORES TEXT CONTENT) >>>
 # create_lesson_prompt
