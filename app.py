@@ -987,8 +987,12 @@ def _learn_extract_json_any(response_text: str):
 # ============================
 # LEARN MODULE SUPPORT HELPERS
 # ============================
-TOKENS_BY_TIME = {"15 minutes": 1800, "30 minutes": 3000, "45 minutes": 4000} # Rough estimates
-
+# UPDATE THIS IN YOUR MAIN CODE BLOCK:
+TOKENS_BY_TIME = {
+    "15 minutes": 2500,  # Increased from 1800
+    "30 minutes": 3500,  # Increased from 3000
+    "45 minutes": 5500   # Increased from 4000
+}
 LEARN_MODULE_SYSTEM_PROMPT = """
 You are a master Expository Theologian and Curriculum Designer.
 Your goal is to deepen the user's faith through rigorous, scripture-saturated teaching that connects the specific text to the whole counsel of God (Genesis to Revelation).
@@ -1174,9 +1178,10 @@ Respond ONLY with a single, valid JSON object with these keys:
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None, previous_struggles: str = None) -> str:
     """
     Updates:
-    - STRICTLY forbids AI writing the prayer (Blasphemy fix).
-    - Naturalizes the tone (No more repetitive "Imagine...").
-    - Limits Contextual References to only what is necessary.
+    - INCREASES CONTENT VOLUME: Explicit word counts and paragraph requirements.
+    - PREVENTS SKIPPING: Mandates sequential verse-by-verse coverage for Deep Dives.
+    - RESTORES: The specific, detailed Knowledge Check rules you preferred.
+    - FIXES: Prayer (Blasphemy) and Flow issues.
     """
     
     # --- Context Clauses ---
@@ -1189,58 +1194,63 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     # --- 1. Knowledge Level Logic ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
-        level_instructions = "Focus on the core narrative. Define theological terms simply within the flow."
+        level_instructions = "Focus on the core narrative. Define ALL theological terms simply within the flow."
     elif knowledge_level == "I know the main stories":
-        level_instructions = "Connect this specific text to the broader Redemptive History."
+        level_instructions = "Connect this specific text to the broader Redemptive History (Creation -> Fall -> Redemption)."
     else: 
-        level_instructions = "Include historical cultural context, original languages, and systematic theology."
+        level_instructions = "Include historical cultural context, original languages (Greek/Hebrew), and systematic theology categories."
 
-    # --- 2. Style Logic (UPDATED FOR NATURAL FLOW) ---
+    # --- 2. Style Logic ---
     style_instructions = ""
     if learning_style == "storytelling":
         style_instructions = (
-            "**Method: Natural Narrative.** Do NOT start every lesson with 'Imagine'. Vary your opening hook (e.g., a historical fact, a question, or a direct observation). "
-            "Explain the theology *through* the imagery. Connect the story visuals to OT prophecies ONLY IF explicitly referenced in the text."
+            "**Method: Natural Narrative.** Do NOT start every lesson with 'Imagine'. Vary your opening hook. "
+            "Explain the theology *through* the imagery. "
+            "For the narrative section, you must retell the *entire* passage detail-by-detail."
         )
     elif learning_style == "analytical":
         style_instructions = "Method: Analytical. Focus on the logic of the argument. Use bullet points for doctrine."
     elif learning_style == "practical":
-        style_instructions = "Method: Application. Briefly state the truth, then focus on 'How to live this out today'."
+        style_instructions = "Method: Application. Briefly state the truth, then focus heavily on 'How to live this out today'."
     else:
         style_instructions = "Method: Reflective. Focus on the heart. Ask internal questions."
 
-    # --- 3. Section Structure (UPDATED FOR PRAYER FIX) ---
+    # --- 3. Section Structure (UPDATED FOR CONTENT VOLUME) ---
     
     section_structure_instructions = ""
+    
     if time_commitment == "45 minutes":
+        # DEEP DIVE: High Volume, Sequential Coverage
         section_structure_instructions = """
         {{REVIEW_SECTION_IF_NEEDED}}
-        - A 'text' section with role 'Introduction' (Vary the hook; do not be repetitive).
-        - A 'text' section with role 'Narrative Exposition' (Retell the text vividly, embedding verse refs).
-        - A 'text' section with role 'Historical Context' (Explain the background/author/setting).
-        - A 'text' section with role 'Theological Breakdown' (Define key terms and explain the doctrine).
+        - A 'text' section with role 'Introduction' (Compelling hook, approx. 150 words).
+        - A 'text' section with role 'Narrative Exposition' (This is the core. Retell the text verse-by-verse. Do not summarize. Minimum 300 words).
+        - A 'text' section with role 'Historical Context' (Deep dive into author/setting. Minimum 200 words).
+        - A 'text' section with role 'Theological Breakdown' (Define at least 2 key terms and explain the doctrine. Minimum 250 words).
         - A 'knowledge_check' section testing the 'Theological Breakdown'.
-        - A 'text' section with role 'Biblical Connections' (Connect ONLY to relevant OT/NT passages; do not force it).
+        - A 'text' section with role 'Biblical Connections' (Connect to relevant OT/NT passages. Minimum 200 words).
         - A 'knowledge_check' section testing the 'Biblical Connections'.
-        - A 'text' section with role 'Application' (Concrete steps to live this truth).
+        - A 'text' section with role 'Application' (3-4 concrete steps to live this truth. Minimum 200 words).
         - A 'text' section with role 'Guided Reflection' (See Critical Prayer Rules below).
         """
     elif time_commitment == "30 minutes":
+        # STEADY: Medium Volume
         section_structure_instructions = """
         {{REVIEW_SECTION_IF_NEEDED}}
-        - A 'text' section with role 'Introduction'.
-        - A 'text' section with role 'Exposition' (Teach the principles).
+        - A 'text' section with role 'Introduction' (Set the stage. ~100 words).
+        - A 'text' section with role 'Exposition' (Teach the principles. Minimum 250 words).
         - A 'knowledge_check' section testing the 'Exposition'.
-        - A 'text' section with role 'Theological Connection'.
-        - A 'text' section with role 'Application'.
+        - A 'text' section with role 'Theological Connection' (Connect to Jesus/Gospel. Minimum 150 words).
+        - A 'text' section with role 'Application' (Practical takeaways. Minimum 150 words).
         - A 'knowledge_check' section testing the 'Application'.
         - A 'text' section with role 'Guided Reflection' (See Critical Prayer Rules below).
         """
     else: # 15 minutes
+        # QUICK: Concise but Substantial
         section_structure_instructions = """
         {{REVIEW_SECTION_IF_NEEDED}}
         - A 'text' section with role 'Introduction'.
-        - A 'text' section with role 'Core Teaching'.
+        - A 'text' section with role 'Core Teaching' (A substantial teaching paragraph. Minimum 200 words).
         - A 'knowledge_check' section testing the 'Core Teaching'.
         - A 'text' section with role 'Guided Reflection' (See Critical Prayer Rules below).
         """
@@ -1248,7 +1258,7 @@ def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_
     # --- 4. The Placeholder Logic ---
     review_block = ""
     if previous_struggles:
-        review_block = f"- A 'text' section with role 'Review' (Briefly re-explain the concept of [{previous_struggles}])."
+        review_block = f"- A 'text' section with role 'Review' (Briefly re-explain the concept of [{previous_struggles}] - approx 100 words)."
     
     section_structure_instructions = section_structure_instructions.replace("{{REVIEW_SECTION_IF_NEEDED}}", review_block)
 
@@ -1260,21 +1270,28 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 **User Profile:**
 - Knowledge Level: {knowledge_level}
 - Learning Style: {learning_style}
+- Time Commitment: {time_commitment}
 
-**CRITICAL RULES:**
-1. **Biblical Density:** Your goal is to teach theology derived from the text.
-2. **Contextual References:** Include Old Testament or New Testament references **ONLY** if they are directly relevant to the text. Do not force connections.
-3. **JSON Structure:** You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
-4. **Lesson Content:** The "lesson_content_sections" MUST be a list of objects in this EXACT order:
-{section_structure_instructions}
+**CRITICAL RULES FOR CONTENT VOLUME:**
+1. **NO SKIMMING:** You must produce detailed, dense content.
+2. **Word Counts:** Respect the minimum word counts specified in the structure below.
+3. **Sequential Coverage:** For the Exposition sections, cover the text sequentially. Do not skip verses to save space.
 
-5. **Style Application:** {style_instructions}
+**CRITICAL RULES FOR THEOLOGY:**
+1. **Biblical Density:** Teach theology derived directly from the text.
+2. **Contextual References:** Include Old Testament or New Testament references **ONLY** if they are directly relevant.
 
 **CRITICAL PRAYER RULE (NO BLASPHEMY):**
 - In the 'Guided Reflection' section, you are a **Guide**, not the Intercessor.
-- **DO NOT** write a prayer in the first person (e.g., "Heavenly Father, I thank you..."). This is presumptuous.
-- **INSTEAD**, write a call to action (e.g., "Take a moment now to bow your head. Thank God for His revelation. Ask Him to help you trust His sovereignty...").
-- Guide the user *to* pray; do not pray *for* them.
+- **DO NOT** write a prayer in the first person (e.g., "Heavenly Father, I thank you...").
+- **INSTEAD**, write a call to action (e.g., "Take a moment now to bow your head. Thank God for His revelation...").
+
+**JSON STRUCTURE INSTRUCTIONS:**
+You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
+The "lesson_content_sections" MUST be a list of objects in this EXACT order:
+{section_structure_instructions}
+
+**STYLE APPLICATION:** {style_instructions}
 
 **CRITICAL KEY REQUIREMENT FOR 'knowledge_check':**
     - Every 'knowledge_check' object MUST include *all* of these keys:
@@ -1285,6 +1302,9 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
     - `biblical_reference`: "The relevant verse, e.g., Genesis 1:1"
     - `options`: (A list of 4 strings, ONLY if `question_type` is "multiple_choice")
     - **LOGIC CHECK:** The `question` text MUST match the `question_type`.
+    -   (Example: A 'true_false' question must be a statement that can be answered True or False, like "True or False: Genesis 3:15 is the first promise of redemption.")
+    -   (Example: A 'multiple_choice' question must be a question with a clear answer in the options.)
+    -   (Example: DO NOT create a 'true_false' question that asks "How..." or "Why...")
     - **Failure to follow these rules will fail the lesson.**
 
 Output ONLY the valid JSON object.
