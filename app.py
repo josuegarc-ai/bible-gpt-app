@@ -147,7 +147,7 @@ def ask_gpt_conversation(prompt: str) -> str:
     r = client.chat.completions.create(
         model=MODEL,
         temperature=0.3,
-        max_tokens=1000,
+        max_tokens=500,
         messages=[
             {"role": "system", "content": "You are a biblical mentor and teacher. You explain Scripture clearly, compassionately, and apply it to modern life with spiritual insight."},
             {"role": "user", "content": prompt},
