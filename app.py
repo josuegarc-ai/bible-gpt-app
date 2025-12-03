@@ -989,14 +989,18 @@ def _learn_extract_json_any(response_text: str):
 # ============================
 TOKENS_BY_TIME = {"15 minutes": 1800, "30 minutes": 3000, "45 minutes": 4000} # Rough estimates
 
-# --- NEW SYSTEM PROMPT FOR LEARN MODULE ---
 LEARN_MODULE_SYSTEM_PROMPT = """
-You are a master theologian and pastoral teacher, an expert in creating biblically-dense, theologically sound, and highly structured curriculum.
-Your primary goal is to guide the user to a deep, accurate, and practical understanding of Scripture.
-- **Theology:** You adhere to a high view of Scripture (inerrant, infallible, and sufficient).
-- **Tone:** Pastoral, encouraging, clear, and authoritative.
-- **Clarity:** You MUST define complex theological terms (e.g., "justification," "sanctification") in simple ways, especially for lower-level learners.
-- **Output:** You respond ONLY with the valid JSON structure requested. Do not add any conversational text outside the JSON.
+You are a master Expository Theologian and Curriculum Designer.
+Your goal is to deepen the user's faith through rigorous, scripture-saturated teaching that connects the specific text to the whole counsel of God (Genesis to Revelation).
+
+**CORE INSTRUCTIONS FOR BIBLICAL DENSITY:**
+1.  **Scripture First:** Never make a theological claim without citing a specific Bible verse (Book Chapter:Verse).
+2.  **Intertextuality:** You MUST actively connect the lesson text to the Old Testament (prophecy/shadows) and the New Testament (fulfillment/doctrine).
+3.  **Expository Depth:** Do not just summarize the story. Explain the *significance* of the original Greek/Hebrew words where relevant (e.g., "The Greek word here is *apokalupsis*, meaning...").
+4.  **Accessible Orthodoxy:** You hold to a high view of Scripture. For "Beginner" users, you must define theological terms (e.g., "Eschatology", "Soteriology") simply within the flow of the story.
+
+**TONE:** Pastoral, authoritative, warm, and captivating.
+**OUTPUT:** Respond ONLY with the valid JSON structure requested.
 """
 
 def ask_gpt_json(prompt: str, max_tokens: int = 4000):
@@ -1066,36 +1070,55 @@ def summarize_lesson_content(lesson_data: dict) -> str:
 # PROMPTS
 # -------------------------
 def create_full_learning_plan_prompt(form_data: dict) -> str:
-    """Creates the master prompt to generate the entire curriculum."""
+    """
+    Creates the master prompt to generate the entire curriculum.
+    MERGES: Original Python logic + New Theological Depth.
+    """
+    # --- 1. KEEP ORIGINAL LOGIC (Critical for App Functionality) ---
     pacing_to_lessons_per_level = {
         "A quick, high-level overview": 1,
         "A steady, detailed study": 2,
         "A deep, comprehensive dive": 3
     }
-    num_lessons_per_level = pacing_to_lessons_per_level.get(form_data['pacing'], 2) # Default to steady
+    # Default to 2 if mapping fails
+    num_lessons_per_level = pacing_to_lessons_per_level.get(form_data['pacing'], 2) 
 
+    # --- 2. DEFINE EXPOSITORY INSTRUCTIONS BASED ON PACING ---
+    # We adapt the instruction so it doesn't contradict the user's choice.
+    if "deep" in form_data['pacing'].lower():
+        structure_instruction = (
+            "**CRITICAL STRUCTURE:** Create levels that follow the **logical flow of the Bible book** (Expository Method). "
+            "Example: Level 1 = Ch 1-3, Level 2 = Ch 4-5. Do NOT create random themes."
+        )
+    else:
+        structure_instruction = (
+            "**CRITICAL STRUCTURE:** Create levels that capture the **Major Themes** of the topic. "
+            "Since this is an overview, group key chapters together logically."
+        )
+
+    # --- 3. THE IMPROVED PROMPT ---
     return f"""
-You are an expert theologian and personalized curriculum designer creating a Bible study plan.
-User Profile:
-- Topics of Interest: {form_data['topics']}
-- Current Knowledge: {form_data['knowledge_level']} (Derived from diagnostic)
-- Learning Goal: {", ".join(form_data['objectives'])}
-- Common Struggles: {", ".join(form_data['struggles'])}
-- Preferred Learning Style: {form_data['learning_style']}
-- Desired Pacing: {form_data['pacing']}
-- Time Commitment per Lesson: {form_data['time_commitment']}
+    You are an expert Theological Curriculum Architect.
+    
+    **USER PROFILE:**
+    - Topic: {form_data['topics']}
+    - Current Knowledge: {form_data['knowledge_level']}
+    - Desired Pacing: {form_data['pacing']} (Target: {num_lessons_per_level} lessons per level)
+    - Style: {form_data['learning_style']}
 
-Task: Design a complete Bible study curriculum plan based on this profile.
-1. Create a personalized `plan_title`.
-2. Write a brief, encouraging `introduction`.
-3. Determine the appropriate number of levels based on the pacing (`quick`: 2-3 levels, `steady`: 3-5 levels, `deep`: 5-7 levels).
-4. For each level, create a concise `name` and `topic` that flows logically towards the user's goals.
-5. For each level, set `num_lessons` based on the user's 'Desired Pacing' (1 for 'quick', 2 for 'steady', 3 for 'deep').
-
-Output ONLY a single, valid JSON object with keys "plan_title", "introduction", and "levels" (a list of objects, each with "name", "topic", and "num_lessons").
-Example level object: {{"name": "Level 1: Title", "topic": "Brief topic description", "num_lessons": {num_lessons_per_level}}}
-"""
-
+    **TASK:** Create a structured Bible study curriculum.
+    
+    **REQUIREMENTS:**
+    1. **Plan Title:** Must be engaging and theologically grounded (e.g., "The Alpha & Omega: A Journey Through Revelation").
+    2. **Introduction:** A pastoral welcome explaining *why* this study matters for their specific goal.
+    3. **Levels:** {structure_instruction}
+    4. **Lessons:** You MUST prescribe exactly {num_lessons_per_level} lessons for every level.
+    
+    **OUTPUT:**
+    Output ONLY a single, valid JSON object with keys "plan_title", "introduction", and "levels" (a list of objects, each with "name", "topic", and "num_lessons").
+    Example level object: {{"name": "Level 1: The Vision", "topic": "Christ among the Lampstands (Rev 1-3)", "num_lessons": {num_lessons_per_level}}}
+    """
+    
 # ================================================================
 # <<< NEW FUNCTION >>>
 # create_remediation_question_prompt
@@ -1148,99 +1171,109 @@ Respond ONLY with a single, valid JSON object with these keys:
 # create_lesson_prompt
 # ================================================================
 def create_lesson_prompt(level_topic: str, lesson_number: int, total_lessons_in_level: int, form_data: dict, previous_lesson_summary: str = None, previous_struggles: str = None) -> str:
-    """Generates a robust, theologically sound prompt for a single lesson."""
+    """
+    The Ultimate Merge:
+    - Retains original code's structural integrity (Roles, Placeholders).
+    - Infuses new 'Biblical Density' and 'Narrative Exposition' logic.
+    - Uses strict Knowledge Check constraints.
+    """
     
     # --- Context Clauses ---
     context_clause_lesson = f" This lesson must logically follow the previous one, which covered: '{previous_lesson_summary}'." if previous_lesson_summary else ""
-    # <<< NEW >>> Add struggle context
-    context_clause_struggle = (
-        f" **Adaptive Learning Note:** This user has previously struggled with these topics: [{previous_struggles}]. "
-        "If relevant to this lesson, you **MUST** add a 'Review' section at the beginning to briefly re-explain one of those concepts before teaching new material."
-    ) if previous_struggles else ""
-
+    
     knowledge_level = form_data['knowledge_level']
     learning_style = form_data['learning_style']
     time_commitment = form_data['time_commitment']
 
-    # --- Define Level Instructions ---
+    # --- 1. Knowledge Level Logic (KEPT FROM ORIGINAL - BETTER SCALING) ---
     level_instructions = ""
     if knowledge_level == "Just starting out":
-        level_instructions = "Focus on the core narrative and clear application. Define ALL theological terms (e.g., 'grace', 'justification', 'redemption'). Assume no prior knowledge."
+        level_instructions = "Focus on the core narrative. **You MUST define ALL theological terms** (e.g., 'Sanctification', 'Atonement') simply within the flow of the story. Assume no prior Bible knowledge."
     elif knowledge_level == "I know the main stories":
-        level_instructions = "Connect the text to broader biblical themes (e.g., covenant, kingdom). Introduce and define one or two key theological concepts per lesson."
+        level_instructions = "Connect this specific text to the broader Redemptive History (Creation -> Fall -> Redemption). Introduce 1-2 deeper theological concepts."
     else: # "I'm comfortable with deeper concepts"
-        level_instructions = "Include historical context, connections to original languages (e.g., 'the Greek word for love here is *agape*...'), and deeper doctrinal synthesis. Do not shy away from complex ideas."
+        level_instructions = "Include historical cultural context (Sitz im Leben), connections to original languages (Greek/Hebrew word studies), and cite systematic theology categories."
 
-    # --- Enhanced Style Instructions ---
+    # --- 2. Style Logic (UPDATED FOR NARRATIVE EXPOSITION) ---
     style_instructions = ""
-    if learning_style == "analytical":
-        style_instructions = "Your teaching method is **Analytical**. Focus on theological terms, logical structure, and doctrinal categories. Use bullet points. Ask 'WHAT' does this text teach us about God, sin, and salvation?"
-    elif learning_style == "storytelling":
-        style_instructions = "Your teaching method is **Narrative Illustration**. Focus on the *theological principles* within the story. Use narrative examples (from the text or modern life) to *illustrate* these principles. Ask 'WHY' is this story in the Bible and what truth does it reveal?"
+    if learning_style == "storytelling":
+        style_instructions = (
+            "**Method: Narrative Exposition.** Do not just tell the story; explain the theology *through* the imagery. "
+            "Use sensory details (sight, sound) to immerse the user, then pause to explain the spiritual significance of what they are seeing. "
+            "Connect the story visuals to OT prophecies and NT fulfillment."
+        )
+    elif learning_style == "analytical":
+        style_instructions = "Method: Analytical. Focus on the logic of the argument. Use bullet points for doctrine. Prove every point with a cross-reference."
     elif learning_style == "practical":
-        style_instructions = "Your teaching method is **Practical Application**. State the biblical principle clearly and briefly. Then, spend *most* of the section on 'How to use this' and 'What this looks like today' with concrete, actionable steps."
-    elif learning_style == "reflective":
-        style_instructions = "Your teaching method is **Introspective**. Focus on internal transformation. Ask probing, *italicized, bolded questions* directly within the text to make the user connect the doctrine to their own heart and motivations."
+        style_instructions = "Method: Application. Briefly state the truth, then spend 70% of the content on 'How to live this out today' in a modern context."
+    else:
+        style_instructions = "Method: Reflective. Focus on the heart. Ask internal questions that force the user to examine their own motivations in light of the text."
 
-    # --- Define the *exact* section structure ---
-    # <<< NEW >>> Added {{REVIEW_SECTION_IF_NEEDED}} placeholder
+    # --- 3. Section Structure (MERGED: Your Placeholders + My Depth) ---
+    # We use your {{REVIEW}} placeholder, but we make the section descriptions deeper.
+    
     section_structure_instructions = ""
-    if time_commitment == "15 minutes":
+    if time_commitment == "45 minutes":
+        # This is the "Deep Dive" structure
         section_structure_instructions = """
         {{REVIEW_SECTION_IF_NEEDED}}
-        - A 'text' section with the role 'Introduction'.
-        - A 'text' section with the role 'Core Teaching & Application'.
-        - A 'knowledge_check' section testing the 'Core Teaching'.
+        - A 'text' section with role 'Introduction' (Hook the reader with a scene or questions).
+        - A 'text' section with role 'Narrative Exposition' (Retell the text vividly, embedding verse refs [Rev 1:9]).
+        - A 'text' section with role 'Historical Context' (Explain the background/author/setting).
+        - A 'text' section with role 'Theological Breakdown' (Define key terms and explain the doctrine).
+        - A 'knowledge_check' section testing the 'Theological Breakdown'.
+        - A 'text' section with role 'Biblical Connections' (Connect this text to OT shadows and Gospel fulfillment).
+        - A 'knowledge_check' section testing the 'Biblical Connections'.
+        - A 'text' section with role 'Application' (Concrete steps to live this truth).
+        - A 'text' section with role 'Guided Reflection' (A closing prayer prompt).
         """
     elif time_commitment == "30 minutes":
         section_structure_instructions = """
         {{REVIEW_SECTION_IF_NEEDED}}
-        - A 'text' section with the role 'Introduction' (State the main topic and passage).
-        - A 'text' section with the role 'Exposition' (Teach the theological principles *from* the passage).
+        - A 'text' section with role 'Introduction' (State main topic and passage).
+        - A 'text' section with role 'Exposition' (Teach the principles from the passage).
         - A 'knowledge_check' section testing the 'Exposition'.
-        - A 'text' section with the role 'Application' (Provide a 'So what?' for daily life).
+        - A 'text' section with role 'Theological Connection' (Connect to Jesus/Gospel).
+        - A 'text' section with role 'Application' (So what? Daily life takeaway).
         - A 'knowledge_check' section testing the 'Application'.
         """
-    else: # 45 minutes
+    else: # 15 minutes
         section_structure_instructions = """
         {{REVIEW_SECTION_IF_NEEDED}}
-        - A 'text' section with the role 'Introduction' (A compelling hook and the main theological question).
-        - A 'text' section with the role 'Exposition' (A deep dive into the *theological principles* of the passage).
-        - A 'knowledge_check' section testing the 'Exposition'.
-        - A 'text' section with the role 'Theological Connection' (Connect these principles to another part of the Bible or a core doctrine).
-        - A 'knowledge_check' section testing the 'Theological Connection'.
-        - A 'text' section with the role 'Practical Application' (A clear, actionable takeaway for daily life).
-        - A 'text' section with the role 'Guided Reflection' (A closing prayer prompt or reflective questions).
+        - A 'text' section with role 'Introduction'.
+        - A 'text' section with role 'Core Teaching' (Brief, impactful truth).
+        - A 'knowledge_check' section testing the 'Core Teaching'.
+        - A 'text' section with role 'Prayer'.
         """
     
-    # <<< NEW >>> Dynamically insert the review block based on struggles
+    # --- 4. The Placeholder Logic (KEPT FROM ORIGINAL - SAFER) ---
     review_block = ""
     if previous_struggles:
-        review_block = f"- A 'text' section with the role 'Review'. (Content: Briefly re-explain a concept from: {previous_struggles}, as a warm-up.)"
+        review_block = f"- A 'text' section with role 'Review' (Briefly re-explain the concept of [{previous_struggles}] using a fresh analogy)."
     
-    # Replace the placeholder with the dynamic block
+    # Inject the review block into the list
     section_structure_instructions = section_structure_instructions.replace("{{REVIEW_SECTION_IF_NEEDED}}", review_block)
 
 
     return f"""
 You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_level} on the topic of "{level_topic}".
 {context_clause_lesson}
-{context_clause_struggle}
 
 **User Profile:**
 - Knowledge Level: {knowledge_level}
 - Learning Style: {learning_style}
 
 **CRITICAL INSTRUCTIONS:**
-1.  **Core Teaching Philosophy:** Your goal is to *teach theology* (what is true about God) and *doctrine* (what we believe) that is *derived from* the biblical text. **DO NOT simply paraphrase or summarize the plot of the Bible passage.** Extract the *principles* from the story and teach those principles.
-2.  **Lesson Title:** Create a **unique and specific** `lesson_title` for this lesson. **DO NOT** just repeat the overall level topic ("{level_topic}").
-3.  **JSON Structure:** You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
-4.  **Lesson Content:** The "lesson_content_sections" MUST be a list of objects. You will generate *exactly* these sections in this order:
+1. **Biblical Density:** Your goal is to teach theology derived from the text. Never make a claim without a verse citation.
+2. **Christ-Centered:** Show how this text points to Jesus.
+3. **JSON Structure:** You must generate a JSON object with keys "lesson_title", "lesson_content_sections", and "summary_points".
+4. **Lesson Content:** The "lesson_content_sections" MUST be a list of objects. You will generate *exactly* these sections in this order:
 {section_structure_instructions}
-5.  **Style is Primary:** The *most important* instruction is to follow the user's `learning_style`. Apply this method to all 'text' sections: {style_instructions}
-6.  **Theological Depth:** All 'text' sections MUST be theologically sound, biblically dense (citing specific passages like John 3:16), and tailored to the user's `knowledge_level`: {level_instructions}
 
-7.  **CRITICAL KEY REQUIREMENT FOR 'knowledge_check':**
+5. **Style Application:** Apply this method to all 'text' sections: {style_instructions}
+6. **Level Application:** Tailor complexity to the user: {level_instructions}
+
+**CRITICAL KEY REQUIREMENT FOR 'knowledge_check':**
     - Every 'knowledge_check' object MUST include *all* of these keys:
     - `type`: "knowledge_check"
     - `question`: "The question text..."
@@ -1256,7 +1289,6 @@ You are a master theologian creating Lesson {lesson_number}/{total_lessons_in_le
 
 Output ONLY the valid JSON object.
 """
-
 def create_level_quiz_prompt(level_topic: str, lesson_summaries: list, level_name: str) -> str:
     """Generates prompt for creating the end-of-level quiz."""
     summaries_text = "\n".join(f"- {s}" for i, s in enumerate(lesson_summaries) if s) # Filter empty summaries
@@ -1346,51 +1378,87 @@ def display_knowledge_check_question(S):
 
     # --- STATE 2: User is in the remediation loop (Breakdown + New Question) ---
     if S.get("awaiting_remediation") == True: # State is True (not False, not "completed")
-        st.error(f"Not quite. The correct answer to the first question was: **{q_original.get('correct_answer')}**")
         
         # --- Display Theological Breakdown ---
         if "breakdown_content" not in S: # Generate breakdown only once
             reference = q_original.get('biblical_reference', '')
-            breakdown_data = {"explanation": "Loading...", "verse_text": "", "reference": reference}
+            # Initialize with default structure
+            breakdown_data = {"parsed_content": None, "verse_text": "", "reference": reference}
+            
             if reference:
                 try:
                     with st.spinner("Loading Theological Breakdown..."):
                         verse_text = fetch_bible_verse(reference)
                         incorrect_ans = S.get("last_incorrect_answer", "their answer")
                         
-                        # <<< ENHANCED PROMPT >>>
+                        # <<< UPDATED STRICT JSON PROMPT >>>
                         explanation_prompt = (
-                            f"You are a pastoral Bible teacher providing a 'Theological Breakdown'. A student was asked: '{q_original.get('question')}' "
-                            f"They incorrectly answered: '{incorrect_ans}'. The correct answer is: '{q_original.get('correct_answer')}'. "
-                            f"The relevant Bible verse is '{reference}', which says: '{verse_text}'. "
-                            f"Your task is to provide a clear, structured breakdown. Respond using these exact bolded headers:\n\n"
-                            f"**1. Theological Principle:** (Briefly explain the *theological principle* taught in '{reference}'.)\n\n"
-                            f"**2. Misunderstanding Analysis:** (Gently explain the *specific error* in thinking that led to the answer '{incorrect_ans}'.)\n\n"
-                            f"**3. Truth Reinforced:** (Clearly explain why '{q_original.get('correct_answer')}' is the correct answer, tying it back to the verse's principle.)"
+                            f"You are a compassionate but biblically accurate Tutor. A student (Level: {S['form_data']['knowledge_level']}) answered incorrectly.\n"
+                            f"**Context:**\n"
+                            f"- Question: '{q_original.get('question')}'\n"
+                            f"- Student's Wrong Answer: '{incorrect_ans}'\n"
+                            f"- Correct Answer: '{q_original.get('correct_answer')}'\n"
+                            f"- Scripture Reference: {reference} ({verse_text})\n\n"
+                            
+                            f"**TASK:** Provide a 3-part corrective explanation tailored to a '{S['form_data']['knowledge_level']}' learner.\n"
+                            f"1. **Analyze the Error:** Gently explain *why* this specific wrong answer is a common misconception (validate logic, then correct).\n"
+                            f"2. **Scriptural Proof:** Explain why the correct answer is right, citing the specific words in {reference}.\n"
+                            f"3. **Theological Anchor:** Connect this specific fact to a broader doctrine (e.g., God's Sovereignty, Redemption).\n\n"
+                            
+                            f"**OUTPUT:** Respond ONLY with a valid JSON object containing exactly these 3 keys:\n"
+                            f"- \"misconception_analysis\"\n"
+                            f"- \"scriptural_correction\"\n"
+                            f"- \"theological_anchor\""
                         )
-                        explanation = ask_gpt_conversation(explanation_prompt)
-                        breakdown_data["explanation"] = explanation
+                        
+                        # Use JSON helper
+                        explanation_json = ask_gpt_json(explanation_prompt, max_tokens=1000)
+                        breakdown_parsed = _learn_extract_json_any(explanation_json)
+                        
+                        if breakdown_parsed:
+                            breakdown_data["parsed_content"] = breakdown_parsed
+                        else:
+                            breakdown_data["parsed_content"] = {
+                                "misconception_analysis": "Analysis unavailable.",
+                                "scriptural_correction": f"The correct answer is {q_original.get('correct_answer')}.",
+                                "theological_anchor": "Review the verse carefully."
+                            }
+                        
                         breakdown_data["verse_text"] = verse_text
                 except Exception as e:
-                    breakdown_data["explanation"] = f"Could not load full breakdown: {e}"
+                     breakdown_data["parsed_content"] = {
+                                "misconception_analysis": f"Error loading analysis: {e}",
+                                "scriptural_correction": "",
+                                "theological_anchor": ""
+                            }
             else:
                 # Fallback if no verse is provided
-                explanation = (
-                    f"**1. Theological Principle:** The question addresses the core concept of '{q_original.get('correct_answer')}'."
-                    f"**2. Misunderstanding Analysis:** Your answer '{S.get('last_incorrect_answer', 'their answer')}' was likely incorrect because [AI to infer reasoning]."
-                    f"**3. Truth Reinforced:** The answer is '{q_original.get('correct_answer')}' because [AI to infer reasoning]."
-                )
-                breakdown_data["explanation"] = explanation
+                breakdown_data["parsed_content"] = {
+                    "misconception_analysis": "Review the question carefully.",
+                    "scriptural_correction": f"The correct answer is {q_original.get('correct_answer')}.",
+                    "theological_anchor": "Check the lesson content."
+                }
             
             S["breakdown_content"] = breakdown_data # Save to state
         
-        # Display the breakdown
+        # --- RENDER THE UI (Using the Parsed JSON) ---
         breakdown = S["breakdown_content"]
-        with st.expander(f"📖 Theological Breakdown: {breakdown.get('reference')}", expanded=True):
+        data = breakdown.get("parsed_content", {})
+        
+        st.warning(f"❌ Not quite. The correct answer was **{q_original.get('correct_answer')}**.")
+        
+        # 1. Misconception Expander
+        with st.expander("🧐 Why was my answer wrong?", expanded=True):
+            st.write(data.get('misconception_analysis', 'Loading analysis...'))
+            
+        # 2. Scripture Expander
+        with st.expander("📖 What does the Bible say?", expanded=True):
             if breakdown.get("verse_text"):
-                st.markdown(f"**Verse Text ({breakdown.get('reference')}):**\n\n> *{breakdown.get('verse_text')}*")
-                st.markdown("---")
-            st.markdown(f"{breakdown.get('explanation')}") # Explanation now has its own markdown formatting
+                st.info(f"**{breakdown.get('reference')}:** {breakdown.get('verse_text')}")
+            st.write(data.get('scriptural_correction', 'Loading correction...'))
+
+        # 3. Theological Anchor (Highlighted)
+        st.markdown(f"**⚓ Theological Anchor:** {data.get('theological_anchor', 'Loading...')}")
 
         # --- Display Remediation Question ---
         st.markdown("---")
@@ -1400,6 +1468,7 @@ def display_knowledge_check_question(S):
         if not S.get("remediation_question"):
             with st.spinner("Preparing a new question..."):
                 try:
+                    # using existing prompt helper
                     remediation_prompt = create_remediation_question_prompt(q_original, S.get("last_incorrect_answer", ""))
                     q_resp = ask_gpt_json(remediation_prompt, 1000)
                     q_data = _learn_extract_json_any(q_resp)
@@ -1407,14 +1476,14 @@ def display_knowledge_check_question(S):
                         raise Exception("Failed to generate valid remediation question JSON.")
                     S["remediation_question"] = q_data
                     st.rerun() # Rerun to display the new question
-                    return # <<< BUG FIX >>> Add return to stop script
+                    return 
                 except Exception as e:
                     st.error(f"Error generating remediation question: {e}. Moving on.")
                     # Abort remediation and show 'Continue'
-                    S["awaiting_remediation"] = "completed" # Use "completed" to skip to continue button
+                    S["awaiting_remediation"] = "completed" 
                     if "breakdown_content" in S: del S["breakdown_content"]
                     st.rerun()
-                    return # <<< BUG FIX >>> Add return to stop script
+                    return 
             
         # 2b. Display and process the remediation question
         q_remediation = S.get("remediation_question")
@@ -1576,7 +1645,7 @@ def run_level_quiz(S):
                 S["current_question_index"] = 0
                 S["user_score"] = 0
                 st.rerun()
-
+                
 # ================================================================
 # DIAGNOSTIC QUIZ FUNCTION
 # ================================================================
